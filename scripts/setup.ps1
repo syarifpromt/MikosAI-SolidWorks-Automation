@@ -51,6 +51,31 @@ $AddinDll  = Join-Path $RepoRoot 'src\MikosAI.Addin\bin\Release\net48\MikosAI.Ad
 $AddinTlb  = [System.IO.Path]::ChangeExtension($AddinDll, '.tlb')
 $RegAsm    = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe'
 
+# Berhenti dengan pesan rapi. `throw` menampilkan jejak exception PowerShell
+# yang membingungkan pengguna, dan setup ini harus terasa simpel.
+function Stop-Setup {
+    param([string] $Pesan, [string] $Petunjuk = '')
+
+    Write-Host ''
+    Write-Host 'SETUP BERHENTI' -ForegroundColor Red
+    Write-Host '--------------'
+    foreach ($baris in ($Pesan -split "`n")) {
+        Write-Host "  $($baris.TrimEnd())" -ForegroundColor Red
+    }
+
+    if ($Petunjuk) {
+        Write-Host ''
+        foreach ($baris in ($Petunjuk -split "`n")) {
+            Write-Host "  $($baris.TrimEnd())"
+        }
+    }
+
+    Write-Host ''
+    Write-Host '  Untuk diagnosis lengkap:  powershell -File scripts\doctor.ps1'
+    Write-Host ''
+    exit 1
+}
+
 $langkah = 0
 function Write-Langkah($teks) {
     $script:langkah++
@@ -112,7 +137,8 @@ if ($blockers.Count -gt 0) {
         Write-Host "  $($item.Saran)"
     }
     Write-Host ''
-    Write-Host 'Perbaiki lalu jalankan ulang. Detail: scripts\doctor.ps1'
+    Write-Host 'Perbaiki lalu jalankan ulang setup.ps1.'
+    Write-Host ''
     exit 1
 }
 
@@ -131,7 +157,8 @@ Write-Langkah 'Build MikosAI.Core dan jalankan test'
 
 & dotnet build $Solution -c Release --nologo -v q
 if ($LASTEXITCODE -ne 0) {
-    throw "Build MikosAI.Core gagal. Ini tidak butuh SolidWorks, jadi kegagalan di sini berarti masalah toolchain."
+    Stop-Setup 'Build MikosAI.Core gagal.' `
+        "Ini tidak butuh SolidWorks sama sekali, jadi kegagalan di sini berarti masalah toolchain.`nPeriksa error compiler di atas."
 }
 Write-Host '  Build OK.' -ForegroundColor Green
 
@@ -141,7 +168,8 @@ if ($SkipTests) {
 else {
     & dotnet test $Solution -c Release --nologo -v q --no-build
     if ($LASTEXITCODE -ne 0) {
-        throw 'Ada test yang gagal. Jangan lanjut sebelum semuanya hijau.'
+        Stop-Setup 'Ada test yang gagal.' `
+            "Jangan lanjut sebelum semuanya hijau. Laporkan nama test yang merah."
     }
     Write-Host '  Semua test hijau.' -ForegroundColor Green
 }
@@ -153,11 +181,8 @@ Write-Langkah 'Verifikasi kode add-in (tanpa SolidWorks)'
 
 & dotnet build $AddinProj -c Release -p:UsePiaStub=true --nologo -v q
 if ($LASTEXITCODE -ne 0) {
-    throw @'
-Kode add-in tidak kompilabel bahkan dengan stub.
-
-Ini murni masalah kode, bukan lingkungan. Laporkan error compiler di atas.
-'@
+    Stop-Setup 'Kode add-in tidak kompilabel bahkan dengan stub.' `
+        "Ini murni masalah kode, bukan lingkungan mesinmu.`nLaporkan error compiler di atas - itu cepat diperbaiki."
 }
 Write-Host '  Kode add-in benar secara tipe.' -ForegroundColor Green
 
@@ -185,19 +210,15 @@ Write-Host "  PIA: $apiDir"
 
 & dotnet build $AddinProj -c Release -p:SolidWorksApiDir="$apiDir" --nologo -v q
 if ($LASTEXITCODE -ne 0) {
-    throw @"
-Build add-in gagal padahal CompileCheck lulus.
-
-Artinya masalahnya di referensi PIA, bukan di kode kita. Periksa:
-  - Apakah $apiDir benar-benar folder api\redist instalasi SolidWorks?
-  - Apakah SolidWorks.Interop.swpublished.dll ada di situ?
-
-Jalankan scripts\doctor.ps1 untuk detailnya.
-"@
+    Stop-Setup 'Build add-in gagal padahal compile-check lulus.' `
+        ("Artinya masalahnya di referensi PIA, BUKAN di kode kita. Periksa:`n" +
+         "  - Apakah folder ini benar-benar api\redist instalasi SolidWorks?`n" +
+         "      $apiDir`n" +
+         "  - Apakah SolidWorks.Interop.swpublished.dll ada di situ?")
 }
 
 if (-not (Test-Path -LiteralPath $AddinDll)) {
-    throw "Build melaporkan sukses tapi $AddinDll tidak ada."
+    Stop-Setup 'Build melaporkan sukses tapi assembly tidak ada.' "Diharapkan di: $AddinDll"
 }
 Write-Host '  Build OK.' -ForegroundColor Green
 
@@ -211,7 +232,8 @@ else {
     Write-Langkah 'Registrasi add-in'
 
     if (-not (Test-Path -LiteralPath $RegAsm)) {
-        throw "RegAsm tidak ditemukan: $RegAsm"
+        Stop-Setup 'RegAsm tidak ditemukan.' `
+            ("Diharapkan di: $RegAsm`nPastikan .NET Framework 4.x terpasang.")
     }
 
     $admin = Test-IsAdministrator
@@ -234,12 +256,11 @@ else {
             -Verb RunAs -Wait -PassThru -ErrorAction Stop
 
         if ($proses.ExitCode -ne 0) {
-            throw @'
-Registrasi gagal di proses terelevasi.
-
-Coba manual: buka PowerShell sebagai administrator, lalu jalankan
-  powershell -File scripts\addin.ps1 -Action Register -RegistrationScope Machine
-'@
+            Stop-Setup 'Registrasi gagal di proses terelevasi.' `
+                ("Kalau prompt UAC kamu tolak, jalankan ulang setup.ps1.`n`n" +
+                 "Kalau UAC disetujui tapi tetap gagal, coba manual:`n" +
+                 "  buka PowerShell sebagai administrator, lalu jalankan`n" +
+                 "  powershell -File scripts\addin.ps1 -Action Register -RegistrationScope Machine")
         }
 
         Write-Host '  Terdaftar.' -ForegroundColor Green
