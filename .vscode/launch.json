@@ -1,0 +1,63 @@
+{
+  // Debugging add-in net48 di VS Code punya batasan nyata - risiko R12 di
+  // docs/ROADMAP.md. Ringkasnya:
+  //
+  //   - C# Dev Kit TIDAK mendukung .NET Framework.
+  //   - Ekstensi C# dasar punya type "clr" dengan attach ke proses, tapi
+  //     dukungannya belum terkonfirmasi di versi terkini.
+  //   - Debugger ReSharper untuk VS Code mendukung attach .NET Framework,
+  //     tapi TIDAK bisa aktif bareng C# Dev Kit (satu debug engine per bahasa).
+  //
+  // Karena itu jalur utama kita adalah DIAGNOSTIK, bukan step-debugging:
+  //
+  //   1. host-status.json - task "addin: probe"
+  //   2. Trace JSONL di %LOCALAPPDATA%\MikosAI\trace\
+  //   3. 138 test di MikosAI.Core yang jalan dalam ~1 detik tanpa SolidWorks
+  //
+  // Itu bukan tambalan karena tidak punya VS. Debugging add-in CAD menyakitkan
+  // apa pun editornya, karena SolidWorks mengunci DLL dan setiap iterasi butuh
+  // restart SolidWorks.
+  //
+  // Pintu darurat: sisipkan System.Diagnostics.Debugger.Launch() di kode
+  // add-in. Itu memunculkan dialog JIT debugger yang bisa menarik debugger apa
+  // pun yang terdaftar di sistem.
+
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Attach ke SLDWORKS.exe (net48)",
+      "type": "clr",
+      "request": "attach",
+      "processName": "SLDWORKS.exe",
+      "presentation": {
+        "order": 1,
+        "group": "addin"
+      }
+    },
+    {
+      "name": "Attach ke proses (pilih manual)",
+      "type": "clr",
+      "request": "attach",
+      "processId": "${command:pickProcess}",
+      "presentation": {
+        "order": 2,
+        "group": "addin"
+      }
+    },
+    {
+      "name": "Debug test MikosAI.Core",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "dotnet",
+      "args": ["test", "${workspaceFolder}/MikosAI.sln", "--nologo"],
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+      "stopAtEntry": false,
+      "presentation": {
+        "order": 3,
+        "group": "core"
+      }
+    }
+  ]
+}

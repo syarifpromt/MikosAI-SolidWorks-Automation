@@ -1,0 +1,84 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SENGAJA TIDAK ADA DI MikosAI.sln.
+
+    Proyek ini butuh PIA SolidWorks dari instalasi lokal, jadi kalau ikut di
+    solution, `dotnet build` dan `dotnet test` akan gagal di mesin tanpa
+    SolidWorks. Bangun lewat scripts/addin.ps1, bukan lewat solution.
+
+    PIA TIDAK di-vendor ke repo - redistribusinya dibatasi lisensi Dassault.
+    Path-nya harus diberikan eksplisit supaya tidak salah merujuk versi
+    SolidWorks yang berbeda:
+
+      powershell -File scripts\addin.ps1 -Action Build `
+        -SolidWorksApiDir 'C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist'
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+
+    <!-- Add-in SolidWorks dimuat in-process ke proses 64-bit. -->
+    <PlatformTarget>x64</PlatformTarget>
+
+    <AssemblyName>MikosAI.Addin</AssemblyName>
+    <RootNamespace>MikosAI.Addin</RootNamespace>
+
+    <!-- Assembly tidak ComVisible secara global; hanya kelas add-in yang ditandai. -->
+    <ComVisible>false</ComVisible>
+    <EnableDefaultItems>true</EnableDefaultItems>
+
+    <!-- Hanya untuk kestabilan identitas assembly, BUKAN code signing Authenticode. -->
+    <SignAssembly Condition="Exists('$(MSBuildThisFileDirectory)MikosAI.Addin.snk')">true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)MikosAI.Addin.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MikosAI.Core\MikosAI.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+
+  <!--
+    PIA dari instalasi lokal. Private=false berarti TIDAK dikopi ke output -
+    PIA harus datang dari instalasi SolidWorks pengguna, bukan dari kita.
+  -->
+  <ItemGroup Condition="'$(SolidWorksApiDir)' != ''">
+    <Reference Include="SolidWorks.Interop.sldworks">
+      <HintPath>$(SolidWorksApiDir)\SolidWorks.Interop.sldworks.dll</HintPath>
+      <Private>false</Private>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="SolidWorks.Interop.swconst">
+      <HintPath>$(SolidWorksApiDir)\SolidWorks.Interop.swconst.dll</HintPath>
+      <Private>false</Private>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+    </Reference>
+    <Reference Include="SolidWorks.Interop.swpublished">
+      <HintPath>$(SolidWorksApiDir)\SolidWorks.Interop.swpublished.dll</HintPath>
+      <Private>false</Private>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+    </Reference>
+  </ItemGroup>
+
+  <!--
+    Gagal dengan pesan yang bisa ditindaklanjuti, bukan dengan puluhan error
+    "type not found" yang menyesatkan.
+  -->
+  <Target Name="CekPiaSolidWorks" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(SolidWorksApiDir)' == ''"
+           Text="SolidWorksApiDir belum diberikan. Bangun lewat: powershell -File scripts\addin.ps1 -Action Build -SolidWorksApiDir '&lt;path ke api\redist&gt;'" />
+    <Error Condition="'$(SolidWorksApiDir)' != '' And !Exists('$(SolidWorksApiDir)\SolidWorks.Interop.sldworks.dll')"
+           Text="SolidWorks.Interop.sldworks.dll tidak ada di '$(SolidWorksApiDir)'. Periksa path api\redist pada instalasi SolidWorks." />
+  </Target>
+
+</Project>

@@ -1,0 +1,81 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "detail": "Build MikosAI.Core + test. Tidak butuh SolidWorks.",
+      "command": "dotnet",
+      "type": "process",
+      "args": ["build", "${workspaceFolder}/MikosAI.sln", "--nologo"],
+      "problemMatcher": "$msCompile",
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "test",
+      "detail": "Jalankan seluruh test. Tidak butuh SolidWorks.",
+      "command": "dotnet",
+      "type": "process",
+      "args": ["test", "${workspaceFolder}/MikosAI.sln", "--nologo"],
+      "problemMatcher": "$msCompile",
+      "group": { "kind": "test", "isDefault": true }
+    },
+    {
+      "label": "test (watch)",
+      "detail": "Jalankan ulang test setiap kali berkas berubah.",
+      "command": "dotnet",
+      "type": "process",
+      "args": ["watch", "test", "--project", "${workspaceFolder}/tests/MikosAI.Core.Tests/MikosAI.Core.Tests.csproj"],
+      "problemMatcher": "$msCompile",
+      "isBackground": true
+    },
+
+    {
+      "label": "addin: buat kunci strong name",
+      "detail": "Sekali per mesin. Tidak butuh sn.exe.",
+      "command": "powershell",
+      "type": "process",
+      "args": [
+        "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}/scripts/New-StrongNameKey.ps1",
+        "-Path", "${workspaceFolder}/src/MikosAI.Addin/MikosAI.Addin.snk"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "addin: build",
+      "detail": "BUTUH SolidWorks terpasang. Path PIA dideteksi atau diminta.",
+      "command": "powershell",
+      "type": "process",
+      "args": [
+        "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}/scripts/addin.ps1",
+        "-Action", "Build"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "addin: status",
+      "detail": "Apa yang terdaftar di registry dan artefak apa yang ada.",
+      "command": "powershell",
+      "type": "process",
+      "args": [
+        "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}/scripts/addin.ps1",
+        "-Action", "Status"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "addin: probe",
+      "detail": "Baca host-status.json dan tegakkan gerbang penerimaan Fase 0.",
+      "command": "powershell",
+      "type": "process",
+      "args": [
+        "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}/scripts/addin.ps1",
+        "-Action", "Probe"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
