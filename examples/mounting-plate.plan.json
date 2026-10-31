@@ -1,0 +1,160 @@
+{
+  "schemaVersion": "1.0",
+  "title": "Mounting plate 100x80x10, 4 lubang M6 counterbore",
+  "intent": "Buat mounting plate 100x80x10 mm dengan 4 lubang M6 counterbore di pojok, jarak 15 mm dari tiap tepi.",
+
+  "units": { "length": "mm", "angle": "deg" },
+
+  "parameters": {
+    "plateWidth":   { "value": 100, "unit": "mm", "source": "user_stated", "description": "Panjang pelat, arah X" },
+    "plateDepth":   { "value": 80,  "unit": "mm", "source": "user_stated", "description": "Lebar pelat, arah Y" },
+    "plateThick":   { "value": 10,  "unit": "mm", "source": "user_stated", "description": "Ketebalan pelat" },
+    "holeInset":    { "value": 15,  "unit": "mm", "source": "user_stated", "description": "Jarak pusat lubang dari tepi" },
+    "cornerRadius": { "value": 5,   "unit": "mm", "source": "assumed",     "description": "Fillet pojok. Tidak disebut pengguna." }
+  },
+
+  "document": { "type": "part", "template": null, "savePath": null },
+
+  "steps": [
+    {
+      "id": "s1",
+      "tool": "create_sketch",
+      "label": "Buat sketsa profil pelat",
+      "arguments": {
+        "plane": { "kind": "plane", "by": "name", "name": "Top Plane" },
+        "name": "SketchPlateProfile"
+      }
+    },
+    {
+      "id": "s2",
+      "tool": "add_rectangle",
+      "label": "Gambar profil 100 x 80",
+      "dependsOn": ["s1"],
+      "arguments": {
+        "mode": "center",
+        "center": { "x": 0, "y": 0 },
+        "width": "$plateWidth",
+        "height": "$plateDepth",
+        "addDimensions": true
+      }
+    },
+    {
+      "id": "s3",
+      "tool": "close_sketch",
+      "dependsOn": ["s2"],
+      "arguments": { "sketchName": "SketchPlateProfile" },
+      "expect": { "sketchFullyDefined": true }
+    },
+    {
+      "id": "s4",
+      "tool": "extrude_boss",
+      "label": "Extrude ketebalan 10 mm",
+      "dependsOn": ["s3"],
+      "arguments": {
+        "sketch": { "kind": "sketch", "by": "name", "name": "SketchPlateProfile" },
+        "endCondition": { "type": "blind", "depth": "$plateThick" },
+        "direction": "normal",
+        "merge": true
+      },
+      "expect": { "featureName": "Boss-Extrude1", "volumeIncreases": true }
+    },
+    {
+      "id": "s5",
+      "tool": "hole_wizard",
+      "label": "4 lubang M6 counterbore",
+      "dependsOn": ["s4"],
+      "arguments": {
+        "face": {
+          "kind": "face",
+          "by": "normal_and_point",
+          "normal": { "x": 0, "y": 0, "z": 1 },
+          "nearPoint": { "x": 0, "y": 0, "z": 10 },
+          "tolerance": 0.5
+        },
+        "holeType": "counterbore",
+        "standard": "ISO",
+        "fastenerSize": "M6",
+        "positions": [
+          { "x": -35, "y": -25 },
+          { "x":  35, "y": -25 },
+          { "x": -35, "y":  25 },
+          { "x":  35, "y":  25 }
+        ],
+        "endCondition": { "type": "through_all" }
+      },
+      "expect": { "featureName": "CBORE for M6 Hex Head Bolt1" }
+    },
+    {
+      "id": "s6",
+      "tool": "fillet",
+      "label": "Fillet 4 pojok R5",
+      "dependsOn": ["s5"],
+      "onFailure": "ask_user",
+      "arguments": {
+        "entities": [
+          { "kind": "edge", "by": "midpoint", "nearPoint": { "x": -50, "y": -40, "z": 5 } },
+          { "kind": "edge", "by": "midpoint", "nearPoint": { "x":  50, "y": -40, "z": 5 } },
+          { "kind": "edge", "by": "midpoint", "nearPoint": { "x": -50, "y":  40, "z": 5 } },
+          { "kind": "edge", "by": "midpoint", "nearPoint": { "x":  50, "y":  40, "z": 5 } }
+        ],
+        "radius": "$cornerRadius",
+        "propagateToTangent": true
+      }
+    }
+  ],
+
+  "acceptance": [
+    { "id": "a1", "check": "rebuild_clean", "required": true },
+    { "id": "a2", "check": "all_sketches_fully_defined", "required": true },
+    { "id": "a3", "check": "nonzero_volume", "required": true },
+    {
+      "id": "a4",
+      "check": "bounding_box_within",
+      "required": true,
+      "arguments": {
+        "expectedSize": { "x": 100, "y": 80, "z": 10 },
+        "toleranceMm": 0.01
+      }
+    },
+    {
+      "id": "a5",
+      "check": "dimension_equals",
+      "required": true,
+      "arguments": {
+        "dimensionName": "D1@Boss-Extrude1",
+        "expectedMm": 10,
+        "toleranceMm": 0.001
+      }
+    }
+  ],
+
+  "openQuestions": [
+    {
+      "question": "Fillet pojok R5 tidak diminta pengguna - apakah memang diinginkan, dan radius berapa?",
+      "affectsParameters": ["cornerRadius"],
+      "assumedValue": 5,
+      "blocking": false
+    },
+    {
+      "question": "Material pelat belum ditentukan. Massa tidak bisa dihitung tanpa ini.",
+      "affectsParameters": [],
+      "blocking": false
+    },
+    {
+      "question": "Counterbore M6 memakai standar ISO untuk hex head bolt. Kalau fastener-nya socket head, kedalaman counterbore berbeda - mana yang dipakai?",
+      "affectsParameters": [],
+      "blocking": false
+    }
+  ],
+
+  "risks": [
+    "Pemilihan tepi untuk fillet memakai midpoint, yang bisa salah target kalau urutan tepi berubah. Verifikasi filletedEdgeCount harus 4.",
+    "Nama fitur Hole Wizard ditentukan SolidWorks dan berbeda antarversi serta antarbahasa UI. Jangan jadikan expect.featureName sebagai check yang required.",
+    "Posisi lubang diturunkan dari holeInset=15 terhadap tepi, menghasilkan +/-35 dan +/-25. Kalau plateWidth atau plateDepth diubah lewat parameterOverrides, posisi lubang TIDAK ikut berubah karena v0.1 belum punya ekspresi aritmetika."
+  ],
+
+  "provenance": {
+    "generatedBy": "contoh manual untuk golden test Fase 3",
+    "editedByHuman": true
+  }
+}

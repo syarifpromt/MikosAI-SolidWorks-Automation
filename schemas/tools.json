@@ -1,0 +1,517 @@
+{
+  "schemaVersion": "1.0",
+  "description": "Katalog tool v0.1. Ini KONTRAK antara Jalur Platform dan Jalur CAD. Daftar tool MCP di-generate dari file ini, difilter oleh status di capabilities.yaml. Perubahan di sini adalah percakapan, bukan commit sepihak.",
+  "commonDefs": "common.schema.json",
+
+  "tools": [
+
+    {
+      "name": "get_active_document",
+      "capabilityId": "document_inspection",
+      "phase": 1,
+      "mutates": false,
+      "description": "Informasi dokumen yang sedang aktif. Panggil ini lebih dulu - semua tool lain mengasumsikan ada dokumen aktif.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "outputData": {
+        "hasDocument": "boolean",
+        "title": "string",
+        "path": "string|null",
+        "type": "part|assembly|drawing",
+        "isDirty": "boolean",
+        "activeConfiguration": "string",
+        "solidworksRevision": "string"
+      },
+      "notes": "hasDocument=false bukan error. Kembalikan ok=true dengan hasDocument=false supaya AI bisa memutuskan membuat dokumen baru."
+    },
+
+    {
+      "name": "list_features",
+      "capabilityId": "document_inspection",
+      "phase": 1,
+      "mutates": false,
+      "description": "Isi FeatureManager tree dokumen aktif, berurutan.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "includeSuppressed": { "type": "boolean", "default": true }
+        }
+      },
+      "outputData": {
+        "features": "array of {name, typeName, isSuppressed, hasError, parentSketch}",
+        "rebuildRequired": "boolean",
+        "errorCount": "integer"
+      },
+      "notes": "errorCount > 0 harus membuat verification verdict minimal WARN. Tree yang punya error bukan tree yang sehat."
+    },
+
+    {
+      "name": "get_bounding_box",
+      "capabilityId": "document_inspection",
+      "phase": 1,
+      "mutates": false,
+      "description": "Kotak pembatas benda padat, dalam mm.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "outputData": {
+        "min": "Vector3D (mm)",
+        "max": "Vector3D (mm)",
+        "size": "Vector3D (mm)",
+        "bodyCount": "integer"
+      },
+      "notes": "bodyCount=0 berarti belum ada solid. Itu fakta sah, bukan error."
+    },
+
+    {
+      "name": "get_mass_properties",
+      "capabilityId": "document_inspection",
+      "phase": 1,
+      "mutates": false,
+      "description": "Volume, massa, pusat massa. Dipakai verifikasi untuk membuktikan geometri benar-benar terbentuk.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "outputData": {
+        "volumeMm3": "number",
+        "massGrams": "number|null",
+        "surfaceAreaMm2": "number",
+        "centerOfMass": "Vector3D (mm)",
+        "densityAssigned": "boolean"
+      },
+      "notes": "massGrams null kalau material belum di-assign. JANGAN mengarang massa dari densitas default lalu menyajikannya sebagai fakta."
+    },
+
+    {
+      "name": "inspect_sketches",
+      "capabilityId": "document_inspection",
+      "phase": 1,
+      "mutates": false,
+      "description": "Status constraint setiap sketsa, dan apakah sketsa dikonsumsi fitur. Inilah tool verifikasi sketsa utama.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sketchName": {
+            "type": "string",
+            "description": "Kosongkan untuk semua sketsa."
+          }
+        }
+      },
+      "outputData": {
+        "sketches": "array of {name, constrainedStatus, entityCount, dimensionCount, consumedByFeature, hasOpenContour}"
+      },
+      "notes": "constrainedStatus dibaca lewat ISketch.GetConstrainedStatus. Status over-defined atau dangling harus menghasilkan FAIL, bukan WARN."
+    },
+
+    {
+      "name": "get_selection",
+      "capabilityId": "document_inspection",
+      "phase": 1,
+      "mutates": false,
+      "description": "Apa yang sedang dipilih pengguna di SolidWorks. Inilah yang membuat AI terasa berada DI DALAM SolidWorks - dia tahu apa yang sedang kamu klik.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "outputData": {
+        "count": "integer",
+        "items": "array of {typeName, entityRef, centroid, normal}"
+      },
+      "notes": "entityRef dikembalikan dalam bentuk EntityRef semantik yang bisa langsung dipakai tool lain - BUKAN Face1/Edge1."
+    },
+
+    {
+      "name": "create_sketch",
+      "capabilityId": "sketch_authoring",
+      "phase": 3,
+      "mutates": true,
+      "description": "Buka sketsa baru pada bidang atau permukaan. Harus ditutup dengan close_sketch.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["plane"],
+        "properties": {
+          "plane": { "$ref": "common.schema.json#/$defs/EntityRef" },
+          "name": {
+            "type": "string",
+            "description": "Nama yang diinginkan. Runner mengembalikan nama sebenarnya - SolidWorks bisa mengubahnya."
+          }
+        }
+      },
+      "outputData": {
+        "sketchName": "string (nama SEBENARNYA, bukan yang diminta)",
+        "isOpen": "boolean"
+      },
+      "notes": "Selalu pakai sketchName yang dikembalikan untuk step berikutnya. Jangan asumsikan nama yang diminta dipakai."
+    },
+
+    {
+      "name": "add_rectangle",
+      "capabilityId": "sketch_authoring",
+      "phase": 3,
+      "mutates": true,
+      "description": "Persegi panjang di sketsa yang terbuka.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["mode", "width", "height"],
+        "properties": {
+          "mode": { "enum": ["center", "corner"] },
+          "center": { "$ref": "common.schema.json#/$defs/Point2D" },
+          "corner": { "$ref": "common.schema.json#/$defs/Point2D" },
+          "width": { "$ref": "common.schema.json#/$defs/Length" },
+          "height": { "$ref": "common.schema.json#/$defs/Length" },
+          "addDimensions": {
+            "type": "boolean",
+            "default": true,
+            "description": "Tambahkan dimensi desain. Kalau false, sketsa kemungkinan under-defined."
+          }
+        }
+      },
+      "outputData": {
+        "entityIds": "array of string",
+        "dimensionNames": "array of string"
+      }
+    },
+
+    {
+      "name": "add_circle",
+      "capabilityId": "sketch_authoring",
+      "phase": 3,
+      "mutates": true,
+      "description": "Lingkaran di sketsa yang terbuka.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["center", "diameter"],
+        "properties": {
+          "center": { "$ref": "common.schema.json#/$defs/Point2D" },
+          "diameter": { "$ref": "common.schema.json#/$defs/Length" },
+          "addDimensions": { "type": "boolean", "default": true }
+        }
+      },
+      "outputData": {
+        "entityIds": "array of string",
+        "dimensionNames": "array of string"
+      },
+      "notes": "Input diameter, bukan radius. Gambar teknik memakai diameter, jadi plan juga."
+    },
+
+    {
+      "name": "add_slot",
+      "capabilityId": "sketch_authoring",
+      "phase": 3,
+      "mutates": true,
+      "description": "Slot ujung bulat (straight slot) di sketsa yang terbuka.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["start", "end", "width"],
+        "properties": {
+          "start": { "$ref": "common.schema.json#/$defs/Point2D" },
+          "end": {
+            "$ref": "common.schema.json#/$defs/Point2D",
+            "description": "Titik pusat ujung yang lain - BUKAN tepi luar slot."
+          },
+          "width": {
+            "$ref": "common.schema.json#/$defs/Length",
+            "description": "Lebar penuh slot, sama dengan diameter ujung bulatnya."
+          },
+          "addDimensions": { "type": "boolean", "default": true }
+        }
+      },
+      "outputData": {
+        "entityIds": "array of string",
+        "dimensionNames": "array of string"
+      },
+      "notes": "start dan end adalah pusat busur ujung. Panjang keseluruhan slot = jarak(start,end) + width. Ini sumber kesalahan yang sering - dokumentasikan di UI."
+    },
+
+    {
+      "name": "fully_define_sketch",
+      "capabilityId": "sketch_authoring",
+      "phase": 3,
+      "mutates": true,
+      "description": "Coba definisikan penuh sketsa. HANYA untuk geometri dasar - persegi dan lingkaran tunggal.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sketchName": { "type": "string" }
+        }
+      },
+      "outputData": {
+        "constrainedStatus": "string",
+        "fullyDefined": "boolean",
+        "addedRelations": "integer",
+        "addedDimensions": "integer"
+      },
+      "notes": "DILARANG dipakai sebagai pengganti dimensi desain pada sketsa kompleks, dan DILARANG memakai Fix massal. Kalau tidak bisa fully defined lewat dimensi yang bermakna, kembalikan verdict BLOCKED - jangan dipaksa."
+    },
+
+    {
+      "name": "close_sketch",
+      "capabilityId": "sketch_authoring",
+      "phase": 3,
+      "mutates": true,
+      "description": "Tutup sketsa yang terbuka.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sketchName": { "type": "string" }
+        }
+      },
+      "outputData": {
+        "sketchName": "string",
+        "constrainedStatus": "string"
+      }
+    },
+
+    {
+      "name": "extrude_boss",
+      "capabilityId": "part_features",
+      "phase": 3,
+      "mutates": true,
+      "description": "Extrude sketsa menjadi material. Sketsa harus sudah ditutup.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sketch", "endCondition"],
+        "properties": {
+          "sketch": { "$ref": "common.schema.json#/$defs/EntityRef" },
+          "endCondition": { "$ref": "common.schema.json#/$defs/EndCondition" },
+          "direction": { "enum": ["normal", "reversed", "both"], "default": "normal" },
+          "draftAngle": { "$ref": "common.schema.json#/$defs/Angle" },
+          "merge": { "type": "boolean", "default": true }
+        }
+      },
+      "outputData": {
+        "featureName": "string",
+        "volumeMm3After": "number"
+      },
+      "notes": "PERINGATAN URUTAN PARAMETER: FeatureExtrusion2/3 punya daftar parameter panjang yang mudah tertukar, dan urutan berbeda antarversi. Tulis test khusus urutan parameter - repo referensi punya test_extrude_cut_param_order.py untuk alasan ini."
+    },
+
+    {
+      "name": "extrude_cut",
+      "capabilityId": "part_features",
+      "phase": 3,
+      "mutates": true,
+      "description": "Extrude sketsa untuk membuang material.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sketch", "endCondition"],
+        "properties": {
+          "sketch": { "$ref": "common.schema.json#/$defs/EntityRef" },
+          "endCondition": { "$ref": "common.schema.json#/$defs/EndCondition" },
+          "direction": { "enum": ["normal", "reversed", "both"], "default": "normal" },
+          "flipSideToCut": { "type": "boolean", "default": false }
+        }
+      },
+      "outputData": {
+        "featureName": "string",
+        "volumeMm3After": "number"
+      },
+      "notes": "Verifikasi WAJIB memeriksa volume BERKURANG. Cut yang sukses secara API tapi tidak mengubah volume adalah cut yang tidak memotong apa pun."
+    },
+
+    {
+      "name": "fillet",
+      "capabilityId": "part_features",
+      "phase": 3,
+      "mutates": true,
+      "description": "Fillet radius konstan pada tepi atau permukaan.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["entities", "radius"],
+        "properties": {
+          "entities": { "$ref": "common.schema.json#/$defs/EntitySelector" },
+          "radius": { "$ref": "common.schema.json#/$defs/Length" },
+          "propagateToTangent": { "type": "boolean", "default": true }
+        }
+      },
+      "outputData": {
+        "featureName": "string",
+        "filletedEdgeCount": "integer"
+      },
+      "notes": "Radius lebih besar dari geometri yang tersedia akan gagal rebuild. Periksa ketebalan dinding lebih dulu kalau bisa; kalau tidak, kembalikan FAIL dengan pesan yang menyebut radius maksimum yang mungkin."
+    },
+
+    {
+      "name": "chamfer",
+      "capabilityId": "part_features",
+      "phase": 3,
+      "mutates": true,
+      "description": "Chamfer jarak-sudut pada tepi atau permukaan.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["entities", "distance"],
+        "properties": {
+          "entities": { "$ref": "common.schema.json#/$defs/EntitySelector" },
+          "distance": { "$ref": "common.schema.json#/$defs/Length" },
+          "angle": { "$ref": "common.schema.json#/$defs/Angle", "default": 45 }
+        }
+      },
+      "outputData": {
+        "featureName": "string",
+        "chamferedEdgeCount": "integer"
+      }
+    },
+
+    {
+      "name": "hole_wizard",
+      "capabilityId": "hole_features",
+      "phase": 3,
+      "mutates": true,
+      "description": "Lubang Hole Wizard pada permukaan. Tipe lubang dan standarnya TIDAK PERNAH ditebak.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["face", "holeType", "positions", "endCondition"],
+        "properties": {
+          "face": { "$ref": "common.schema.json#/$defs/EntityRef" },
+          "holeType": {
+            "enum": ["simple", "counterbore", "countersink", "tapped"]
+          },
+          "standard": {
+            "type": "string",
+            "description": "Mis. ISO, ANSI Metric. WAJIB diisi untuk counterbore/countersink/tapped."
+          },
+          "fastenerSize": {
+            "type": "string",
+            "description": "Mis. M6, M8. WAJIB untuk tipe selain simple."
+          },
+          "diameter": {
+            "$ref": "common.schema.json#/$defs/Length",
+            "description": "Hanya untuk holeType simple."
+          },
+          "positions": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "common.schema.json#/$defs/Point2D" },
+            "description": "Posisi pada permukaan, dalam mm."
+          },
+          "endCondition": { "$ref": "common.schema.json#/$defs/EndCondition" }
+        }
+      },
+      "outputData": {
+        "featureName": "string",
+        "holeCount": "integer",
+        "actualPositions": "array of Point2D (dibaca ulang dari model)"
+      },
+      "notes": "Verifikasi WAJIB membandingkan actualPositions dengan positions yang diminta. Kalau standard atau fastenerSize tidak diberikan untuk tipe yang membutuhkannya, kembalikan BLOCKED dan buat entri openQuestions - JANGAN pilih standar default."
+    },
+
+    {
+      "name": "linear_pattern",
+      "capabilityId": "patterns",
+      "phase": 3,
+      "mutates": true,
+      "description": "Pattern linear satu atau dua arah dari fitur yang sudah ada.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["features", "direction1"],
+        "properties": {
+          "features": { "$ref": "common.schema.json#/$defs/EntitySelector" },
+          "direction1": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["edge", "spacing", "instances"],
+            "properties": {
+              "edge": { "$ref": "common.schema.json#/$defs/EntityRef" },
+              "spacing": { "$ref": "common.schema.json#/$defs/Length" },
+              "instances": { "$ref": "common.schema.json#/$defs/Count" },
+              "reverse": { "type": "boolean", "default": false }
+            }
+          },
+          "direction2": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["edge", "spacing", "instances"],
+            "properties": {
+              "edge": { "$ref": "common.schema.json#/$defs/EntityRef" },
+              "spacing": { "$ref": "common.schema.json#/$defs/Length" },
+              "instances": { "$ref": "common.schema.json#/$defs/Count" },
+              "reverse": { "type": "boolean", "default": false }
+            }
+          }
+        }
+      },
+      "outputData": {
+        "featureName": "string",
+        "actualInstanceCount": "integer"
+      },
+      "notes": "instances TERMASUK fitur aslinya, mengikuti konvensi SolidWorks. 4 lubang berarti instances=4, bukan 3. Verifikasi membandingkan actualInstanceCount dengan yang diminta - instance yang gagal dibuat tidak selalu menggagalkan panggilan API."
+    }
+  ],
+
+  "orchestrationTools": [
+    {
+      "name": "validate_design_plan",
+      "capabilityId": "design_plan_execution",
+      "mutates": false,
+      "description": "Validasi DesignPlan terhadap skema, ledger kemampuan, dan referensi parameter. TIDAK menyentuh model.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["plan"],
+        "properties": {
+          "plan": { "$ref": "design-plan.schema.json" }
+        }
+      },
+      "outputData": {
+        "valid": "boolean",
+        "errors": "array of {path, message}",
+        "blockingQuestions": "array of string",
+        "toolsNotAvailable": "array of string"
+      }
+    },
+    {
+      "name": "run_design_plan",
+      "capabilityId": "design_plan_execution",
+      "mutates": true,
+      "description": "Eksekusi DesignPlan step demi step dengan trace. Validasi dijalankan lebih dulu; plan tidak valid ditolak tanpa menyentuh model.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["plan"],
+        "properties": {
+          "plan": { "$ref": "design-plan.schema.json" },
+          "parameterOverrides": {
+            "type": "object",
+            "description": "Jalur Lapis 2: ubah parameter dan jalankan ulang tanpa memanggil AI.",
+            "additionalProperties": { "type": ["number", "string", "boolean"] }
+          },
+          "stopAtStep": {
+            "type": "string",
+            "description": "Untuk debugging - berhenti setelah step ini."
+          }
+        }
+      },
+      "outputData": {
+        "runId": "string",
+        "stepsCompleted": "integer",
+        "stepResults": "array of ToolResult",
+        "acceptanceResults": "array of VerificationCheck",
+        "finalVerdict": "PASS|WARN|FAIL|BLOCKED",
+        "documentPath": "string|null"
+      },
+      "notes": "finalVerdict mengagregasi SEMUA step dan SEMUA kriteria acceptance. Satu FAIL yang required membuat seluruh run FAIL, walaupun step lain PASS."
+    }
+  ]
+}

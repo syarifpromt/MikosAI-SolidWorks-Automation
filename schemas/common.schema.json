@@ -1,0 +1,284 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mikosai.dev/schemas/common.schema.json",
+  "title": "MikosAI Common Definitions",
+  "description": "Tipe bersama untuk DesignPlan dan katalog tool. Semua panjang dalam mm, sudut dalam derajat. Konversi ke SI (meter/radian) terjadi di ToolExecutor, bukan di plan.",
+
+  "$defs": {
+
+    "Length": {
+      "description": "Panjang dalam milimeter. Boleh angka, atau referensi parameter seperti \"$plateWidth\".",
+      "oneOf": [
+        { "type": "number" },
+        { "$ref": "#/$defs/ParameterRef" }
+      ]
+    },
+
+    "Angle": {
+      "description": "Sudut dalam derajat. Boleh angka, atau referensi parameter.",
+      "oneOf": [
+        { "type": "number" },
+        { "$ref": "#/$defs/ParameterRef" }
+      ]
+    },
+
+    "Count": {
+      "description": "Bilangan bulat positif, atau referensi parameter.",
+      "oneOf": [
+        { "type": "integer", "minimum": 1 },
+        { "$ref": "#/$defs/ParameterRef" }
+      ]
+    },
+
+    "ParameterRef": {
+      "description": "Referensi ke entri parameters di DesignPlan. Hanya referensi langsung - TIDAK ada ekspresi aritmetika. Lihat docs/skema-tool-dan-plan.md.",
+      "type": "string",
+      "pattern": "^\\$[A-Za-z][A-Za-z0-9_]*$"
+    },
+
+    "Point2D": {
+      "description": "Titik pada bidang sketsa aktif, dalam mm, relatif ke origin sketsa.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "$ref": "#/$defs/Length" },
+        "y": { "$ref": "#/$defs/Length" }
+      }
+    },
+
+    "Vector3D": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      }
+    },
+
+    "StandardPlane": {
+      "type": "string",
+      "enum": ["Front Plane", "Top Plane", "Right Plane"]
+    },
+
+    "EntityRef": {
+      "description": "Referensi entitas berbasis kriteria STABIL. Face1/Edge1 dan koordinat layar dilarang - lihat CONTRIBUTING.md aturan 4.",
+      "type": "object",
+      "required": ["kind", "by"],
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "required": ["kind", "by", "name"],
+          "properties": {
+            "kind": { "enum": ["plane", "feature", "sketch"] },
+            "by": { "const": "name" },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Nama di FeatureManager tree, atau nama bidang standar."
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["kind", "by", "normal", "nearPoint"],
+          "properties": {
+            "kind": { "const": "face" },
+            "by": { "const": "normal_and_point" },
+            "normal": {
+              "$ref": "#/$defs/Vector3D",
+              "description": "Normal permukaan yang diharapkan, dalam koordinat model."
+            },
+            "nearPoint": {
+              "$ref": "#/$defs/Vector3D",
+              "description": "Titik dalam mm; permukaan dengan normal cocok yang terdekat ke titik ini yang dipilih."
+            },
+            "tolerance": {
+              "type": "number",
+              "default": 0.5,
+              "description": "Toleransi pencocokan normal, dalam derajat."
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["kind", "by", "nearPoint"],
+          "properties": {
+            "kind": { "const": "edge" },
+            "by": { "const": "midpoint" },
+            "nearPoint": { "$ref": "#/$defs/Vector3D" },
+            "direction": {
+              "$ref": "#/$defs/Vector3D",
+              "description": "Opsional. Arah tepi yang diharapkan, untuk memperketat pencocokan."
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["kind", "by", "persistId"],
+          "properties": {
+            "kind": { "enum": ["face", "edge", "vertex"] },
+            "by": { "const": "persist_id" },
+            "persistId": {
+              "type": "string",
+              "description": "Hasil GetPersistReference3, base64. Paling stabil, tapi hanya valid dalam dokumen yang sama. Belum dipakai di v0.1."
+            }
+          }
+        }
+      ]
+    },
+
+    "EntitySelector": {
+      "description": "Satu atau beberapa entitas.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/EntityRef" }
+    },
+
+    "EndCondition": {
+      "description": "Kondisi akhir fitur extrude.",
+      "type": "object",
+      "required": ["type"],
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "required": ["type", "depth"],
+          "properties": {
+            "type": { "const": "blind" },
+            "depth": { "$ref": "#/$defs/Length" }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "enum": ["through_all", "up_to_next"] }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["type", "face"],
+          "properties": {
+            "type": { "const": "up_to_surface" },
+            "face": { "$ref": "#/$defs/EntityRef" }
+          }
+        }
+      ]
+    },
+
+    "Verdict": {
+      "description": "Agregasi: BLOCKED > FAIL > WARN > PASS. Status tidak dikenal menjadi BLOCKED.",
+      "type": "string",
+      "enum": ["PASS", "WARN", "FAIL", "BLOCKED"]
+    },
+
+    "VerificationCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "verdict", "required"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Mis. feature_exists_in_tree, rebuild_succeeds, save_reopen_dimension_readback."
+        },
+        "verdict": { "$ref": "#/$defs/Verdict" },
+        "required": {
+          "type": "boolean",
+          "description": "Kalau true, FAIL di sini tidak boleh ditutupi PASS tingkat atas."
+        },
+        "observed": {
+          "description": "Nilai yang benar-benar dibaca dari model. Bukti, bukan klaim."
+        },
+        "expected": { "description": "Nilai yang diharapkan." },
+        "message": { "type": "string" }
+      }
+    },
+
+    "VerificationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verdict", "checks", "manualReviewRequired"],
+      "properties": {
+        "verdict": { "$ref": "#/$defs/Verdict" },
+        "checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/VerificationCheck" }
+        },
+        "manualReviewRequired": {
+          "type": "boolean",
+          "description": "Tugas tidak boleh ditandai selesai selama ini true, walaupun verdict PASS."
+        }
+      }
+    },
+
+    "ErrorKind": {
+      "type": "string",
+      "enum": [
+        "transient",
+        "invalid_argument",
+        "environment_missing",
+        "tool_unavailable",
+        "verification_failed",
+        "user_action_required",
+        "policy_blocked",
+        "capability_gap",
+        "provider_silent",
+        "fatal"
+      ]
+    },
+
+    "ToolError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "message"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/ErrorKind" },
+        "code": { "type": "string" },
+        "message": {
+          "type": "string",
+          "description": "Untuk Lapis 1 UI: sebut tindakan konkret yang harus dilakukan manusia, bukan kode internal."
+        },
+        "hresult": {
+          "type": "string",
+          "description": "HRESULT COM mentah kalau ada, untuk diagnosis."
+        }
+      }
+    },
+
+    "ToolResult": {
+      "description": "Envelope untuk SETIAP hasil tool. Perhatikan: `ok` berarti panggilan terlaksana. `verification.verdict` berarti tugasnya berhasil. Keduanya TIDAK sama - itu prinsip inti proyek ini, dan di sini dikodekan ke dalam skema.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "capabilityId"],
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "description": "Panggilan terlaksana tanpa exception. BUKAN berarti tugas berhasil."
+        },
+        "capabilityId": {
+          "type": "string",
+          "description": "Id di capabilities.yaml. Dipakai untuk menegakkan gating."
+        },
+        "data": {
+          "type": "object",
+          "description": "Payload khusus per tool."
+        },
+        "verification": { "$ref": "#/$defs/VerificationResult" },
+        "error": { "$ref": "#/$defs/ToolError" },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "documentPath": { "type": "string" },
+            "solidworksRevision": { "type": "string" },
+            "featureNames": { "type": "array", "items": { "type": "string" } },
+            "sha256": { "type": "string" }
+          }
+        },
+        "durationMs": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

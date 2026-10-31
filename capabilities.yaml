@@ -1,0 +1,194 @@
+# MikosAI Capability Ledger
+#
+# SATU-SATUNYA sumber kebenaran kemampuan. Tidak ada registry kedua.
+# Add-in, MCP server, UI, dan golden test semuanya membaca file ini.
+#
+# ATURAN:
+#   - Hanya status `verified` dan `pilot` yang diekspos sebagai tool MCP.
+#   - `reference_only` dan `not_implemented` TIDAK PERNAH terlihat oleh AI.
+#   - Promosi ke `verified` butuh: golden test lulus di SolidWorks nyata,
+#     versi tercatat, dan 3 kali lulus berturut-turut.
+#   - Menaikkan status tanpa bukti test adalah pelanggaran paling serius di repo ini.
+
+schema_version: "1.0"
+
+# Versi yang diuji. Jangan klaim versi yang belum pernah dijalankan.
+verified_versions:
+  solidworks: []          # diisi saat golden test pertama lulus, mis. ["2026"]
+
+tested_providers: []      # diisi di Fase 2, mis. [{id: antigravity, version: "1.0.6"}]
+
+# ---------------------------------------------------------------------------
+# Status: verified | pilot | reference_only | not_implemented
+# ---------------------------------------------------------------------------
+
+capabilities:
+
+  # ---- Fase 1: read-only ------------------------------------------------
+  - id: document_inspection
+    label: Baca dokumen aktif, fitur, dan properti massa
+    status: not_implemented
+    phase: 1
+    review_required: false
+    tools:
+      - get_active_document
+      - list_features
+      - get_bounding_box
+      - get_mass_properties
+      - inspect_sketches
+      - get_selection
+    notes: >
+      Read-only. Tidak menulis apa pun ke model. Aman diekspos lebih dulu
+      karena kegagalannya tidak merusak pekerjaan pengguna.
+
+  # ---- Fase 3: sketsa ---------------------------------------------------
+  - id: sketch_authoring
+    label: Buat sketsa dengan geometri dasar dan fully define
+    status: not_implemented
+    phase: 3
+    review_required: true
+    tools:
+      - create_sketch
+      - add_rectangle
+      - add_circle
+      - add_slot
+      - fully_define_sketch
+      - close_sketch
+    verification:
+      - sketch_exists_in_tree
+      - constrained_status_read        # GetConstrainedStatus, BUKAN Fix massal
+      - consumed_by_target_feature
+    notes: >
+      fully_define_sketch hanya untuk geometri dasar (persegi, lingkaran).
+      Sketsa kompleks harus memakai dimensi desain eksplisit, lalu diverifikasi
+      lewat inspect_sketches. Fix massal sebagai pengganti dimensi desain dilarang.
+
+  # ---- Fase 3: fitur ----------------------------------------------------
+  - id: part_features
+    label: Extrude boss/cut, fillet, chamfer
+    status: not_implemented
+    phase: 3
+    review_required: true
+    tools:
+      - extrude_boss
+      - extrude_cut
+      - fillet
+      - chamfer
+    verification:
+      - feature_exists_in_tree
+      - rebuild_succeeds               # EditRebuild3, tanpa rebuild error
+      - nonzero_volume
+      - save_reopen_dimension_readback # paling sering dilewati, paling sering menangkap bug
+
+  - id: hole_features
+    label: Hole wizard - blind, counterbore, countersink, tapped
+    status: not_implemented
+    phase: 3
+    review_required: true
+    tools:
+      - hole_wizard
+    verification:
+      - feature_exists_in_tree
+      - hole_positions_match_plan
+      - rebuild_succeeds
+      - save_reopen_dimension_readback
+    notes: >
+      Tipe lubang, datum, dan toleransi TIDAK BOLEH ditebak dari geometri.
+      Kalau plan tidak menyebutnya, hasilnya review_required.
+
+  - id: patterns
+    label: Linear pattern
+    status: not_implemented
+    phase: 3
+    review_required: true
+    tools:
+      - linear_pattern
+    verification:
+      - instance_count_matches_plan
+      - rebuild_succeeds
+
+  # ---- Fase 3: eksekusi plan -------------------------------------------
+  - id: design_plan_execution
+    label: Eksekusi DesignPlan tervalidasi skema
+    status: not_implemented
+    phase: 3
+    review_required: true
+    tools:
+      - run_design_plan
+      - validate_design_plan
+    notes: >
+      Plan divalidasi terhadap skema SEBELUM eksekusi. Plan yang tidak valid
+      ditolak tanpa menyentuh model.
+
+  # ---- Setelah v0.1 ----------------------------------------------------
+  - id: semantic_entity_reference
+    label: Pemilihan face/edge lewat kriteria stabil
+    status: not_implemented
+    phase: post-v0.1
+    review_required: true
+    notes: >
+      Prioritas 1 setelah v0.1. Face1/Edge1 dan koordinat layar dilarang di
+      seluruh repo. Pendekatan: normal + centroid, lalu persistent reference ID
+      lewat IModelDoc2.Extension.GetPersistReference3.
+
+  - id: drawing_automation
+    label: Pembuatan drawing, view, dimensi, GD&T
+    status: not_implemented
+    phase: post-v0.1
+    review_required: true
+    notes: >
+      API drawing rapuh antarversi SolidWorks. Butuh matriks versi sendiri.
+      Verifikasi sebaiknya lewat baca ulang PDF hasil export (sidecar Python).
+
+  - id: assembly_and_mates
+    label: Komponen assembly dan mate
+    status: not_implemented
+    phase: post-v0.1
+    review_required: true
+    notes: Butuh semantic_entity_reference yang sudah kuat lebih dulu.
+
+  - id: export_delivery
+    label: Export STEP/STL/PDF, BOM, Pack and Go
+    status: not_implemented
+    phase: post-v0.1
+    review_required: true
+
+  - id: fea_preflight
+    label: Persiapan input FEA dan audit hasil
+    status: not_implemented
+    phase: post-v0.1
+    review_required: true
+    notes: >
+      Selalu pilot, selalu butuh review insinyur. Butuh solver eksternal,
+      bukti material, dan bukti kondisi batas. Tidak pernah unattended.
+
+# ---------------------------------------------------------------------------
+# Backend. v0.1 hanya satu. Daftar ini ada supaya penambahan nanti tidak
+# memaksa perubahan skema.
+# ---------------------------------------------------------------------------
+
+backend_catalog:
+  solidworks-csharp-addin:
+    language: C#
+    runtime: in_process_managed_addin
+    suitable_for:
+      - Seluruh operasi CAD v0.1
+      - Langganan event
+      - PropertyManagerPage dan TaskPane
+      - Callback UI yang hidup lama
+    limitations:
+      - Butuh registrasi Machine, TLB, dan deployment terpercaya
+      - Crash menjatuhkan SolidWorks - wajib lewat MainThreadDispatcher
+      - Bukan pengganti interface yang hanya tersedia untuk C++ unmanaged
+
+  python-sidecar:
+    language: Python
+    runtime: external_process
+    suitable_for:
+      - OCCT dan format terbuka
+      - Konversi mesh
+      - Baca ulang PDF untuk verifikasi drawing
+      - Orkestrasi solver FEA
+    limitations:
+      - Tidak bisa membuat atau memverifikasi semantik feature tree SLDPRT native
+    status: not_implemented
