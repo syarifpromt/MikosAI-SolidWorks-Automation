@@ -384,6 +384,7 @@ Urutan mengikuti nilai dibagi risiko, bukan keinginan.
 | R11 | Dua orang, cakupan membengkak | Tinggi | Gerbang penerimaan per fase; "kecil itu fitur" | ✅ |
 | R12 | Tanpa Visual Studio, step-debug net48 terbatas | Sedang | Diagnostik-first (`host-status.json`, trace); Core tanpa dependensi SolidWorks diuji cepat | Core ✅, diagnostik ✅ |
 | R13 | Kode add-in tidak bisa diverifikasi tanpa SolidWorks | Tinggi | Permukaan PIA dikecilkan ke `ISwAddin` saja, sisanya late-bound; stub compile-check | ✅ |
+| R14 | Dependensi add-in `/codebase` dicari di folder SLDWORKS.exe, bukan folder kita | **Kritis** — add-in diam-diam tidak terinstansiasi, tanpa pesan error | `AssemblyResolver` dipasang di static ctor; `HostDiagnostics` nol dependensi eksternal | ✅ |
 
 R1, R3, R4 yang paling perlu diawasi. R1 dan R4 bisa diselesaikan dengan kode. R3 tidak —
 itu keputusan, bukan bug.

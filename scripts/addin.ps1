@@ -320,11 +320,46 @@ if ($Action -eq 'Probe') {
         Write-Host "host-status.json tidak ada: $StatusFile" -ForegroundColor Red
         Write-Host ''
         Write-Host 'Artinya add-in belum pernah menjalankan ConnectToSW.' -ForegroundColor Red
-        Write-Host 'Penyebab paling sering, urut dari yang paling mungkin:'
-        Write-Host '  1. Registrasi Machine belum dilakukan (CurrentUser tidak cukup)'
-        Write-Host '  2. TLB belum terdaftar - SolidWorks memuat DLL tapi tidak instansiasi ISwAddin'
-        Write-Host '  3. Add-in belum dicentang di SolidWorks: Tools > Add-Ins'
-        Write-Host '  4. SolidWorks belum dibuka setelah registrasi'
+        Write-Host ''
+        Write-Host 'Periksa berurutan:' -ForegroundColor Yellow
+        Write-Host '  1. Sudah buka SolidWorks SETELAH registrasi?'
+        Write-Host '  2. MikosAI MUNCUL di Tools > Add-Ins? Kalau tidak muncul sama sekali,'
+        Write-Host '     masalahnya registrasi atau TLB - bukan kode add-in.'
+        Write-Host '  3. Sudah dicentang di situ?'
+
+        # Dependensi yang hilang adalah penyebab paling membingungkan: SolidWorks
+        # melaporkan sukses, add-in tidak pernah terinstansiasi, tidak ada pesan
+        # apa pun. Jadi diperiksa di sini, bukan dibiarkan jadi misteri.
+        $folder = Split-Path -Parent $AddinDll
+        if (Test-Path -LiteralPath $folder) {
+            Write-Host ''
+            Write-Host 'Dependensi di folder add-in:' -ForegroundColor Yellow
+
+            $wajib = @('MikosAI.Addin.dll', 'MikosAI.Core.dll', 'System.Text.Json.dll', 'YamlDotNet.dll')
+            $hilang = 0
+
+            foreach ($nama in $wajib) {
+                $jalur = Join-Path $folder $nama
+                if (Test-Path -LiteralPath $jalur) {
+                    Write-Host "  ADA    $nama" -ForegroundColor Green
+                }
+                else {
+                    Write-Host "  TIDAK  $nama" -ForegroundColor Red
+                    $hilang++
+                }
+            }
+
+            if ($hilang -gt 0) {
+                Write-Host ''
+                Write-Host "$hilang dependensi hilang dari folder output." -ForegroundColor Red
+                Write-Host 'Bangun ulang: powershell -File scripts\setup.ps1'
+            }
+
+            $dll = @(Get-ChildItem -LiteralPath $folder -Filter *.dll -ErrorAction SilentlyContinue)
+            Write-Host ''
+            Write-Host "  Total $($dll.Count) DLL di folder output."
+        }
+
         Write-Host ''
         Write-Host 'Jalankan -Action Status untuk melihat apa yang sudah terdaftar.'
         exit 1
@@ -365,6 +400,20 @@ if ($Action -eq 'Probe') {
         Write-Section 'Error yang tercatat'
         foreach ($err in $status.errors) {
             Write-Host "  $err" -ForegroundColor Red
+        }
+    }
+
+    if ($status.PSObject.Properties.Name -contains 'assemblyResolveLog' -and
+        $status.assemblyResolveLog -and $status.assemblyResolveLog.Count -gt 0) {
+        Write-Section 'Resolusi dependensi'
+        Write-Host '  Dependensi add-in yang dimuat lewat handler kita, bukan oleh CLR.'
+        Write-Host '  Itu wajar: /codebase membuat CLR mencari dependensi di folder'
+        Write-Host '  SLDWORKS.exe, bukan folder kita.'
+        Write-Host ''
+        foreach ($baris in $status.assemblyResolveLog) {
+            $warna = 'Gray'
+            if ($baris -match '^TIDAK ADA|^GAGAL') { $warna = 'Red' }
+            Write-Host "  $baris" -ForegroundColor $warna
         }
     }
 

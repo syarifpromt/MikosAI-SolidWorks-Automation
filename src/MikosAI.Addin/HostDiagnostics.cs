@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
-using System.Text.Json;
 
 namespace MikosAI.Addin
 {
@@ -12,27 +12,47 @@ namespace MikosAI.Addin
     /// Ini SATU-SATUNYA cara yang sah untuk menyatakan add-in benar-benar hidup.
     /// <c>ISldWorks.LoadAddIn()</c> mengembalikan 0 TIDAK dihitung lulus:
     /// SolidWorks bisa memuat DLL dan melaporkan sukses tanpa pernah
-    /// menginstansiasi <c>ISwAddin</c> - biasanya karena TLB belum terdaftar.
+    /// menginstansiasi <c>ISwAddin</c>.
     ///
-    /// Berkas ini juga pengganti debugger. Step-debug add-in net48 tanpa Visual
-    /// Studio terbatas (risiko R12), dan bahkan dengan VS pun menyakitkan karena
-    /// SolidWorks mengunci DLL yang dimuat. Jadi diagnostik ditulis lengkap
-    /// dengan sengaja.
+    /// NOL DEPENDENSI EKSTERNAL, DAN ITU DISENGAJA.
+    ///
+    /// JSON di sini dibangun dengan tangan, bukan lewat System.Text.Json.
+    /// Alasannya ditemukan dengan cara yang mahal: kelas ini dibuat di field
+    /// initializer MikosAiAddin, jadi memuatnya adalah prasyarat untuk
+    /// menginstansiasi add-in. Kalau ia butuh assembly eksternal dan assembly
+    /// itu tidak bisa diselesaikan, konstruktor gagal, SolidWorks diam-diam
+    /// tidak memuat add-in, dan TIDAK ADA diagnostik apa pun yang tertulis -
+    /// tepat ketika diagnostik paling dibutuhkan.
+    ///
+    /// Aturannya: yang melaporkan kegagalan tidak boleh bergantung pada hal-hal
+    /// yang bisa gagal.
     /// </summary>
     internal sealed class HostDiagnostics
     {
         private readonly object _lock = new object();
         private readonly List<string> _errors = new List<string>();
         private readonly string _path;
+        private readonly bool _bisaTulis;
 
         internal HostDiagnostics()
         {
-            var directory = Path.Combine(
+            var direktori = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "MikosAI");
 
-            Directory.CreateDirectory(directory);
-            _path = Path.Combine(directory, "host-status.json");
+            _path = Path.Combine(direktori, "host-status.json");
+
+            try
+            {
+                Directory.CreateDirectory(direktori);
+                _bisaTulis = true;
+            }
+            catch (Exception)
+            {
+                // Jangan melempar dari konstruktor - itu akan menggagalkan
+                // instansiasi add-in, yaitu hal yang sedang kita coba diagnosis.
+                _bisaTulis = false;
+            }
         }
 
         internal string Path_ => _path;
@@ -54,14 +74,13 @@ namespace MikosAI.Addin
 
         internal int AddinCookie { get; set; }
 
-        /// <summary>Hitungan event, dipakai gerbang penerimaan Fase 0 poin 4.</summary>
         internal int FileNewEvents { get; set; }
 
         internal int ActiveDocChangeEvents { get; set; }
 
+        /// <summary>-1 berarti tidak bisa dibaca - BUKAN nol.</summary>
         internal int OpenDocumentCount { get; set; } = -1;
 
-        /// <summary>Thread utama SolidWorks yang berhasil ditangkap dispatcher.</summary>
         internal int MainThreadId { get; set; }
 
         internal bool DispatcherReady { get; set; }
@@ -76,16 +95,21 @@ namespace MikosAI.Addin
 
         /// <summary>
         /// Mencatat exception beserta tipenya. Tipe exception sering jadi
-        /// petunjuk langsung - mis. InvalidCastException pada PropertyManagerPage
-        /// berarti handler-nya tidak menyediakan IDispatch.
+        /// petunjuk langsung - mis. <c>FileNotFoundException</c> pada assembly
+        /// berarti masalah resolusi dependensi, dan
+        /// <c>InvalidCastException</c> pada PropertyManagerPage berarti
+        /// handler-nya tidak menyediakan IDispatch.
         /// </summary>
         internal void AddError(string context, Exception exception)
         {
-            var hresult = exception is System.Runtime.InteropServices.COMException com
-                ? $" HRESULT=0x{com.HResult:X8}"
-                : string.Empty;
+            var tambahan = string.Empty;
 
-            AddError($"{context}: {exception.GetType().Name}{hresult}: {exception.Message}");
+            if (exception is System.Runtime.InteropServices.COMException com)
+            {
+                tambahan = $" HRESULT=0x{com.HResult:X8}";
+            }
+
+            AddError($"{context}: {exception.GetType().Name}{tambahan}: {exception.Message}");
         }
 
         /// <summary>
@@ -95,6 +119,11 @@ namespace MikosAI.Addin
         /// </summary>
         internal void Write()
         {
+            if (!_bisaTulis)
+            {
+                return;
+            }
+
             try
             {
                 string[] errors;
@@ -103,41 +132,123 @@ namespace MikosAI.Addin
                     errors = _errors.ToArray();
                 }
 
-                var payload = new Dictionary<string, object?>(StringComparer.Ordinal)
-                {
-                    ["schemaVersion"] = "1.0",
-                    ["writtenAt"] = DateTimeOffset.UtcNow.ToString("O"),
-                    ["status"] = Status,
-                    ["callbackRegistered"] = CallbackRegistered,
-                    ["commandGroup"] = CommandGroup,
-                    ["taskPane"] = TaskPane,
-                    ["mcpServer"] = McpServer,
-                    ["solidworksRevision"] = SolidWorksRevision,
-                    ["addinCookie"] = AddinCookie,
-                    ["dispatcherReady"] = DispatcherReady,
-                    ["mainThreadId"] = MainThreadId,
-                    ["fileNewEvents"] = FileNewEvents,
-                    ["activeDocChangeEvents"] = ActiveDocChangeEvents,
-                    ["openDocumentCount"] = OpenDocumentCount,
-                    ["addinAssembly"] = SafeAssemblyLocation(),
-                    ["processId"] = SafeProcessId(),
-                    ["errors"] = errors,
-                };
+                var sb = new StringBuilder(2048);
+                sb.Append("{\n");
 
-                var json = JsonSerializer.Serialize(
-                    payload,
-                    new JsonSerializerOptions { WriteIndented = true });
+                Field(sb, "schemaVersion", "1.0");
+                Field(sb, "writtenAt", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+                Field(sb, "status", Status);
+                FieldBool(sb, "callbackRegistered", CallbackRegistered);
+                FieldBool(sb, "commandGroup", CommandGroup);
+                FieldBool(sb, "taskPane", TaskPane);
+                FieldBool(sb, "mcpServer", McpServer);
+                Field(sb, "solidworksRevision", SolidWorksRevision);
+                FieldInt(sb, "addinCookie", AddinCookie);
+                FieldBool(sb, "dispatcherReady", DispatcherReady);
+                FieldInt(sb, "mainThreadId", MainThreadId);
+                FieldInt(sb, "fileNewEvents", FileNewEvents);
+                FieldInt(sb, "activeDocChangeEvents", ActiveDocChangeEvents);
+                FieldInt(sb, "openDocumentCount", OpenDocumentCount);
+                Field(sb, "addinAssembly", LokasiAssemblyAman());
+                Field(sb, "addinFolder", AssemblyResolver.FolderAddin);
+                FieldBool(sb, "assemblyResolverInstalled", AssemblyResolver.Terpasang);
+                FieldInt(sb, "processId", ProcessIdAman());
+                Array_(sb, "assemblyResolveLog", AssemblyResolver.Jejak_);
+                Array_(sb, "errors", errors, terakhir: true);
 
-                File.WriteAllText(_path, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                sb.Append("}\n");
+
+                File.WriteAllText(_path, sb.ToString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             }
             catch (Exception)
             {
-                // Tidak ada tempat lain untuk melapor. Jangan sampai menjatuhkan
-                // ConnectToSW.
+                // Tidak ada tempat lain untuk melapor.
             }
         }
 
-        private static string SafeAssemblyLocation()
+        // --- Pembangun JSON minimal -----------------------------------------
+        //
+        // Cukup untuk bentuk yang kita tulis: objek datar dengan nilai string,
+        // bool, int, dan array string. Bukan serializer umum, dan tidak perlu
+        // jadi serializer umum.
+
+        private static void Field(StringBuilder sb, string nama, string? nilai)
+        {
+            sb.Append("  \"").Append(nama).Append("\": ");
+            if (nilai is null)
+            {
+                sb.Append("null");
+            }
+            else
+            {
+                Quote(sb, nilai);
+            }
+            sb.Append(",\n");
+        }
+
+        private static void FieldBool(StringBuilder sb, string nama, bool nilai)
+            => sb.Append("  \"").Append(nama).Append("\": ")
+                 .Append(nilai ? "true" : "false").Append(",\n");
+
+        private static void FieldInt(StringBuilder sb, string nama, int nilai)
+            => sb.Append("  \"").Append(nama).Append("\": ")
+                 .Append(nilai.ToString(CultureInfo.InvariantCulture)).Append(",\n");
+
+        private static void Array_(StringBuilder sb, string nama, IReadOnlyList<string> nilai, bool terakhir = false)
+        {
+            sb.Append("  \"").Append(nama).Append("\": [");
+
+            for (var i = 0; i < nilai.Count; i++)
+            {
+                sb.Append("\n    ");
+                Quote(sb, nilai[i]);
+                if (i < nilai.Count - 1)
+                {
+                    sb.Append(',');
+                }
+            }
+
+            if (nilai.Count > 0)
+            {
+                sb.Append("\n  ");
+            }
+
+            sb.Append(']');
+            sb.Append(terakhir ? "\n" : ",\n");
+        }
+
+        private static void Quote(StringBuilder sb, string nilai)
+        {
+            sb.Append('"');
+
+            foreach (var c in nilai)
+            {
+                switch (c)
+                {
+                    case '"':  sb.Append("\\\""); break;
+                    case '\\': sb.Append("\\\\"); break;
+                    case '\n': sb.Append("\\n");  break;
+                    case '\r': sb.Append("\\r");  break;
+                    case '\t': sb.Append("\\t");  break;
+                    case '\b': sb.Append("\\b");  break;
+                    case '\f': sb.Append("\\f");  break;
+                    default:
+                        if (c < ' ')
+                        {
+                            sb.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
+                        }
+                        else
+                        {
+                            sb.Append(c);
+                        }
+                        break;
+                }
+            }
+
+            sb.Append('"');
+        }
+
+        private static string LokasiAssemblyAman()
         {
             try
             {
@@ -149,7 +260,7 @@ namespace MikosAI.Addin
             }
         }
 
-        private static int SafeProcessId()
+        private static int ProcessIdAman()
         {
             try
             {

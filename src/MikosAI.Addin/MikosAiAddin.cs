@@ -43,6 +43,26 @@ namespace MikosAI.Addin
         private const string AddinTitle = "MikosAI";
         private const string AddinDescription = "Otomasi SolidWorks berbantuan AI, dioperasikan dari dalam SolidWorks.";
 
+        /// <summary>
+        /// Memasang resolver dependensi SEBELUM apa pun yang lain.
+        ///
+        /// Static constructor berjalan sebelum instance pertama dibuat, jadi
+        /// sebelum field initializer di bawah dieksekusi. Urutan itu WAJIB.
+        ///
+        /// Add-in kita didaftarkan dengan /codebase, dan dependensi dari
+        /// assembly yang dimuat lewat codebase dicari relatif ke app base HOST -
+        /// folder SLDWORKS.exe, bukan folder kita. Tanpa resolver ini, memuat
+        /// tipe apa pun yang menyentuh MikosAI.Core akan gagal, SolidWorks
+        /// diam-diam tidak menginstansiasi add-in, dan tidak ada satu pun pesan
+        /// error.
+        ///
+        /// JANGAN pindahkan pemasangan ini ke constructor instance.
+        /// </summary>
+        static MikosAiAddin()
+        {
+            AssemblyResolver.Pasang();
+        }
+
         private readonly HostDiagnostics _diagnostics = new HostDiagnostics();
 
         private SolidWorksApi? _sw;
@@ -102,14 +122,41 @@ namespace MikosAI.Addin
             }
 
             // --- Daftarkan callback -----------------------------------------
-            _diagnostics.CallbackRegistered = _sw.TryRegisterCallback(this, Cookie);
+            try
+            {
+                _diagnostics.CallbackRegistered = _sw.TryRegisterCallback(this, Cookie);
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("TryRegisterCallback", exception);
+            }
 
             // --- Bukti bahwa API benar-benar bisa dipanggil -----------------
-            _diagnostics.SolidWorksRevision = _sw.TryGetRevision();
-            _diagnostics.OpenDocumentCount = _sw.TryGetDocumentCount();
+            try
+            {
+                _diagnostics.SolidWorksRevision = _sw.TryGetRevision();
+                _diagnostics.OpenDocumentCount = _sw.TryGetDocumentCount();
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("baca properti aplikasi", exception);
+            }
 
             _diagnostics.Status = "connected";
-            _diagnostics.Write();
+
+            // Pengaman terluar. Kegagalan di sini - mis. JIT tidak bisa
+            // menyelesaikan assembly - akan lolos keluar dari ConnectToSW,
+            // dan SolidWorks akan membuang add-in TANPA jejak apa pun. Itu
+            // mode kegagalan terburuk yang mungkin, jadi tidak boleh terjadi.
+            try
+            {
+                _diagnostics.Write();
+            }
+            catch (Exception)
+            {
+                // Diagnostik tidak bisa ditulis. Add-in tetap terhubung, jadi
+                // lebih baik lanjut daripada menolak dimuat.
+            }
 
             return true;
         }
