@@ -35,6 +35,10 @@ param(
     [switch] $SkipRegister,
     [switch] $SkipTests,
 
+    # Jalur mundur: kopi swpublished.dll ke folder output alih-alih menanamkan
+    # tipe interop. Pakai hanya kalau penanaman bermasalah.
+    [switch] $NoEmbedPia,
+
     # Dipakai internal saat script menjalankan ulang dirinya dengan hak admin.
     [switch] $ElevatedRegisterOnly
 )
@@ -88,8 +92,31 @@ function Invoke-Register {
         throw "Assembly tidak ada: $AddinDll"
     }
 
-    & $RegAsm $AddinDll /codebase /tlb:$AddinTlb
+    $keluaran = & $RegAsm $AddinDll /codebase /tlb:$AddinTlb 2>&1
+    $keluaran | ForEach-Object { Write-Host $_ }
+
     if ($LASTEXITCODE -ne 0) {
+        $teks = ($keluaran | Out-String)
+
+        # Kegagalan yang paling mungkin dan paling membingungkan: RegAsm harus
+        # MEMUAT assembly kita untuk memanggil [ComRegisterFunction], dan saat
+        # itu CLR butuh PIA SolidWorks - yang tidak ada di GAC.
+        if ($teks -match 'SolidWorks\.Interop') {
+            throw @'
+RegAsm tidak bisa memuat PIA SolidWorks.
+
+Assembly add-in dibangun dengan referensi PIA biasa, bukan tipe interop yang
+ditanam, jadi CLR mencari swpublished.dll saat RegAsm memuat assembly kita -
+dan PIA SolidWorks tidak ada di GAC.
+
+Bangun ulang dengan penanaman tipe interop (sudah default):
+  powershell -File scripts\setup.ps1
+
+Atau pakai jalur mundur copy-local:
+  powershell -File scripts\setup.ps1 -NoEmbedPia
+'@
+        }
+
         throw "RegAsm gagal dengan exit code $LASTEXITCODE."
     }
 }
@@ -208,7 +235,17 @@ if (-not $punyaSolidWorks) {
 Write-Langkah 'Build add-in'
 Write-Host "  PIA: $apiDir"
 
-& dotnet build $AddinProj -c Release -p:SolidWorksApiDir="$apiDir" --nologo -v q
+$embed = 'true'
+if ($NoEmbedPia) { $embed = 'false' }
+
+if ($NoEmbedPia) {
+    Write-Host '  Mode: copy-local PIA (-NoEmbedPia)' -ForegroundColor Yellow
+}
+else {
+    Write-Host '  Mode: tipe interop ditanam (tanpa dependensi runtime)'
+}
+
+& dotnet build $AddinProj -c Release -p:SolidWorksApiDir="$apiDir" -p:EmbedPia=$embed --nologo -v q
 if ($LASTEXITCODE -ne 0) {
     Stop-Setup 'Build add-in gagal padahal compile-check lulus.' `
         ("Artinya masalahnya di referensi PIA, BUKAN di kode kita. Periksa:`n" +
@@ -251,6 +288,7 @@ else {
             '-File'; "`"$PSCommandPath`""
             '-ElevatedRegisterOnly'
         )
+        if ($NoEmbedPia) { $argumen += '-NoEmbedPia' }
 
         $proses = Start-Process -FilePath 'powershell' -ArgumentList $argumen `
             -Verb RunAs -Wait -PassThru -ErrorAction Stop

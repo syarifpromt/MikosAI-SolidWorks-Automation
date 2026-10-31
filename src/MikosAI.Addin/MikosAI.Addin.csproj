@@ -87,14 +87,40 @@
 
   <!--
     PIA dari instalasi lokal. Hanya swpublished - ISwAddin satu-satunya tipe
-    PIA yang kita butuh saat kompilasi. Private=false berarti TIDAK dikopi ke
-    output; PIA harus datang dari instalasi SolidWorks pengguna.
+    PIA yang kita butuh saat kompilasi.
+
+    EmbedInteropTypes=true (NoPIA) MENANAMKAN definisi ISwAddin ke dalam
+    assembly kita, sehingga TIDAK ADA dependensi assembly saat runtime.
+
+    Ini memperbaiki dua hal sekaligus:
+
+    1. RegAsm harus MEMUAT assembly kita untuk memanggil [ComRegisterFunction].
+       Dengan referensi biasa, CLR butuh swpublished.dll saat itu - dan PIA
+       SolidWorks tidak ada di GAC, jadi registrasi gagal dengan
+       "Could not load file or assembly 'SolidWorks.Interop.swpublished'".
+
+    2. Referensi biasa mengikat versi PIA secara keras (mis. 33.1.1.1 untuk
+       SW2025). Add-in yang dibangun di satu versi SolidWorks lalu dipakai di
+       versi lain akan bermasalah - dan dua laptop kami bisa beda versi.
+       Type equivalence pada interop yang ditanam membuat interface-nya
+       menyatu dengan apa pun yang dimuat SolidWorks.
+
+    Kalau ternyata penanaman bermasalah, jalur mundurnya adalah copy-local:
+      -p:EmbedPia=false
+    Itu mengopi swpublished.dll ke folder output, yang juga sah - folder
+    sumbernya memang bernama "redist".
   -->
+  <PropertyGroup>
+    <EmbedPia Condition="'$(EmbedPia)' == ''">true</EmbedPia>
+  </PropertyGroup>
+
   <ItemGroup Condition="'$(UsePiaStub)' != 'true' And '$(SolidWorksApiDir)' != ''">
     <Reference Include="SolidWorks.Interop.swpublished">
       <HintPath>$(SolidWorksApiDir)\SolidWorks.Interop.swpublished.dll</HintPath>
-      <Private>false</Private>
-      <EmbedInteropTypes>false</EmbedInteropTypes>
+      <EmbedInteropTypes>$(EmbedPia)</EmbedInteropTypes>
+      <!-- Kalau ditanam, tidak perlu dikopi. Kalau tidak, WAJIB dikopi. -->
+      <Private Condition="'$(EmbedPia)' != 'true'">true</Private>
+      <Private Condition="'$(EmbedPia)' == 'true'">false</Private>
     </Reference>
   </ItemGroup>
 

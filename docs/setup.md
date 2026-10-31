@@ -113,6 +113,37 @@ Gunanya: kode add-in bisa diverifikasi benar secara tipe di mesin tanpa CAD. Tan
 satu-satunya cara tahu kode add-in kompilabel adalah mencobanya di mesin bermesin
 SolidWorks — umpan balik lambat, tepat di langkah yang ingin kita buat simpel.
 
+### Tipe interop ditanam, bukan direferensi
+
+`EmbedInteropTypes=true` (NoPIA) menanamkan definisi `ISwAddin` ke dalam assembly kita,
+sehingga **tidak ada dependensi assembly saat runtime**.
+
+Ini memperbaiki dua hal:
+
+**Pertama, registrasi.** RegAsm harus *memuat* assembly kita untuk memanggil
+`[ComRegisterFunction]`. Dengan referensi biasa, CLR butuh `swpublished.dll` saat itu — dan
+PIA SolidWorks **tidak ada di GAC**, jadi registrasi gagal:
+
+```
+RegAsm : error RA0000 : Could not load file or assembly
+'SolidWorks.Interop.swpublished, Version=33.1.1.1 ...'
+```
+
+**Kedua, dan ini yang lebih penting untuk kolaborasi:** referensi biasa mengikat versi PIA
+secara keras. `Version=33.1.1.1` itu SolidWorks 2025. Add-in yang dibangun di SW2025 lalu
+dipakai di SW2026 akan memuat dua versi assembly yang sama ke satu proses. Type equivalence
+pada interop yang ditanam membuat interface-nya **menyatu** dengan apa pun yang dimuat
+SolidWorks — jadi dua laptop dengan versi berbeda tidak masalah.
+
+Jalur mundur kalau penanaman bermasalah:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1 -NoEmbedPia
+```
+
+Itu mengopi `swpublished.dll` ke folder output. Juga sah — folder sumbernya memang bernama
+`redist`, dan Dassault menyediakannya untuk didistribusikan bersama add-in.
+
 ### Tanpa strong naming
 
 `RegAsm /codebase` merekam **path** assembly, bukan identitas strong name, jadi SolidWorks
@@ -151,6 +182,22 @@ menghasilkan kegagalan yang membingungkan.
 | `addin.ps1 -Action Unregister` | Lepas registrasi (butuh administrator) |
 | `setup.ps1 -SkipRegister` | Build saja, hindari prompt UAC |
 | `setup.ps1 -SolidWorksApiDir '<path>'` | Timpa hasil deteksi otomatis |
+| `setup.ps1 -NoEmbedPia` | Jalur mundur: kopi PIA alih-alih menanam tipe interop |
+
+### Warning RegAsm yang wajar muncul
+
+```
+RegAsm : warning RA0000 : Registering an unsigned assembly with /codebase ...
+Please give your assembly a strong name and re-register it.
+```
+
+Ini **warning, bukan error**, dan registrasi tetap berhasil. `/codebase` diperlukan karena
+assembly kita tidak ada di GAC — tanpa itu, CLR tidak akan menemukannya saat SolidWorks
+memuat add-in. Add-in .NET SolidWorks umumnya didaftarkan begini.
+
+Kalau nanti warning itu benar-benar menimbulkan masalah pemuatan, jalan keluarnya adalah
+strong naming dengan kunci yang di-commit ke repo — strong name bukan mekanisme keamanan,
+jadi itu praktik yang lazim. Belum dilakukan karena belum ada buktinya diperlukan.
 
 **Sebelum rebuild:** SolidWorks mengunci DLL yang sudah dimuat. Tutup SolidWorks atau lepas
 add-in lebih dulu. Menimpa paksa menghasilkan gejala yang membingungkan.

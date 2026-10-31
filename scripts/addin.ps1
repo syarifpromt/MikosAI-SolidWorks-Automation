@@ -46,7 +46,9 @@ param(
     [string] $RegistrationScope = 'Machine',
 
     [ValidateSet('Debug', 'Release')]
-    [string] $Configuration = 'Release'
+    [string] $Configuration = 'Release',
+
+    [switch] $NoEmbedPia
 )
 
 $ErrorActionPreference = 'Stop'
@@ -133,7 +135,10 @@ if ($Action -eq 'Build') {
     Write-Section "Build add-in ($Configuration, net48, x64)"
     Write-Host "PIA: $apiDir"
 
-    & dotnet build $AddinProj -c $Configuration -p:SolidWorksApiDir="$apiDir" --nologo
+    $embed = 'true'
+    if ($NoEmbedPia) { $embed = 'false' }
+
+    & dotnet build $AddinProj -c $Configuration -p:SolidWorksApiDir="$apiDir" -p:EmbedPia=$embed --nologo
     if ($LASTEXITCODE -ne 0) {
         throw "Build gagal dengan exit code $LASTEXITCODE."
     }
@@ -174,7 +179,15 @@ Buka PowerShell sebagai administrator, lalu jalankan ulang perintah yang sama.
         # /codebase supaya CLR tahu lokasi DLL tanpa GAC.
         # /tlb WAJIB. Tanpa TLB, SolidWorks bisa memuat DLL dan mengembalikan
         # LoadAddIn=0, lalu TIDAK PERNAH menginstansiasi ISwAddin.
-        & $RegAsm $AddinDll /codebase /tlb:$AddinTlb
+        $keluaran = & $RegAsm $AddinDll /codebase /tlb:$AddinTlb 2>&1
+        $keluaran | ForEach-Object { Write-Host $_ }
+
+        if (($keluaran | Out-String) -match 'SolidWorks\.Interop') {
+            Write-Host ''
+            Write-Host 'RegAsm tidak bisa memuat PIA SolidWorks.' -ForegroundColor Red
+            Write-Host 'Bangun ulang: powershell -File scripts\setup.ps1' -ForegroundColor Yellow
+            Write-Host 'Atau jalur mundur: powershell -File scripts\setup.ps1 -NoEmbedPia' -ForegroundColor Yellow
+        }
     }
     else {
         Write-Host "CurrentUser hanya membuktikan aktivasi CLR/COM." -ForegroundColor Yellow
