@@ -1,8 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/MikosAI.Core/MikosAI.Core.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/MikosAI.Core.Tests/MikosAI.Core.Tests.csproj" />
-  </Folder>
-</Solution>
