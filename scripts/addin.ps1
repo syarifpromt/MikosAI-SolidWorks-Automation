@@ -374,6 +374,47 @@ if ($Action -eq 'Probe') {
     Write-Host "Assembly : $($status.addinAssembly)"
     Write-Host "PID      : $($status.processId)"
 
+    # Deteksi DLL usang. Dua kali kami mendiagnosis error runtime dari kode yang
+    # sudah diperbaiki, karena yang dimuat SolidWorks ternyata build lama.
+    $commitDll = $null
+    if ($status.PSObject.Properties.Name -contains 'buildCommit') {
+        $commitDll = $status.buildCommit
+    }
+
+    $commitRepo = $null
+    try {
+        $commitRepo = (& git -C $RepoRoot rev-parse --short HEAD 2>$null)
+        if ($commitRepo) { $commitRepo = $commitRepo.Trim() }
+    }
+    catch {
+        $commitRepo = $null
+    }
+
+    Write-Host "Commit   : $commitDll (build DLL)"
+
+    if ($commitDll -and $commitRepo) {
+        if ($commitDll -eq $commitRepo) {
+            Write-Host "           sama dengan HEAD repo - DLL ini mutakhir" -ForegroundColor Green
+        }
+        else {
+            Write-Host ''
+            Write-Host 'DLL YANG BERJALAN BUKAN KODE TERBARU' -ForegroundColor Red
+            Write-Host '------------------------------------'
+            Write-Host "  DLL dibangun dari : $commitDll"
+            Write-Host "  HEAD repo sekarang: $commitRepo"
+            Write-Host ''
+            Write-Host '  Hasil di bawah TIDAK mencerminkan kode terbaru.' -ForegroundColor Red
+            Write-Host '  Tutup SolidWorks, lalu:' -ForegroundColor Yellow
+            Write-Host '    git pull origin main'
+            Write-Host '    powershell -File scripts\setup.ps1'
+            Write-Host '  lalu buka SolidWorks dan probe ulang.'
+            Write-Host ''
+        }
+    }
+    elseif (-not $commitDll) {
+        Write-Host '           (DLL dibangun sebelum cap commit ada - rebuild untuk mengaktifkannya)' -ForegroundColor Yellow
+    }
+
     Write-Section 'Gerbang penerimaan'
 
     $gates = @(

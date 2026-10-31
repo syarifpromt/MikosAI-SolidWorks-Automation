@@ -149,6 +149,8 @@ namespace MikosAI.Addin
                 FieldInt(sb, "fileNewEvents", FileNewEvents);
                 FieldInt(sb, "activeDocChangeEvents", ActiveDocChangeEvents);
                 FieldInt(sb, "openDocumentCount", OpenDocumentCount);
+                Field(sb, "buildCommit", MetadataAssembly("BuildCommit"));
+                Field(sb, "buildTime", MetadataAssembly("BuildTime"));
                 Field(sb, "addinAssembly", LokasiAssemblyAman());
                 Field(sb, "addinFolder", AssemblyResolver.FolderAddin);
                 FieldBool(sb, "assemblyResolverInstalled", AssemblyResolver.Terpasang);
@@ -246,6 +248,34 @@ namespace MikosAI.Addin
             }
 
             sb.Append('"');
+        }
+
+        /// <summary>
+        /// Membaca nilai AssemblyMetadata yang dicap saat build. Dipakai probe
+        /// untuk mendeteksi DLL usang - lihat target CapCommitGit di csproj.
+        /// </summary>
+        private static string? MetadataAssembly(string kunci)
+        {
+            try
+            {
+                var atribut = typeof(HostDiagnostics).Assembly
+                    .GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), inherit: false);
+
+                foreach (var item in atribut)
+                {
+                    if (item is System.Reflection.AssemblyMetadataAttribute meta
+                        && string.Equals(meta.Key, kunci, StringComparison.Ordinal))
+                    {
+                        return meta.Value;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Metadata tidak wajib ada.
+            }
+
+            return null;
         }
 
         private static string LokasiAssemblyAman()

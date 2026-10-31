@@ -172,6 +172,32 @@ Write-Host ''
 Write-Host 'Setup MikosAI' -ForegroundColor Cyan
 Write-Host '============='
 
+# Tampilkan commit yang sedang dibangun, dan peringatkan kalau branch lokal
+# tertinggal dari origin. Dua kali kami menguji kode lama karena git pull
+# terlewat, dan gejalanya menyesatkan - error runtime dari bug yang sudah
+# diperbaiki.
+try {
+    $commit  = (& git -C $RepoRoot rev-parse --short HEAD 2>$null)
+    $subjek  = (& git -C $RepoRoot log -1 --format=%s 2>$null)
+
+    if ($commit) {
+        Write-Host ''
+        Write-Host "Commit: $($commit.Trim())  $subjek"
+
+        $tertinggal = (& git -C $RepoRoot rev-list --count "HEAD..origin/main" 2>$null)
+        if ($tertinggal -and ([int] $tertinggal) -gt 0) {
+            Write-Host ''
+            Write-Host "PERINGATAN: branch lokal tertinggal $tertinggal commit dari origin/main." -ForegroundColor Yellow
+            Write-Host '            Kalau tidak sengaja, hentikan dan jalankan:' -ForegroundColor Yellow
+            Write-Host '              git pull origin main' -ForegroundColor Yellow
+            Write-Host '            (perbandingan ini memakai ref origin yang tersimpan, jalankan git fetch kalau ragu)'
+        }
+    }
+}
+catch {
+    # Bukan repo git, atau git tidak ada. Bukan masalah.
+}
+
 # ====================================================================
 # 1. Lingkungan
 # ====================================================================
