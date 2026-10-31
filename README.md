@@ -60,6 +60,20 @@ Tiga aturan yang ditegakkan secara struktural, bukan lewat niat baik:
    `not_implemented` tidak pernah muncul di daftar tool MCP. Bukan dilarang lewat prompt —
    tool-nya memang tidak ada.
 
+## Build dan test
+
+`MikosAI.Core` tidak punya dependensi SolidWorks, jadi bisa dibuild dan ditest di mesin mana
+pun — termasuk mesin tanpa SolidWorks dan tanpa Visual Studio:
+
+```powershell
+dotnet build
+dotnet test
+```
+
+Itu yang membuat Jalur Platform bisa bekerja penuh tanpa CAD. Proyek `MikosAI.Addin` (yang
+menyentuh PIA SolidWorks) butuh instalasi SolidWorks dan dikerjakan mulai Fase 0 di sisi
+yang punya lisensi.
+
 ## Kebutuhan
 
 - Windows 10 1809+ (ConPTY), SolidWorks dengan seat lisensi aktif dan sesi desktop

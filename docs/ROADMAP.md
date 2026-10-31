@@ -101,13 +101,33 @@ SolidWorks dan punya kanal thread yang benar.
 **Jalur CAD**
 
 - `capabilities.yaml` versi awal (skema + entri v0.1 berstatus `not_implemented`)
-- `CapabilityLedger` loader + validator
+- ~~`CapabilityLedger` loader + validator~~ → `MikosAI.Core/Capabilities/` **selesai**
 - ~~Skema JSON untuk `DesignPlan`~~ → `schemas/design-plan.schema.json` **selesai**
 - ~~Skema input/output 18 tool v0.1~~ → `schemas/tools.json` **selesai**, perlu ditinjau
   bersama sebelum dianggap final
-- Validator DesignPlan, termasuk aturan parameter `assumed` wajib punya `openQuestions`
+- ~~Validator DesignPlan, termasuk aturan parameter `assumed` wajib punya `openQuestions`~~
+  → `MikosAI.Core/Plan/PlanValidator.cs` **selesai**
 - Harness golden test yang bisa jalan tanpa SolidWorks (pakai fake), menjalankan
   `examples/mounting-plate.plan.json`
+
+### Sudah selesai di `MikosAI.Core`
+
+108 test hijau, dibuild dan dijalankan tanpa SolidWorks dan tanpa Visual Studio:
+
+| Berkas | Isi |
+|---|---|
+| `Execution/VerificationGate.cs` | Normalisasi dan agregasi putusan |
+| `Execution/RecoveryAdvisor.cs` | 11 kelas error, keputusan tanpa eksekusi |
+| `Execution/ToolResult.cs` | Envelope dengan pemisahan `Ok` dan `IsTaskSuccessful` |
+| `Capabilities/CapabilityLedger.cs` | Pembaca `capabilities.yaml` dan gating |
+| `Tools/ToolCatalog.cs` | Katalog tool dan validasi silang terhadap ledger |
+| `Plan/PlanValidator.cs` | Aturan semantik plan |
+| `Threading/IMainThreadDispatcher.cs` | Abstraksi; implementasi nyata di Addin |
+| `Tracing/TraceWriter.cs` | JSONL dengan redaksi, tidak pernah melempar exception |
+
+`MikosAI.Core` sengaja **tidak** punya dependensi SolidWorks. Itu yang membuat Jalur
+Platform bisa bekerja penuh tanpa CAD, dan membuat seluruh logika keamanan bisa diuji
+dalam hitungan detik.
 
 **Gerbang penerimaan Fase 0**
 
