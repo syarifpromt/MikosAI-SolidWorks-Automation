@@ -92,11 +92,37 @@ function Invoke-Register {
         throw "Assembly tidak ada: $AddinDll"
     }
 
-    $keluaran = & $RegAsm $AddinDll /codebase /tlb:$AddinTlb 2>&1
-    $keluaran | ForEach-Object { Write-Host $_ }
+    # JANGAN biarkan 2>&1 pada executable native menjadi error yang menghentikan.
+    #
+    # Di PowerShell 5.1, meredirect stderr sebuah exe membungkus tiap baris jadi
+    # ErrorRecord (NativeCommandError). Dengan $ErrorActionPreference='Stop',
+    # warning RegAsm yang TIDAK BERBAHAYA ikut menghentikan script - padahal
+    # RegAsm keluar dengan kode 0 dan registrasinya berhasil.
+    #
+    # Jadi: turunkan preference sementara, dan nilai keberhasilan HANYA dari
+    # $LASTEXITCODE. ToString() pada ErrorRecord memberi pesannya saja, tanpa
+    # jejak posisi yang bikin panik.
+    $eapSebelumnya = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $baris = & $RegAsm $AddinDll /codebase /tlb:$AddinTlb 2>&1 | ForEach-Object { $_.ToString() }
+        $kode  = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $eapSebelumnya
+    }
 
-    if ($LASTEXITCODE -ne 0) {
-        $teks = ($keluaran | Out-String)
+    foreach ($b in $baris) {
+        if ($b -match 'warning RA0000') {
+            Write-Host "  (warning wajar, registrasi tetap jalan) $b" -ForegroundColor DarkGray
+        }
+        else {
+            Write-Host "  $b"
+        }
+    }
+
+    if ($kode -ne 0) {
+        $teks = ($baris -join "`n")
 
         # Kegagalan yang paling mungkin dan paling membingungkan: RegAsm harus
         # MEMUAT assembly kita untuk memanggil [ComRegisterFunction], dan saat
@@ -117,7 +143,7 @@ Atau pakai jalur mundur copy-local:
 '@
         }
 
-        throw "RegAsm gagal dengan exit code $LASTEXITCODE."
+        throw "RegAsm gagal dengan exit code $kode."
     }
 }
 

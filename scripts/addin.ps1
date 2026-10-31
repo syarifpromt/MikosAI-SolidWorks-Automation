@@ -73,6 +73,54 @@ function Test-Administrator {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+function Invoke-RegAsm {
+    <#
+        Menjalankan RegAsm dan mengembalikan keluarannya sebagai string biasa.
+
+        JANGAN biarkan 2>&1 pada executable native menjadi error yang
+        menghentikan. Di PowerShell 5.1, meredirect stderr sebuah exe membungkus
+        tiap baris jadi ErrorRecord (NativeCommandError). Dengan
+        $ErrorActionPreference='Stop', warning RegAsm yang TIDAK BERBAHAYA ikut
+        menghentikan script - padahal RegAsm keluar dengan kode 0 dan
+        registrasinya berhasil.
+
+        Keberhasilan dinilai HANYA dari $LASTEXITCODE.
+    #>
+    param([string[]] $Argumen)
+
+    $eapSebelumnya = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $baris = & $RegAsm @Argumen 2>&1 | ForEach-Object { $_.ToString() }
+        $kode  = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $eapSebelumnya
+    }
+
+    foreach ($b in $baris) {
+        if ($b -match 'warning RA0000') {
+            Write-Host "  (warning wajar, registrasi tetap jalan)" -ForegroundColor DarkGray
+            Write-Host "  $b" -ForegroundColor DarkGray
+        }
+        else {
+            Write-Host "  $b"
+        }
+    }
+
+    if ($kode -ne 0) {
+        if (($baris -join "`n") -match 'SolidWorks\.Interop') {
+            Write-Host ''
+            Write-Host 'RegAsm tidak bisa memuat PIA SolidWorks.' -ForegroundColor Red
+            Write-Host 'Bangun ulang: powershell -File scripts\setup.ps1' -ForegroundColor Yellow
+            Write-Host 'Atau jalur mundur: powershell -File scripts\setup.ps1 -NoEmbedPia' -ForegroundColor Yellow
+        }
+        throw "RegAsm gagal dengan exit code $kode."
+    }
+
+    return $baris
+}
+
 function Resolve-SolidWorksApiDir {
     if ($SolidWorksApiDir) {
         if (-not (Test-Path -LiteralPath $SolidWorksApiDir)) {
@@ -179,24 +227,12 @@ Buka PowerShell sebagai administrator, lalu jalankan ulang perintah yang sama.
         # /codebase supaya CLR tahu lokasi DLL tanpa GAC.
         # /tlb WAJIB. Tanpa TLB, SolidWorks bisa memuat DLL dan mengembalikan
         # LoadAddIn=0, lalu TIDAK PERNAH menginstansiasi ISwAddin.
-        $keluaran = & $RegAsm $AddinDll /codebase /tlb:$AddinTlb 2>&1
-        $keluaran | ForEach-Object { Write-Host $_ }
-
-        if (($keluaran | Out-String) -match 'SolidWorks\.Interop') {
-            Write-Host ''
-            Write-Host 'RegAsm tidak bisa memuat PIA SolidWorks.' -ForegroundColor Red
-            Write-Host 'Bangun ulang: powershell -File scripts\setup.ps1' -ForegroundColor Yellow
-            Write-Host 'Atau jalur mundur: powershell -File scripts\setup.ps1 -NoEmbedPia' -ForegroundColor Yellow
-        }
+        $baris = Invoke-RegAsm @($AddinDll, '/codebase', "/tlb:$AddinTlb")
     }
     else {
         Write-Host "CurrentUser hanya membuktikan aktivasi CLR/COM." -ForegroundColor Yellow
         Write-Host "SolidWorks TIDAK akan memuat add-in dengan scope ini." -ForegroundColor Yellow
-        & $RegAsm $AddinDll /codebase
-    }
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "RegAsm gagal dengan exit code $LASTEXITCODE."
+        $baris = Invoke-RegAsm @($AddinDll, '/codebase')
     }
 
     Write-Host ''
@@ -226,7 +262,7 @@ Kalau assembly sudah terhapus, bersihkan registry manual:
 
     Write-Section 'Lepas registrasi'
 
-    & $RegAsm $AddinDll /unregister /tlb:$AddinTlb
+    $baris = Invoke-RegAsm @($AddinDll, '/unregister', "/tlb:$AddinTlb")
     Write-Host ''
     Write-Host 'Selesai.' -ForegroundColor Green
     Write-Host 'Tutup SolidWorks sebelum rebuild - SolidWorks mengunci DLL yang sudah dimuat.'

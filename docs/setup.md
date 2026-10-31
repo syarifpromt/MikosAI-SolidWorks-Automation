@@ -191,7 +191,16 @@ RegAsm : warning RA0000 : Registering an unsigned assembly with /codebase ...
 Please give your assembly a strong name and re-register it.
 ```
 
-Ini **warning, bukan error**, dan registrasi tetap berhasil. `/codebase` diperlukan karena
+Ini **warning, bukan error**, dan registrasi tetap berhasil. Script menampilkannya dengan
+label `(warning wajar, registrasi tetap jalan)` supaya tidak disalahartikan.
+
+> **Catatan untuk yang mengubah script:** jangan memakai `2>&1` pada executable native tanpa
+> pengaman. Di PowerShell 5.1 itu membungkus tiap baris stderr jadi `ErrorRecord`
+> (`NativeCommandError`), dan dengan `$ErrorActionPreference = 'Stop'` warning yang tidak
+> berbahaya pun menghentikan script — padahal exe-nya keluar dengan kode 0. Pernah terjadi
+> dan membuat registrasi yang berhasil terlihat gagal. Pola yang benar ada di
+> `Invoke-RegAsm`: turunkan preference sementara, lalu nilai keberhasilan **hanya** dari
+> `$LASTEXITCODE`. `/codebase` diperlukan karena
 assembly kita tidak ada di GAC — tanpa itu, CLR tidak akan menemukannya saat SolidWorks
 memuat add-in. Add-in .NET SolidWorks umumnya didaftarkan begini.
 
