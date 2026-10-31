@@ -71,6 +71,10 @@ namespace MikosAI.Core.Plan
             return Validate(document.RootElement);
         }
 
+        /// <summary>Overload untuk pemanggil yang sudah memegang plan sebagai JsonObject.</summary>
+        public PlanValidationResult Validate(System.Text.Json.Nodes.JsonObject plan)
+            => Validate(plan.ToJsonString());
+
         public PlanValidationResult Validate(JsonElement plan)
         {
             var errors = new List<PlanProblem>();

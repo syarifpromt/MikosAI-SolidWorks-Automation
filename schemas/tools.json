@@ -274,8 +274,10 @@
       },
       "outputData": {
         "sketchName": "string",
-        "constrainedStatus": "string"
-      }
+        "constrainedStatus": "string",
+        "sketchFullyDefined": "boolean"
+      },
+      "notes": "sketchFullyDefined memenuhi expect.sketchFullyDefined di DesignPlan. Hanya executor yang bisa menghitungnya, karena hanya dia yang membaca status constraint sebenarnya."
     },
 
     {
@@ -298,7 +300,8 @@
       },
       "outputData": {
         "featureName": "string",
-        "volumeMm3After": "number"
+        "volumeMm3After": "number",
+        "volumeIncreases": "boolean"
       },
       "notes": "PERINGATAN URUTAN PARAMETER: FeatureExtrusion2/3 punya daftar parameter panjang yang mudah tertukar, dan urutan berbeda antarversi. Tulis test khusus urutan parameter - repo referensi punya test_extrude_cut_param_order.py untuk alasan ini."
     },
@@ -322,7 +325,8 @@
       },
       "outputData": {
         "featureName": "string",
-        "volumeMm3After": "number"
+        "volumeMm3After": "number",
+        "volumeDecreases": "boolean"
       },
       "notes": "Verifikasi WAJIB memeriksa volume BERKURANG. Cut yang sukses secara API tapi tidak mengubah volume adalah cut yang tidak memotong apa pun."
     },
