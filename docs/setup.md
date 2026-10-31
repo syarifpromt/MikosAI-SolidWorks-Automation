@@ -85,19 +85,25 @@ SolidWorks — termasuk CI nanti. Add-in dibangun lewat `scripts/addin.ps1`.
 
 Akibatnya `dotnet build` dan `dotnet test` **selalu hijau di mesin mana pun**.
 
-### Permukaan PIA dikecilkan ke satu interface
+### Pemanggilan API early-bound, bukan `dynamic`
 
-Satu-satunya tipe PIA yang dipakai saat kompilasi adalah `ISwAddin`. Semua panggilan
-SolidWorks lain late-bound lewat `SolidWorksApi` (`dynamic` — SolidWorks mendukung
-IDispatch).
+Versi pertama memakai `dynamic` supaya kode add-in bisa dikompilasi tanpa PIA. Alasannya
+terdengar bagus: tanda tangan API yang salah jadi error terstruktur di `host-status.json`
+alih-alih error compiler di mesin orang lain.
 
-Tanda tangan API yang berbeda antarversi jadi **error terstruktur di `host-status.json`**,
-bukan error compiler di mesin kalian. Yang kita tukar: "build gagal di mesinmu" menjadi
-"satu baris error di berkas diagnostik" — dan yang kedua jauh lebih mudah dilaporkan dan
-diperbaiki.
+**Itu terbukti salah di mesin nyata.** Setiap panggilan gagal dengan HRESULT yang sama:
 
-Pendaftaran callback bahkan punya fallback: `SetAddinCallbackInfo2` dicoba lebih dulu, lalu
-`SetAddinCallbackInfo` versi lama.
+```
+0x8002802B  TYPE_E_ELEMENTNOTFOUND
+```
+
+Artinya nama member tidak ditemukan lewat IDispatch — `SetAddinCallbackInfo2`,
+`RevisionNumber`, `GetDocumentCount`, semuanya. Interface SolidWorks dideskripsikan oleh
+type library dan dipanggil lewat vtable; ia **tidak** bisa dicari namanya lewat IDispatch
+seperti yang diasumsikan DLR.
+
+Jadi pemanggilan harus early-bound lewat PIA bertipe. Keuntungan lintas-versi dipertahankan
+dengan cara lain — lihat bagian berikutnya.
 
 ### Compile-check tanpa SolidWorks
 

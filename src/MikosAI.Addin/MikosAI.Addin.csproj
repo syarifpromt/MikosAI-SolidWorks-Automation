@@ -72,8 +72,6 @@
   <ItemGroup>
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
-    <!-- dynamic di SolidWorksApi butuh ini. -->
-    <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
 
   <!--
@@ -115,10 +113,34 @@
   </PropertyGroup>
 
   <ItemGroup Condition="'$(UsePiaStub)' != 'true' And '$(SolidWorksApiDir)' != ''">
+    <!-- ISwAddin: interface yang diimplementasikan add-in. -->
     <Reference Include="SolidWorks.Interop.swpublished">
       <HintPath>$(SolidWorksApiDir)\SolidWorks.Interop.swpublished.dll</HintPath>
       <EmbedInteropTypes>$(EmbedPia)</EmbedInteropTypes>
       <!-- Kalau ditanam, tidak perlu dikopi. Kalau tidak, WAJIB dikopi. -->
+      <Private Condition="'$(EmbedPia)' != 'true'">true</Private>
+      <Private Condition="'$(EmbedPia)' == 'true'">false</Private>
+    </Reference>
+
+    <!--
+      ISldWorks: objek aplikasi.
+
+      WAJIB bertipe. Versi pertama memakai dynamic dan setiap panggilan gagal
+      dengan 0x8002802B TYPE_E_ELEMENTNOTFOUND - interface SolidWorks
+      dideskripsikan type library dan dipanggil lewat vtable, tidak bisa dicari
+      namanya lewat IDispatch. Lihat komentar di SolidWorksApi.cs.
+    -->
+    <Reference Include="SolidWorks.Interop.sldworks">
+      <HintPath>$(SolidWorksApiDir)\SolidWorks.Interop.sldworks.dll</HintPath>
+      <EmbedInteropTypes>$(EmbedPia)</EmbedInteropTypes>
+      <Private Condition="'$(EmbedPia)' != 'true'">true</Private>
+      <Private Condition="'$(EmbedPia)' == 'true'">false</Private>
+    </Reference>
+
+    <!-- Tipe enum/konstanta yang dirujuk tanda tangan ISldWorks. -->
+    <Reference Include="SolidWorks.Interop.swconst">
+      <HintPath>$(SolidWorksApiDir)\SolidWorks.Interop.swconst.dll</HintPath>
+      <EmbedInteropTypes>$(EmbedPia)</EmbedInteropTypes>
       <Private Condition="'$(EmbedPia)' != 'true'">true</Private>
       <Private Condition="'$(EmbedPia)' == 'true'">false</Private>
     </Reference>
@@ -133,6 +155,8 @@
            Text="SolidWorksApiDir belum diberikan. Jalankan: powershell -File scripts\setup.ps1  (atau scripts\addin.ps1 -Action Build -SolidWorksApiDir '&lt;path api\redist&gt;')" />
     <Error Condition="!Exists('$(SolidWorksApiDir)\SolidWorks.Interop.swpublished.dll')"
            Text="SolidWorks.Interop.swpublished.dll tidak ada di '$(SolidWorksApiDir)'. Jalankan scripts\doctor.ps1 untuk mendeteksi path yang benar." />
+    <Error Condition="!Exists('$(SolidWorksApiDir)\SolidWorks.Interop.sldworks.dll')"
+           Text="SolidWorks.Interop.sldworks.dll tidak ada di '$(SolidWorksApiDir)'." />
   </Target>
 
 </Project>

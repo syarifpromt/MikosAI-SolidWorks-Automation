@@ -9,7 +9,7 @@ Terakhir diperbarui 2026-10-31
 
 | Fase | Isi | Progres |
 |---|---|---|
-| **0** | Fondasi | ~90% — tinggal verifikasi add-in di SolidWorks nyata |
+| **0** | Fondasi | ~92% — add-in terbukti hidup di SW2025; tinggal panggilan API |
 | 1 | MCP server + tool read-only | ~50% — server jalan, 6 tool CAD belum |
 | 2 | Provider host (`agy`) | belum mulai |
 | 3 | Jalur tulis | belum mulai |
@@ -157,10 +157,11 @@ Platform bisa bekerja penuh tanpa CAD.
 
 ### Gerbang penerimaan Fase 0
 
-- [ ] Add-in diinstansiasi oleh `SLDWORKS.exe`, `LoadAddIn` mengembalikan 0
+- [x] Add-in diinstansiasi oleh `SLDWORKS.exe` — terbukti, `status: connected`
 - [ ] `host-status.json` memenuhi kelima syarat di `ARSITEKTUR.md` §4.1
 - [ ] Test membuktikan: tanpa TLB, add-in **tidak** terinstansiasi walaupun `LoadAddIn=0`
 - [ ] Test membuktikan: handler PMP tanpa `IDispatch` melempar `InvalidCastException`
+- [x] `MainThreadDispatcher` menangkap thread utama — terbukti, `dispatcherReady: true`
 - [ ] `MainThreadDispatcher` punya test yang gagal kalau API SolidWorks dipanggil dari thread lain
 - [x] `capabilities.yaml` tervalidasi
 - [ ] 18 skema tool disetujui kedua orang
@@ -374,7 +375,7 @@ Urutan mengikuti nilai dibagi risiko, bukan keinginan.
 | R1 | `agy` diam ketika stdout bukan TTY | **Kritis** — kegagalan menyerupai sukses | ConPTY; kelas error `provider_silent`; test yang gagal tanpa ConPTY | Kelas error ✅, ConPTY ⬜ |
 | R2 | Flag `agy` berubah antarrilis | Tinggi | Probing `--help` saat startup; pin versi teruji | ⬜ |
 | R3 | ToS: orkestrasi eksternal dengan akun subscription | Tinggi, **legal** | Abstraksi provider; jalur API key; cek ToS sebelum distribusi | ⬜ |
-| R4 | API SolidWorks tidak thread-safe | **Kritis** — crash acak tak bisa direproduksi | `MainThreadDispatcher`; aturan review; test | Abstraksi ✅, impl ⬜ |
+| R4 | API SolidWorks tidak thread-safe | **Kritis** — crash acak tak bisa direproduksi | `MainThreadDispatcher`; aturan review; test | ✅ **terbukti hidup di SLDWORKS.exe** |
 | R5 | Crash add-in menjatuhkan SolidWorks | Tinggi | Operasi dibungkus guard; verifikasi sebelum klaim sukses | `PlanRunner` menangkap exception ✅ |
 | R6 | Referensi `Face1`/`Edge1` rusak saat fitur disisipkan | Tinggi | Referensi semantik; dilarang lewat skema | Skema melarangnya ✅ |
 | R7 | SolidWorks mengunci DLL yang dimuat | Sedang | `UnloadAddIn` sebelum rebuild; didokumentasikan | ✅ terdokumentasi |
@@ -383,8 +384,9 @@ Urutan mengikuti nilai dibagi risiko, bukan keinginan.
 | R10 | Redistribusi PIA dibatasi lisensi | Sedang | Rujuk instalasi lokal, jangan vendor ke repo | ✅ terdokumentasi |
 | R11 | Dua orang, cakupan membengkak | Tinggi | Gerbang penerimaan per fase; "kecil itu fitur" | ✅ |
 | R12 | Tanpa Visual Studio, step-debug net48 terbatas | Sedang | Diagnostik-first (`host-status.json`, trace); Core tanpa dependensi SolidWorks diuji cepat | Core ✅, diagnostik ✅ |
-| R13 | Kode add-in tidak bisa diverifikasi tanpa SolidWorks | Tinggi | Permukaan PIA dikecilkan ke `ISwAddin` saja, sisanya late-bound; stub compile-check | ✅ |
-| R14 | Dependensi add-in `/codebase` dicari di folder SLDWORKS.exe, bukan folder kita | **Kritis** — add-in diam-diam tidak terinstansiasi, tanpa pesan error | `AssemblyResolver` dipasang di static ctor; `HostDiagnostics` nol dependensi eksternal | ✅ |
+| R13 | Kode add-in tidak bisa diverifikasi tanpa SolidWorks | Tinggi | Stub PIA compile-check (`-Action CompileCheck`) | ✅ |
+| R14 | Dependensi add-in `/codebase` dicari di folder SLDWORKS.exe, bukan folder kita | **Kritis** — add-in diam-diam tidak terinstansiasi, tanpa pesan error | `AssemblyResolver` dipasang di static ctor; `HostDiagnostics` nol dependensi eksternal | ✅ terbukti di mesin nyata |
+| R15 | API SolidWorks tidak bisa dipanggil lewat `dynamic`/IDispatch | Tinggi — semua panggilan gagal `0x8002802B` | PIA bertipe wajib; `EmbedInteropTypes` mempertahankan keuntungan lintas-versi | ✅ terbukti di mesin nyata |
 
 R1, R3, R4 yang paling perlu diawasi. R1 dan R4 bisa diselesaikan dengan kode. R3 tidak —
 itu keputusan, bukan bug.

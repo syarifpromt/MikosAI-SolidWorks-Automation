@@ -87,23 +87,12 @@ namespace MikosAI.Addin
             _diagnostics.AddinCookie = Cookie;
 
             // --- Simpan referensi aplikasi ----------------------------------
-            try
-            {
-                if (ThisSW is null)
-                {
-                    _diagnostics.AddError("ConnectToSW menerima ThisSW null.");
-                    _diagnostics.Status = "failed";
-                    _diagnostics.Write();
-                    return false;
-                }
+            _sw = SolidWorksApi.Buat(ThisSW, _diagnostics);
 
-                _sw = new SolidWorksApi(ThisSW, _diagnostics);
-            }
-            catch (Exception exception)
+            if (_sw is null)
             {
-                _diagnostics.AddError("inisialisasi SolidWorksApi", exception);
                 _diagnostics.Status = "failed";
-                _diagnostics.Write();
+                try { _diagnostics.Write(); } catch (Exception) { }
                 return false;
             }
 

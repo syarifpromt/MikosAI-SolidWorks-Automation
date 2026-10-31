@@ -1,28 +1,39 @@
 using System;
+using SolidWorks.Interop.sldworks;
 
 namespace MikosAI.Addin
 {
     /// <summary>
-    /// Pembungkus late-bound di atas <c>ISldWorks</c>.
+    /// Pembungkus bertipe di atas <c>ISldWorks</c>.
     ///
-    /// KENAPA LATE-BOUND, BUKAN PIA BERTIPE.
+    /// KENAPA BERTIPE, BUKAN `dynamic`.
     ///
-    /// Kode add-in ini tidak bisa dikompilasi di mesin tanpa SolidWorks, jadi
-    /// setiap tanda tangan API yang salah baru ketahuan saat seseorang
-    /// mencobanya di mesin bermesin CAD - umpan balik yang lambat dan
-    /// menjengkelkan, tepat di langkah yang ingin kita buat simpel.
+    /// Versi pertama kelas ini memakai <c>dynamic</c> dengan alasan yang
+    /// terdengar bagus: kode add-in jadi bisa dikompilasi tanpa PIA, sehingga
+    /// tanda tangan API yang salah menjadi error terstruktur di
+    /// host-status.json alih-alih error compiler di mesin orang lain.
     ///
-    /// Dengan late-binding lewat <c>dynamic</c> (SolidWorks mendukung IDispatch),
-    /// permukaan PIA saat kompilasi menyusut jadi SATU interface:
-    /// <c>ISwAddin</c>. Semua yang lain diselesaikan saat runtime, dan setiap
-    /// pemanggilan di sini dibungkus try/catch yang mencatat kegagalannya ke
-    /// host-status.json.
+    /// Itu TERBUKTI SALAH di mesin nyata. Setiap panggilan gagal dengan
+    /// HRESULT yang sama:
     ///
-    /// Harganya: tidak ada pemeriksaan tipe saat kompilasi untuk panggilan API.
-    /// Itu diterima karena pemeriksaan tipe LOKAL pun tidak pernah kita dapat -
-    /// kami tidak punya PIA untuk dicek. Yang kita tukar adalah "error compiler
-    /// di mesin mereka" menjadi "error terstruktur di host-status.json", dan
-    /// yang kedua jauh lebih mudah dilaporkan dan diperbaiki.
+    ///   0x8002802B TYPE_E_ELEMENTNOTFOUND
+    ///
+    /// yang berarti nama member tidak ditemukan lewat IDispatch -
+    /// SetAddinCallbackInfo2, RevisionNumber, GetDocumentCount, semuanya.
+    /// Interface SolidWorks dideskripsikan oleh type library dan dipanggil lewat
+    /// vtable; ia tidak bisa dicari namanya lewat IDispatch seperti yang
+    /// diasumsikan DLR.
+    ///
+    /// Jadi pemanggilan harus early-bound. Keuntungan lintas-versi tetap
+    /// dipertahankan dengan cara lain: PIA direferensi dengan
+    /// EmbedInteropTypes, sehingga definisi interface DITANAM ke assembly kita
+    /// dan type equivalence membuatnya menyatu dengan apa pun yang dimuat
+    /// SolidWorks. Tidak ada dependensi assembly saat runtime, dan tidak ada
+    /// pengikatan versi yang keras.
+    ///
+    /// Setiap pemanggilan tetap dibungkus try/catch yang mencatat kegagalannya
+    /// ke host-status.json, karena perilaku runtime SolidWorks tetap tidak bisa
+    /// diverifikasi dari sini.
     ///
     /// ATURAN: setiap method di kelas ini HANYA boleh dipanggil dari thread
     /// utama SolidWorks, lewat MainThreadDispatcher. Lihat CONTRIBUTING.md
@@ -30,25 +41,48 @@ namespace MikosAI.Addin
     /// </summary>
     internal sealed class SolidWorksApi
     {
-        private readonly dynamic _app;
+        private readonly ISldWorks _app;
         private readonly HostDiagnostics _diagnostics;
 
-        internal SolidWorksApi(object application, HostDiagnostics diagnostics)
+        private SolidWorksApi(ISldWorks app, HostDiagnostics diagnostics)
         {
-            _app = application ?? throw new ArgumentNullException(nameof(application));
-            _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+            _app = app;
+            _diagnostics = diagnostics;
+        }
+
+        /// <summary>
+        /// Membungkus objek aplikasi. Mengembalikan null kalau cast gagal -
+        /// kegagalan cast dicatat ke diagnostik, bukan dilempar, supaya
+        /// ConnectToSW tetap bisa menulis laporan.
+        /// </summary>
+        internal static SolidWorksApi? Buat(object application, HostDiagnostics diagnostics)
+        {
+            if (application is null)
+            {
+                diagnostics.AddError("ConnectToSW menerima ThisSW null.");
+                return null;
+            }
+
+            try
+            {
+                return new SolidWorksApi((ISldWorks)application, diagnostics);
+            }
+            catch (Exception exception)
+            {
+                diagnostics.AddError("cast ke ISldWorks", exception);
+                return null;
+            }
         }
 
         /// <summary>Objek COM mentah, untuk dilepas saat disconnect.</summary>
         internal object Raw => _app;
 
         /// <summary>
-        /// Mendaftarkan callback add-in.
+        /// Mendaftarkan callback add-in. Tanpa ini, SolidWorks tidak bisa
+        /// memanggil balik method add-in.
         ///
-        /// Mencoba <c>SetAddinCallbackInfo2</c> lebih dulu, lalu jatuh ke
-        /// <c>SetAddinCallbackInfo</c>. Keduanya ada di versi SolidWorks yang
-        /// berbeda, dan kita tidak ingin satu nama yang tidak tersedia
-        /// menggagalkan seluruh connect.
+        /// Nilai kembaliannya sengaja tidak dipakai, supaya tanda tangan stub
+        /// compile-check tidak perlu cocok persis pada tipe kembalian.
         /// </summary>
         internal bool TryRegisterCallback(object addin, int cookie)
         {
@@ -60,28 +94,16 @@ namespace MikosAI.Addin
             catch (Exception exception)
             {
                 _diagnostics.AddError("SetAddinCallbackInfo2", exception);
-            }
-
-            try
-            {
-                _app.SetAddinCallbackInfo(0, addin, cookie);
-                _diagnostics.AddError("info", new InvalidOperationException(
-                    "SetAddinCallbackInfo2 gagal, memakai SetAddinCallbackInfo versi lama."));
-                return true;
-            }
-            catch (Exception exception)
-            {
-                _diagnostics.AddError("SetAddinCallbackInfo", exception);
                 return false;
             }
         }
 
-        /// <summary>Nomor revisi SolidWorks, mis. "34.1.1" untuk SW2026 SP1.1.</summary>
+        /// <summary>Nomor revisi SolidWorks, mis. "33.1.1" untuk SW2025 SP1.1.</summary>
         internal string? TryGetRevision()
         {
             try
             {
-                return (string?)_app.RevisionNumber();
+                return _app.RevisionNumber();
             }
             catch (Exception exception)
             {
@@ -100,31 +122,12 @@ namespace MikosAI.Addin
         {
             try
             {
-                return (int)_app.GetDocumentCount();
+                return _app.GetDocumentCount();
             }
             catch (Exception exception)
             {
                 _diagnostics.AddError("GetDocumentCount", exception);
                 return -1;
-            }
-        }
-
-        /// <summary>
-        /// Versi SolidWorks dalam bentuk yang enak dibaca manusia.
-        /// Opsional - kalau gagal, bukan masalah.
-        /// </summary>
-        internal string? TryGetVersionLabel()
-        {
-            try
-            {
-                // Tanda tangan: GetBuildNumbers2(out string, out string, out string)
-                // bervariasi antarversi, jadi dicoba lewat properti yang lebih
-                // sederhana dulu.
-                return (string?)_app.RevisionNumber();
-            }
-            catch (Exception)
-            {
-                return null;
             }
         }
     }
