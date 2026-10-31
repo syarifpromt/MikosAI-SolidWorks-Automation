@@ -7,7 +7,10 @@
     .NET Framework. Tidak ada yang butuh Visual Studio atau Windows SDK.
 
     Action:
-      Build       Compile add-in. Butuh -SolidWorksApiDir.
+      Build        Compile add-in. Butuh -SolidWorksApiDir.
+      CompileCheck Verifikasi kode add-in kompilabel TANPA SolidWorks, memakai
+                   stub ISwAddin lokal. Outputnya tidak boleh dipakai - ini
+                   hanya pemeriksaan tipe.
       Register    Registrasi COM + TLB. Scope Machine butuh administrator.
       Unregister  Lepas registrasi. Pakai path assembly yang sama.
       Probe       Baca host-status.json dan tegakkan gerbang penerimaan.
@@ -34,7 +37,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Build', 'Register', 'Unregister', 'Probe', 'Status')]
+    [ValidateSet('Build', 'CompileCheck', 'Register', 'Unregister', 'Probe', 'Status')]
     [string] $Action,
 
     [string] $SolidWorksApiDir,
@@ -100,6 +103,25 @@ Berikan eksplisit:
 
 Direktori itu harus memuat SolidWorks.Interop.sldworks.dll.
 "@
+}
+
+# ====================================================================
+# CompileCheck - verifikasi tipe tanpa SolidWorks
+# ====================================================================
+if ($Action -eq 'CompileCheck') {
+    Write-Section 'Compile-check add-in (stub ISwAddin, tanpa PIA)'
+    Write-Host 'Ini hanya pemeriksaan tipe. Output di bin\compilecheck TIDAK boleh dipakai.'
+    Write-Host ''
+
+    & dotnet build $AddinProj -c $Configuration -p:UsePiaStub=true --nologo
+    if ($LASTEXITCODE -ne 0) {
+        throw "Compile-check gagal dengan exit code $LASTEXITCODE. Ini murni masalah kode, bukan lingkungan."
+    }
+
+    Write-Host ''
+    Write-Host 'Kode add-in benar secara tipe.' -ForegroundColor Green
+    Write-Host 'Build nyata tetap butuh PIA: -Action Build'
+    exit 0
 }
 
 # ====================================================================

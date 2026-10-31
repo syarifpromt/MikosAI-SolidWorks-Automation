@@ -1,7 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
-using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swpublished;
 
 namespace MikosAI.Addin
@@ -13,14 +12,18 @@ namespace MikosAI.Addin
     ///
     /// Tujuan satu-satunya versi ini: menjawab pertanyaan yang paling berisiko
     /// dan belum terjawab - apakah add-in benar-benar diinstansiasi oleh
-    /// SLDWORKS.exe di lingkungan kalian, dan apakah thread utamanya bisa
-    /// ditangkap.
+    /// SLDWORKS.exe, dan apakah thread utamanya bisa ditangkap.
     ///
-    /// Yang BELUM ada di sini, dan itu disengaja: CommandGroup, TaskPane,
-    /// WebView2, PropertyManagerPage, dan MCP server. Semuanya menyentuh
-    /// permukaan API yang jauh lebih luas, jadi ditambahkan setelah fondasi ini
-    /// terbukti hidup. Menambahkannya sekarang hanya memperbanyak kemungkinan
-    /// penyebab kalau gagal.
+    /// Yang BELUM ada, dan itu disengaja: CommandGroup, TaskPane, WebView2,
+    /// PropertyManagerPage, MCP server. Semuanya menyentuh permukaan API yang
+    /// jauh lebih luas, jadi ditambahkan setelah fondasi ini terbukti hidup.
+    /// Menambahkannya sekarang hanya memperbanyak kemungkinan penyebab kalau
+    /// gagal.
+    ///
+    /// Satu-satunya tipe PIA yang dipakai saat kompilasi adalah ISwAddin.
+    /// Semua panggilan SolidWorks lain late-bound lewat SolidWorksApi, supaya
+    /// tanda tangan API yang berbeda antarversi jadi error terstruktur di
+    /// host-status.json, bukan error compiler di mesin pengguna.
     ///
     /// Jangan percaya LoadAddIn=0. Periksa
     /// %LOCALAPPDATA%\MikosAI\host-status.json.
@@ -42,9 +45,8 @@ namespace MikosAI.Addin
 
         private readonly HostDiagnostics _diagnostics = new HostDiagnostics();
 
-        private ISldWorks? _swApp;
+        private SolidWorksApi? _sw;
         private MainThreadDispatcher? _dispatcher;
-        private int _cookie;
 
         // ====================================================================
         // ISwAddin
@@ -53,43 +55,36 @@ namespace MikosAI.Addin
         /// <summary>
         /// Dipanggil SolidWorks saat add-in dimuat, pada thread STA utama.
         ///
-        /// Seluruh isi method ini dibungkus try/catch per langkah. Alasannya:
-        /// exception yang lolos dari ConnectToSW tidak meninggalkan jejak apa
-        /// pun - SolidWorks hanya diam-diam tidak memuat add-in. Dengan
-        /// menangkap per langkah, kita selalu punya host-status.json yang
-        /// menyebut langkah mana yang gagal.
+        /// Setiap langkah dibungkus try/catch sendiri. Alasannya: exception yang
+        /// lolos dari ConnectToSW tidak meninggalkan jejak apa pun - SolidWorks
+        /// hanya diam-diam tidak memuat add-in. Dengan menangkap per langkah,
+        /// kita selalu punya host-status.json yang menyebut langkah mana yang
+        /// gagal.
         /// </summary>
         public bool ConnectToSW(object ThisSW, int Cookie)
         {
             _diagnostics.Status = "connecting";
             _diagnostics.AddinCookie = Cookie;
-            _cookie = Cookie;
 
             // --- Simpan referensi aplikasi ----------------------------------
             try
             {
-                _swApp = (ISldWorks)ThisSW;
+                if (ThisSW is null)
+                {
+                    _diagnostics.AddError("ConnectToSW menerima ThisSW null.");
+                    _diagnostics.Status = "failed";
+                    _diagnostics.Write();
+                    return false;
+                }
+
+                _sw = new SolidWorksApi(ThisSW, _diagnostics);
             }
             catch (Exception exception)
             {
-                _diagnostics.AddError("cast ISldWorks", exception);
+                _diagnostics.AddError("inisialisasi SolidWorksApi", exception);
                 _diagnostics.Status = "failed";
                 _diagnostics.Write();
                 return false;
-            }
-
-            // --- Daftarkan callback -----------------------------------------
-            // Tanpa ini, SolidWorks tidak bisa memanggil balik method add-in.
-            try
-            {
-                _swApp.SetAddinCallbackInfo2(0, this, Cookie);
-                _diagnostics.CallbackRegistered = true;
-            }
-            catch (Exception exception)
-            {
-                // Dicatat tapi tidak membatalkan connect: kita masih ingin tahu
-                // apakah sisanya jalan.
-                _diagnostics.AddError("SetAddinCallbackInfo2", exception);
             }
 
             // --- Tangkap thread utama ---------------------------------------
@@ -106,24 +101,12 @@ namespace MikosAI.Addin
                 _diagnostics.AddError("MainThreadDispatcher", exception);
             }
 
-            // --- Baca revisi untuk bukti ------------------------------------
-            try
-            {
-                _diagnostics.SolidWorksRevision = _swApp.RevisionNumber();
-            }
-            catch (Exception exception)
-            {
-                _diagnostics.AddError("RevisionNumber", exception);
-            }
+            // --- Daftarkan callback -----------------------------------------
+            _diagnostics.CallbackRegistered = _sw.TryRegisterCallback(this, Cookie);
 
-            try
-            {
-                _diagnostics.OpenDocumentCount = _swApp.GetDocumentCount();
-            }
-            catch (Exception exception)
-            {
-                _diagnostics.AddError("GetDocumentCount", exception);
-            }
+            // --- Bukti bahwa API benar-benar bisa dipanggil -----------------
+            _diagnostics.SolidWorksRevision = _sw.TryGetRevision();
+            _diagnostics.OpenDocumentCount = _sw.TryGetDocumentCount();
 
             _diagnostics.Status = "connected";
             _diagnostics.Write();
@@ -156,9 +139,9 @@ namespace MikosAI.Addin
 
             try
             {
-                if (_swApp is not null)
+                if (_sw is not null && Marshal.IsComObject(_sw.Raw))
                 {
-                    Marshal.ReleaseComObject(_swApp);
+                    Marshal.ReleaseComObject(_sw.Raw);
                 }
             }
             catch (Exception exception)
@@ -167,7 +150,7 @@ namespace MikosAI.Addin
             }
             finally
             {
-                _swApp = null;
+                _sw = null;
             }
 
             _diagnostics.Status = "disconnected";
@@ -203,7 +186,6 @@ namespace MikosAI.Addin
 
             var guidKey = $"{{{type.GUID.ToString().ToUpperInvariant()}}}";
 
-            // Daftar add-in yang dipindai SolidWorks.
             using (var addinKey = Registry.LocalMachine.CreateSubKey($@"SOFTWARE\SolidWorks\Addins\{guidKey}"))
             {
                 if (addinKey is null)
@@ -214,13 +196,12 @@ namespace MikosAI.Addin
                 }
 
                 // Nilai default 0 berarti tersedia tapi tidak dimuat otomatis;
-                // pemuatan otomatis diatur lewat kunci AddInsStartup per pengguna.
+                // pemuatan otomatis diatur lewat AddInsStartup per pengguna.
                 addinKey.SetValue(null, 0, RegistryValueKind.DWord);
                 addinKey.SetValue("Title", AddinTitle, RegistryValueKind.String);
                 addinKey.SetValue("Description", AddinDescription, RegistryValueKind.String);
             }
 
-            // Preferensi pemuatan saat startup, per pengguna.
             using (var startupKey = Registry.CurrentUser.CreateSubKey($@"SOFTWARE\SolidWorks\AddInsStartup\{guidKey}"))
             {
                 startupKey?.SetValue(null, 1, RegistryValueKind.DWord);

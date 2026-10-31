@@ -3,16 +3,25 @@
   <!--
     SENGAJA TIDAK ADA DI MikosAI.sln.
 
-    Proyek ini butuh PIA SolidWorks dari instalasi lokal, jadi kalau ikut di
+    Build nyata butuh PIA SolidWorks dari instalasi lokal, jadi kalau ikut di
     solution, `dotnet build` dan `dotnet test` akan gagal di mesin tanpa
-    SolidWorks. Bangun lewat scripts/addin.ps1, bukan lewat solution.
+    SolidWorks. Bangun lewat scripts/addin.ps1.
+
+    DUA MODE BUILD:
+
+      -Action Build         PIA asli dari instalasi SolidWorks. Ini yang
+                            menghasilkan DLL yang dipakai sungguhan.
+
+      -Action CompileCheck  Stub ISwAddin lokal, TANPA PIA. Hanya untuk
+                            memverifikasi kode add-in benar secara tipe di mesin
+                            tanpa SolidWorks. Outputnya tidak boleh dipakai.
+
+    Permukaan PIA saat kompilasi sengaja menyusut ke SATU interface: ISwAddin.
+    Semua panggilan SolidWorks lain late-bound lewat SolidWorksApi, supaya
+    tanda tangan API yang berbeda antarversi jadi error terstruktur di
+    host-status.json, bukan error compiler di mesin pengguna.
 
     PIA TIDAK di-vendor ke repo - redistribusinya dibatasi lisensi Dassault.
-    Path-nya harus diberikan eksplisit supaya tidak salah merujuk versi
-    SolidWorks yang berbeda:
-
-      powershell -File scripts\addin.ps1 -Action Build `
-        -SolidWorksApiDir 'C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist'
   -->
 
   <PropertyGroup>
@@ -28,11 +37,28 @@
 
     <!-- Assembly tidak ComVisible secara global; hanya kelas add-in yang ditandai. -->
     <ComVisible>false</ComVisible>
-    <EnableDefaultItems>true</EnableDefaultItems>
 
-    <!-- Hanya untuk kestabilan identitas assembly, BUKAN code signing Authenticode. -->
-    <SignAssembly Condition="Exists('$(MSBuildThisFileDirectory)MikosAI.Addin.snk')">true</SignAssembly>
-    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)MikosAI.Addin.snk</AssemblyOriginatorKeyFile>
+    <!--
+      TIDAK ada strong naming, dan itu disengaja.
+
+      RegAsm /codebase merekam PATH assembly, bukan identitas strong name, jadi
+      SolidWorks tidak membutuhkannya. Strong name juga BUKAN code signing
+      Authenticode - distribusi tetap butuh penandatanganan di pipeline rilis.
+
+      Menambahkannya justru merugikan: assembly strong-named tidak boleh
+      mereferensi yang tidak (CS8002), jadi MikosAI.Core harus ikut ditandatangani
+      - dan itu membuat `dotnet build` bergantung pada kunci yang digenerate dan
+      tidak di-commit, sehingga clone baru gagal build.
+
+      scripts/New-StrongNameKey.ps1 tetap ada untuk kebutuhan rilis nanti.
+    -->
+  </PropertyGroup>
+
+  <!-- Mode compile-check: stub, tanpa PIA. -->
+  <PropertyGroup Condition="'$(UsePiaStub)' == 'true'">
+    <DefineConstants>$(DefineConstants);MIKOSAI_PIA_STUB</DefineConstants>
+    <AssemblyName>MikosAI.Addin.CompileCheck</AssemblyName>
+    <OutputPath>$(MSBuildThisFileDirectory)bin\compilecheck\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -46,23 +72,25 @@
   <ItemGroup>
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
+    <!-- dynamic di SolidWorksApi butuh ini. -->
+    <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
 
   <!--
-    PIA dari instalasi lokal. Private=false berarti TIDAK dikopi ke output -
-    PIA harus datang dari instalasi SolidWorks pengguna, bukan dari kita.
+    Stub hanya ikut dikompilasi di mode compile-check. Di build nyata ia
+    dikecualikan sepenuhnya, jadi tidak ada risiko tanda tangan stub sampai ke
+    runtime.
   -->
-  <ItemGroup Condition="'$(SolidWorksApiDir)' != ''">
-    <Reference Include="SolidWorks.Interop.sldworks">
-      <HintPath>$(SolidWorksApiDir)\SolidWorks.Interop.sldworks.dll</HintPath>
-      <Private>false</Private>
-      <EmbedInteropTypes>false</EmbedInteropTypes>
-    </Reference>
-    <Reference Include="SolidWorks.Interop.swconst">
-      <HintPath>$(SolidWorksApiDir)\SolidWorks.Interop.swconst.dll</HintPath>
-      <Private>false</Private>
-      <EmbedInteropTypes>false</EmbedInteropTypes>
-    </Reference>
+  <ItemGroup Condition="'$(UsePiaStub)' != 'true'">
+    <Compile Remove="Interop\SwAddinStub.cs" />
+  </ItemGroup>
+
+  <!--
+    PIA dari instalasi lokal. Hanya swpublished - ISwAddin satu-satunya tipe
+    PIA yang kita butuh saat kompilasi. Private=false berarti TIDAK dikopi ke
+    output; PIA harus datang dari instalasi SolidWorks pengguna.
+  -->
+  <ItemGroup Condition="'$(UsePiaStub)' != 'true' And '$(SolidWorksApiDir)' != ''">
     <Reference Include="SolidWorks.Interop.swpublished">
       <HintPath>$(SolidWorksApiDir)\SolidWorks.Interop.swpublished.dll</HintPath>
       <Private>false</Private>
@@ -74,11 +102,11 @@
     Gagal dengan pesan yang bisa ditindaklanjuti, bukan dengan puluhan error
     "type not found" yang menyesatkan.
   -->
-  <Target Name="CekPiaSolidWorks" BeforeTargets="BeforeBuild">
+  <Target Name="CekPiaSolidWorks" BeforeTargets="BeforeBuild" Condition="'$(UsePiaStub)' != 'true'">
     <Error Condition="'$(SolidWorksApiDir)' == ''"
-           Text="SolidWorksApiDir belum diberikan. Bangun lewat: powershell -File scripts\addin.ps1 -Action Build -SolidWorksApiDir '&lt;path ke api\redist&gt;'" />
-    <Error Condition="'$(SolidWorksApiDir)' != '' And !Exists('$(SolidWorksApiDir)\SolidWorks.Interop.sldworks.dll')"
-           Text="SolidWorks.Interop.sldworks.dll tidak ada di '$(SolidWorksApiDir)'. Periksa path api\redist pada instalasi SolidWorks." />
+           Text="SolidWorksApiDir belum diberikan. Jalankan: powershell -File scripts\setup.ps1  (atau scripts\addin.ps1 -Action Build -SolidWorksApiDir '&lt;path api\redist&gt;')" />
+    <Error Condition="!Exists('$(SolidWorksApiDir)\SolidWorks.Interop.swpublished.dll')"
+           Text="SolidWorks.Interop.swpublished.dll tidak ada di '$(SolidWorksApiDir)'. Jalankan scripts\doctor.ps1 untuk mendeteksi path yang benar." />
   </Target>
 
 </Project>

@@ -60,19 +60,34 @@ Tiga aturan yang ditegakkan secara struktural, bukan lewat niat baik:
    `not_implemented` tidak pernah muncul di daftar tool MCP. Bukan dilarang lewat prompt —
    tool-nya memang tidak ada.
 
-## Build dan test
+## Mulai
 
-`MikosAI.Core` tidak punya dependensi SolidWorks, jadi bisa dibuild dan ditest di mesin mana
-pun — termasuk mesin tanpa SolidWorks dan tanpa Visual Studio:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
+```
+
+Satu perintah: periksa lingkungan, build, jalankan 171 test, verifikasi kode add-in, build
+add-in, dan registrasi dengan prompt UAC sekali. Aman diulang.
+
+**Tanpa SolidWorks, setup tetap berhasil** — langkah add-in dilewati, dan pengembangan
+`MikosAI.Core` tetap jalan penuh. Jadi kolaborator yang belum punya lisensi CAD tidak
+terhalang.
+
+Kalau ada yang tidak jalan:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1
+```
+
+Hanya butuh .NET Framework 4.8 dan dotnet SDK. **Tidak** butuh Visual Studio, **tidak** butuh
+Windows SDK. Detail lengkap di [docs/setup.md](docs/setup.md).
+
+Pengembangan sehari-hari:
 
 ```powershell
 dotnet build
 dotnet test
 ```
-
-Itu yang membuat Jalur Platform bisa bekerja penuh tanpa CAD. Proyek `MikosAI.Addin` (yang
-menyentuh PIA SolidWorks) butuh instalasi SolidWorks dan dikerjakan mulai Fase 0 di sisi
-yang punya lisensi.
 
 ## Kebutuhan
 
@@ -90,6 +105,7 @@ akan menyatakannya dengan jujur.
 | [docs/ARSITEKTUR.md](docs/ARSITEKTUR.md) | Acuan arsitektur — mulai dari sini |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 5 fase, gerbang penerimaan, pembagian kerja, registry risiko |
 | [docs/integrasi-antigravity.md](docs/integrasi-antigravity.md) | Integrasi `agy`. **Wajib dibaca sebelum menyentuh ProviderHost** |
+| [docs/setup.md](docs/setup.md) | Setup, troubleshooting, dan keputusan yang membuatnya simpel |
 | [docs/skema-tool-dan-plan.md](docs/skema-tool-dan-plan.md) | Keputusan skema tool dan DesignPlan, plus konvensi yang mudah salah |
 | [docs/bedah-repo-referensi.md](docs/bedah-repo-referensi.md) | Analisis proyek yang menjadi acuan kita |
 | [docs/adr/](docs/adr/) | Catatan keputusan arsitektur dan alasannya |

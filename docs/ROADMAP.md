@@ -9,7 +9,7 @@ Terakhir diperbarui 2026-10-31
 
 | Fase | Isi | Progres |
 |---|---|---|
-| **0** | Fondasi | ~85% — tinggal verifikasi add-in di SolidWorks nyata |
+| **0** | Fondasi | ~90% — tinggal verifikasi add-in di SolidWorks nyata |
 | 1 | MCP server + tool read-only | ~50% — server jalan, 6 tool CAD belum |
 | 2 | Provider host (`agy`) | belum mulai |
 | 3 | Jalur tulis | belum mulai |
@@ -102,13 +102,17 @@ SolidWorks dan punya kanal thread yang benar.
 - [x] Solution C#, target `net48`, `.sln` klasik agar bisa dibuka tooling non-VS
 - [x] `Tracing/TraceWriter.cs` — JSONL append-only dengan redaksi
 - [x] `Threading/IMainThreadDispatcher.cs` — abstraksi
-- [x] **`MainThreadDispatcher` implementasi nyata** lewat `Control.BeginInvoke` — risiko R4 *(belum dikompilasi)*
-- [x] `MikosAI.Addin` mengimplementasikan `ISwAddin` + `SetAddinCallbackInfo2` *(belum dikompilasi)*
+- [x] **`MainThreadDispatcher` implementasi nyata** lewat `Control.BeginInvoke` — risiko R4 *(sudah lewat compile-check)*
+- [x] `MikosAI.Addin` mengimplementasikan `ISwAddin` + `SetAddinCallbackInfo2` *(sudah lewat compile-check)*
 - [ ] CommandGroup 3 tombol
 - [ ] TaskPane dengan WebView2 menampilkan halaman statis
 - [x] Penulis diagnostik `host-status.json`
 - [x] Script PowerShell build / register / unregister / probe / status (RegAsm 64-bit + TLB)
-- [x] Generator `.snk` tanpa `sn.exe`
+- [x] **`setup.ps1` satu perintah** — periksa, build, test, registrasi, UAC otomatis
+- [x] **`doctor.ps1`** — deteksi lingkungan + saran perbaikan per item
+- [x] **`-Action CompileCheck`** — verifikasi kode add-in tanpa SolidWorks lewat stub `ISwAddin`
+- [x] Deteksi otomatis path PIA lewat registry CLSID dan kunci Setup per versi
+- [x] ~~Generator `.snk`~~ → strong naming dihapus, tidak dibutuhkan `RegAsm /codebase`
 - [x] `launch.json` + `tasks.json` untuk VS Code
 - [x] Set platform `x64` untuk proyek Addin
 
@@ -378,7 +382,8 @@ Urutan mengikuti nilai dibagi risiko, bukan keinginan.
 | R9 | Drift versi SolidWorks (2024/2025/2026) | Sedang | Matriks versi di ledger; `verified` selalu menyebut versi | Ledger siap ✅ |
 | R10 | Redistribusi PIA dibatasi lisensi | Sedang | Rujuk instalasi lokal, jangan vendor ke repo | ✅ terdokumentasi |
 | R11 | Dua orang, cakupan membengkak | Tinggi | Gerbang penerimaan per fase; "kecil itu fitur" | ✅ |
-| R12 | Tanpa Visual Studio, step-debug net48 terbatas | Sedang | Diagnostik-first (`host-status.json`, trace); Core tanpa dependensi SolidWorks diuji cepat | Core ✅, diagnostik ⬜ |
+| R12 | Tanpa Visual Studio, step-debug net48 terbatas | Sedang | Diagnostik-first (`host-status.json`, trace); Core tanpa dependensi SolidWorks diuji cepat | Core ✅, diagnostik ✅ |
+| R13 | Kode add-in tidak bisa diverifikasi tanpa SolidWorks | Tinggi | Permukaan PIA dikecilkan ke `ISwAddin` saja, sisanya late-bound; stub compile-check | ✅ |
 
 R1, R3, R4 yang paling perlu diawasi. R1 dan R4 bisa diselesaikan dengan kode. R3 tidak —
 itu keputusan, bukan bug.
