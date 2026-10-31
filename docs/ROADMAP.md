@@ -9,14 +9,14 @@ Terakhir diperbarui 2026-10-31
 
 | Fase | Isi | Progres |
 |---|---|---|
-| **0** | Fondasi | ~55% — Core selesai, add-in belum mulai |
-| 1 | MCP server + tool read-only | belum mulai |
+| **0** | Fondasi | ~85% — tinggal verifikasi add-in di SolidWorks nyata |
+| 1 | MCP server + tool read-only | ~50% — server jalan, 6 tool CAD belum |
 | 2 | Provider host (`agy`) | belum mulai |
 | 3 | Jalur tulis | belum mulai |
 | 4 | Pengalaman dua lapis | belum mulai |
 | 5 | Pengemasan | belum mulai |
 
-Sudah jalan: **138 test hijau**, seluruh alur DesignPlan end-to-end dengan executor palsu,
+Sudah jalan: **171 test hijau**, seluruh alur DesignPlan end-to-end dengan executor palsu,
 tanpa SolidWorks.
 
 Belum ada kemampuan berstatus `verified`, jadi daftar tool MCP masih kosong. Itu benar —
@@ -102,15 +102,15 @@ SolidWorks dan punya kanal thread yang benar.
 - [x] Solution C#, target `net48`, `.sln` klasik agar bisa dibuka tooling non-VS
 - [x] `Tracing/TraceWriter.cs` — JSONL append-only dengan redaksi
 - [x] `Threading/IMainThreadDispatcher.cs` — abstraksi
-- [ ] **`MainThreadDispatcher` implementasi nyata** lewat `Control.BeginInvoke` — risiko R4
-- [ ] `MikosAI.Addin` mengimplementasikan `ISwAddin` + `SetAddinCallbackInfo2`
+- [x] **`MainThreadDispatcher` implementasi nyata** lewat `Control.BeginInvoke` — risiko R4 *(belum dikompilasi)*
+- [x] `MikosAI.Addin` mengimplementasikan `ISwAddin` + `SetAddinCallbackInfo2` *(belum dikompilasi)*
 - [ ] CommandGroup 3 tombol
 - [ ] TaskPane dengan WebView2 menampilkan halaman statis
-- [ ] Penulis diagnostik `host-status.json`
-- [ ] Script PowerShell build / register / unregister (CurrentUser + Machine, RegAsm 64-bit + TLB)
-- [ ] Generator `.snk` tanpa `sn.exe` (tidak ada Windows SDK di mesin tanpa VS)
-- [ ] `launch.json` + `tasks.json` untuk VS Code
-- [ ] Set platform `x64` untuk proyek Addin
+- [x] Penulis diagnostik `host-status.json`
+- [x] Script PowerShell build / register / unregister / probe / status (RegAsm 64-bit + TLB)
+- [x] Generator `.snk` tanpa `sn.exe`
+- [x] `launch.json` + `tasks.json` untuk VS Code
+- [x] Set platform `x64` untuk proyek Addin
 
 ### Jalur CAD
 
@@ -127,7 +127,7 @@ SolidWorks dan punya kanal thread yang benar.
 
 ### Sudah selesai di `MikosAI.Core`
 
-138 test hijau, dibuild dan dijalankan tanpa SolidWorks dan tanpa Visual Studio:
+171 test hijau, dibuild dan dijalankan tanpa SolidWorks dan tanpa Visual Studio:
 
 | Berkas | Isi |
 |---|---|
@@ -143,6 +143,10 @@ SolidWorks dan punya kanal thread yang benar.
 | `Threading/IMainThreadDispatcher.cs` | Abstraksi; implementasi nyata di Addin |
 | `Tracing/TraceWriter.cs` | JSONL dengan redaksi, tidak pernah melempar exception |
 | `Testing/FakeToolExecutor.cs` | Executor + evaluator palsu, scriptable |
+| `Mcp/McpHttpServer.cs` | HTTP loopback, port ephemeral, bearer token |
+| `Mcp/McpRequestHandler.cs` | Protokol JSON-RPC MCP, terpisah dari transport |
+| `Mcp/McpToolDescriptor.cs` | Daftar tool MCP dari katalog + ledger |
+| `Mcp/AgentWorkspace.cs` | Workspace milik sendiri, penulis `mcp_config.json` |
 
 `MikosAI.Core` sengaja **tidak** punya dependensi SolidWorks. Itu yang membuat Jalur
 Platform bisa bekerja penuh tanpa CAD.
@@ -163,11 +167,13 @@ Platform bisa bekerja penuh tanpa CAD.
 
 ### Jalur Platform
 
-- [ ] `McpHttpServer` di `127.0.0.1`, port ephemeral, transport streamable HTTP
-- [ ] Bearer token per sesi, ditulis ke `session.json` ber-ACL
-- [ ] Daftar tool di-generate dari `ToolCatalog.ExposableTools()`
-- [ ] `AgentWorkspace`: folder sendiri di `%LOCALAPPDATA%`, tulis `.agents/mcp_config.json`
+- [x] `McpHttpServer` di `127.0.0.1`, port ephemeral, HTTP loopback
+- [x] Bearer token per sesi, ditulis ke `session.json` ber-ACL
+- [x] Daftar tool di-generate dari `ToolCatalog.ExposableTools()`
+- [x] `AgentWorkspace`: folder sendiri di `%LOCALAPPDATA%`, tulis `.agents/mcp_config.json`
       tiap sesi, **jangan sentuh config global pengguna**
+- [x] `McpRequestHandler`: JSON-RPC initialize / tools/list / tools/call / ping
+- [ ] Hubungkan `McpHttpServer` ke add-in di `ConnectToSW`
 
 ### Jalur CAD — 6 tool read-only, aman karena tidak menulis apa pun
 
@@ -183,8 +189,8 @@ Platform bisa bekerja penuh tanpa CAD.
 
 - [ ] `agy` bisa melihat daftar tool kita dan memanggilnya, round-trip terbukti
 - [ ] Semua 6 tool dieksekusi lewat dispatcher — dibuktikan test, bukan inspeksi mata
-- [ ] Tool berstatus `reference_only` **tidak muncul** di daftar MCP
-- [ ] Request tanpa bearer token ditolak
+- [x] Tool berstatus `reference_only` **tidak muncul** di daftar MCP
+- [x] Request tanpa bearer token ditolak
 - [ ] Server hanya bind loopback — diverifikasi dari mesin lain di jaringan
 - [ ] Config global `~/.gemini/config/mcp_config.json` **tidak berubah** setelah add-in
       berjalan — dibuktikan dengan hash sebelum dan sesudah

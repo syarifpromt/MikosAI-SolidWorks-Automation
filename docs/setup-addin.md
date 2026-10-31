@@ -13,7 +13,7 @@ CI nanti.
 
 Akibatnya:
 
-- `dotnet build` dan `dotnet test` **selalu hijau di mesin mana pun** (Core + 138 test)
+- `dotnet build` dan `dotnet test` **selalu hijau di mesin mana pun** (Core + 171 test)
 - Add-in dibangun lewat `scripts/addin.ps1`, yang menuntut path PIA eksplisit
 
 PIA tidak di-vendor ke repo — redistribusinya dibatasi lisensi Dassault.
@@ -138,7 +138,7 @@ diagnostik**, bukan step-debugging:
 
 1. `host-status.json` — task `addin: probe`
 2. Trace JSONL di `%LOCALAPPDATA%\MikosAI\trace\`
-3. 138 test `MikosAI.Core` yang jalan ~1 detik tanpa SolidWorks
+3. 171 test `MikosAI.Core` yang jalan ~1 detik tanpa SolidWorks
 
 Itu bukan tambalan karena tidak punya Visual Studio. Debugging add-in CAD menyakitkan apa
 pun editornya — SolidWorks mengunci DLL, jadi setiap iterasi butuh restart SolidWorks. Orang
