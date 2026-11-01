@@ -9,7 +9,7 @@ Terakhir diperbarui 2026-10-31
 
 | Fase | Isi | Progres |
 |---|---|---|
-| **0** | Fondasi | ~92% — add-in terbukti hidup di SW2025; tinggal panggilan API |
+| **0** | Fondasi | ~95% — add-in hidup, API bekerja; tinggal callback IDispatch |
 | 1 | MCP server + tool read-only | ~50% — server jalan, 6 tool CAD belum |
 | 2 | Provider host (`agy`) | belum mulai |
 | 3 | Jalur tulis | belum mulai |
@@ -158,6 +158,7 @@ Platform bisa bekerja penuh tanpa CAD.
 ### Gerbang penerimaan Fase 0
 
 - [x] Add-in diinstansiasi oleh `SLDWORKS.exe` — terbukti, `status: connected`
+- [x] Panggilan API SolidWorks bekerja — terbukti, `RevisionNumber` = `33.1.1` (SW2025 SP1.1)
 - [ ] `host-status.json` memenuhi kelima syarat di `ARSITEKTUR.md` §4.1
 - [ ] Test membuktikan: tanpa TLB, add-in **tidak** terinstansiasi walaupun `LoadAddIn=0`
 - [ ] Test membuktikan: handler PMP tanpa `IDispatch` melempar `InvalidCastException`
@@ -386,7 +387,9 @@ Urutan mengikuti nilai dibagi risiko, bukan keinginan.
 | R12 | Tanpa Visual Studio, step-debug net48 terbatas | Sedang | Diagnostik-first (`host-status.json`, trace); Core tanpa dependensi SolidWorks diuji cepat | Core ✅, diagnostik ✅ |
 | R13 | Kode add-in tidak bisa diverifikasi tanpa SolidWorks | Tinggi | Stub PIA compile-check (`-Action CompileCheck`) | ✅ |
 | R14 | Dependensi add-in `/codebase` dicari di folder SLDWORKS.exe, bukan folder kita | **Kritis** — add-in diam-diam tidak terinstansiasi, tanpa pesan error | `AssemblyResolver` dipasang di static ctor; `HostDiagnostics` nol dependensi eksternal | ✅ terbukti di mesin nyata |
-| R15 | API SolidWorks tidak bisa dipanggil lewat `dynamic`/IDispatch | Tinggi — semua panggilan gagal `0x8002802B` | PIA bertipe wajib; `EmbedInteropTypes` mempertahankan keuntungan lintas-versi | ✅ terbukti di mesin nyata |
+| R15 | API SolidWorks tidak bisa dipanggil lewat `dynamic`/IDispatch | Tinggi — semua panggilan gagal `0x8002802B` | PIA bertipe wajib; `EmbedInteropTypes` mempertahankan keuntungan lintas-versi | ✅ **selesai, `RevisionNumber` terbaca** |
+| R16 | Kelas add-in tanpa IDispatch → `SetAddinCallbackInfo2` gagal `InvalidCastException` | Tinggi — callback SolidWorks tidak bisa didaftarkan | `ClassInterfaceType.AutoDispatch`; uji `Marshal.GetIDispatchForObject` sendiri + gerbang probe | ⬜ menunggu verifikasi |
+| R17 | Menguji DLL usang karena `git pull` terlewat | Sedang — mendiagnosis bug yang sudah diperbaiki | Commit dicap ke metadata assembly; probe membandingkan dengan HEAD | ✅ |
 
 R1, R3, R4 yang paling perlu diawasi. R1 dan R4 bisa diselesaikan dengan kode. R3 tidak —
 itu keputusan, bukan bug.

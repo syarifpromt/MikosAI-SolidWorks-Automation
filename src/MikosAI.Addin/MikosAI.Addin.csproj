@@ -54,7 +54,39 @@
     -->
   </PropertyGroup>
 
-  <!-- Mode compile-check: stub, tanpa PIA. -->
+  <!--
+    Deteksi PIA otomatis, supaya proyek ini AMAN ikut di MikosAI.sln.
+
+    Kalau SolidWorksApiDir tidak diberikan eksplisit, coba lokasi umum. Kalau
+    tetap tidak ada, turun ke mode compile-check alih-alih menggagalkan build.
+
+    Alasannya: proyek ini pernah menggagalkan seluruh solution begitu ikut
+    ditambahkan ke MikosAI.sln - termasuk `dotnet test` dan langkah build di
+    setup.ps1. Dengan fallback ini, `dotnet build` jalan di mesin mana pun, DAN
+    kode add-in otomatis ikut diperiksa tipenya setiap kali.
+
+    scripts/setup.ps1 tetap meneruskan path hasil deteksi registry, yang lebih
+    andal daripada pencocokan path di sini.
+  -->
+  <PropertyGroup Condition="'$(UsePiaStub)' != 'true' And '$(SolidWorksApiDir)' == ''">
+    <PiaKandidat1>C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist</PiaKandidat1>
+    <PiaKandidat2>C:\Program Files\SolidWorks Corp\SolidWorks\api\redist</PiaKandidat2>
+
+    <SolidWorksApiDir Condition="Exists('$(PiaKandidat1)\SolidWorks.Interop.swpublished.dll')">$(PiaKandidat1)</SolidWorksApiDir>
+    <SolidWorksApiDir Condition="'$(SolidWorksApiDir)' == '' And Exists('$(PiaKandidat2)\SolidWorks.Interop.swpublished.dll')">$(PiaKandidat2)</SolidWorksApiDir>
+
+    <!-- Masih tidak ada: turun ke stub, jangan gagalkan solution. -->
+    <UsePiaStub Condition="'$(SolidWorksApiDir)' == ''">true</UsePiaStub>
+    <PiaTurunKeStub Condition="'$(SolidWorksApiDir)' == ''">true</PiaTurunKeStub>
+  </PropertyGroup>
+
+  <!--
+    Mode compile-check: stub, tanpa PIA.
+
+    Nama assembly dan folder output SENGAJA berbeda, supaya build stub tidak
+    pernah bisa menimpa DLL yang didaftarkan ke SolidWorks. Registrasi menunjuk
+    bin\Release\net48\MikosAI.Addin.dll, yang tidak pernah ditulis mode ini.
+  -->
   <PropertyGroup Condition="'$(UsePiaStub)' == 'true'">
     <DefineConstants>$(DefineConstants);MIKOSAI_PIA_STUB</DefineConstants>
     <AssemblyName>MikosAI.Addin.CompileCheck</AssemblyName>
@@ -181,12 +213,24 @@
     </ItemGroup>
   </Target>
 
-  <Target Name="CekPiaSolidWorks" BeforeTargets="BeforeBuild" Condition="'$(UsePiaStub)' != 'true'">
-    <Error Condition="'$(SolidWorksApiDir)' == ''"
-           Text="SolidWorksApiDir belum diberikan. Jalankan: powershell -File scripts\setup.ps1  (atau scripts\addin.ps1 -Action Build -SolidWorksApiDir '&lt;path api\redist&gt;')" />
-    <Error Condition="!Exists('$(SolidWorksApiDir)\SolidWorks.Interop.swpublished.dll')"
+  <Target Name="CekPiaSolidWorks" BeforeTargets="BeforeBuild">
+    <!--
+      Turun ke mode compile-check karena SolidWorks tidak terdeteksi.
+
+      Ini WARNING, bukan error: solution harus tetap bisa dibangun di mesin tanpa
+      CAD. Tapi harus TERLIHAT, supaya tidak ada yang menyangka sudah punya DLL
+      yang bisa didaftarkan.
+    -->
+    <Warning Condition="'$(PiaTurunKeStub)' == 'true'"
+             Text="SolidWorks tidak terdeteksi - MikosAI.Addin dibangun dalam MODE COMPILE-CHECK. Output di bin\compilecheck TIDAK bisa didaftarkan ke SolidWorks. Untuk build nyata: powershell -File scripts\setup.ps1" />
+
+    <!--
+      Path diberikan eksplisit tapi isinya salah: itu error, bukan sesuatu yang
+      boleh dialihkan ke stub secara diam-diam.
+    -->
+    <Error Condition="'$(UsePiaStub)' != 'true' And !Exists('$(SolidWorksApiDir)\SolidWorks.Interop.swpublished.dll')"
            Text="SolidWorks.Interop.swpublished.dll tidak ada di '$(SolidWorksApiDir)'. Jalankan scripts\doctor.ps1 untuk mendeteksi path yang benar." />
-    <Error Condition="!Exists('$(SolidWorksApiDir)\SolidWorks.Interop.sldworks.dll')"
+    <Error Condition="'$(UsePiaStub)' != 'true' And !Exists('$(SolidWorksApiDir)\SolidWorks.Interop.sldworks.dll')"
            Text="SolidWorks.Interop.sldworks.dll tidak ada di '$(SolidWorksApiDir)'." />
   </Target>
 

@@ -421,6 +421,7 @@ if ($Action -eq 'Probe') {
         @{ Nama = 'status == connected';        Lulus = ($status.status -eq 'connected') }
         @{ Nama = 'callbackRegistered';          Lulus = [bool]$status.callbackRegistered }
         @{ Nama = 'dispatcherReady';             Lulus = [bool]$status.dispatcherReady }
+        @{ Nama = 'addinExposesIDispatch';       Lulus = [bool]$status.addinExposesIDispatch }
         @{ Nama = 'mainThreadId terisi';         Lulus = ($status.mainThreadId -gt 0) }
         @{ Nama = 'revisi SolidWorks terbaca';   Lulus = -not [string]::IsNullOrWhiteSpace($status.solidworksRevision) }
         @{ Nama = 'errors kosong';               Lulus = ($null -eq $status.errors -or $status.errors.Count -eq 0) }

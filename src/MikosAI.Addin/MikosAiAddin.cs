@@ -30,7 +30,31 @@ namespace MikosAI.Addin
     /// </summary>
     [ComVisible(true)]
     [Guid(AddinGuid)]
-    [ClassInterface(ClassInterfaceType.None)]
+    //
+    // AutoDispatch, BUKAN None. Ini bukan pilihan gaya.
+    //
+    // Dengan ClassInterfaceType.None, kelas ini hanya mengekspos interface yang
+    // diimplementasikan secara eksplisit - ISwAddin. Itu cukup untuk SolidWorks
+    // memanggil ConnectToSW, dan memang berhasil. TAPI objek ini juga diserahkan
+    // ke SolidWorks lewat SetAddinCallbackInfo2 sebagai target callback, dan
+    // SolidWorks memanggil callback BERDASARKAN NAMA METHOD - jadi ia butuh
+    // IDispatch.
+    //
+    // Tanpa IDispatch, SetAddinCallbackInfo2 gagal dengan:
+    //   InvalidCastException: Specified cast is not valid.
+    //
+    // yang terjadi di dalam SolidWorks saat ia meng-cast objek kita ke IDispatch.
+    //
+    // AutoDispatch membangkitkan dispinterface saat runtime sehingga pemanggilan
+    // late-bound berdasarkan nama bisa jalan. AutoDual juga memberi IDispatch
+    // tapi sekaligus membekukan layout vtable, yang rapuh antarversi - jadi
+    // tidak dipakai.
+    //
+    // Ini kelas jebakan yang sama dengan yang didokumentasikan untuk
+    // PropertyManagerPage handler: handler yang hanya menyediakan IUnknown
+    // tanpa IDispatch membuat SolidWorks melempar InvalidCastException.
+    //
+    [ClassInterface(ClassInterfaceType.AutoDispatch)]
     [ProgId("MikosAI.Addin.MikosAiAddin")]
     public sealed class MikosAiAddin : ISwAddin
     {
@@ -109,6 +133,13 @@ namespace MikosAI.Addin
             {
                 _diagnostics.AddError("MainThreadDispatcher", exception);
             }
+
+            // --- Periksa sendiri apakah kita mengekspos IDispatch -----------
+            // SolidWorks memanggil callback berdasarkan nama, jadi IDispatch
+            // wajib. Diuji di sini supaya kegagalan SetAddinCallbackInfo2
+            // langsung bisa dijelaskan, bukan jadi InvalidCastException misterius
+            // yang terjadi di dalam SolidWorks.
+            _diagnostics.AddinExposesIDispatch = UjiIDispatch();
 
             // --- Daftarkan callback -----------------------------------------
             try
@@ -197,6 +228,37 @@ namespace MikosAI.Addin
             GC.WaitForPendingFinalizers();
 
             return true;
+        }
+
+        /// <summary>
+        /// Memastikan objek ini bisa di-cast ke IDispatch oleh COM.
+        ///
+        /// Kalau false, SetAddinCallbackInfo2 PASTI gagal dengan
+        /// InvalidCastException, dan penyebabnya adalah atribut ClassInterface -
+        /// bukan sesuatu di sisi SolidWorks.
+        /// </summary>
+        private bool UjiIDispatch()
+        {
+            var pointer = IntPtr.Zero;
+            try
+            {
+                pointer = Marshal.GetIDispatchForObject(this);
+                return pointer != IntPtr.Zero;
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError(
+                    "objek add-in tidak mengekspos IDispatch - periksa atribut ClassInterface",
+                    exception);
+                return false;
+            }
+            finally
+            {
+                if (pointer != IntPtr.Zero)
+                {
+                    Marshal.Release(pointer);
+                }
+            }
         }
 
         // ====================================================================

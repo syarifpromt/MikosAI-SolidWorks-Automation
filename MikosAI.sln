@@ -1,3 +1,4 @@
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -6,23 +7,62 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MikosAI.Core", "src\MikosAI
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MikosAI.Core.Tests", "tests\MikosAI.Core.Tests\MikosAI.Core.Tests.csproj", "{BB9DE9F7-0EDA-45F7-BB6A-8E30BAC4E5F7}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MikosAI.Addin", "src\MikosAI.Addin\MikosAI.Addin.csproj", "{858CB1B6-609D-47FA-9A72-DB60C2D60F7C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
 		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{E2CEA975-9BEA-4719-8D0C-39DFF8836E5C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{E2CEA975-9BEA-4719-8D0C-39DFF8836E5C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E2CEA975-9BEA-4719-8D0C-39DFF8836E5C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E2CEA975-9BEA-4719-8D0C-39DFF8836E5C}.Debug|x64.Build.0 = Debug|Any CPU
+		{E2CEA975-9BEA-4719-8D0C-39DFF8836E5C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E2CEA975-9BEA-4719-8D0C-39DFF8836E5C}.Debug|x86.Build.0 = Debug|Any CPU
 		{E2CEA975-9BEA-4719-8D0C-39DFF8836E5C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E2CEA975-9BEA-4719-8D0C-39DFF8836E5C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E2CEA975-9BEA-4719-8D0C-39DFF8836E5C}.Release|x64.ActiveCfg = Release|Any CPU
+		{E2CEA975-9BEA-4719-8D0C-39DFF8836E5C}.Release|x64.Build.0 = Release|Any CPU
+		{E2CEA975-9BEA-4719-8D0C-39DFF8836E5C}.Release|x86.ActiveCfg = Release|Any CPU
+		{E2CEA975-9BEA-4719-8D0C-39DFF8836E5C}.Release|x86.Build.0 = Release|Any CPU
 		{BB9DE9F7-0EDA-45F7-BB6A-8E30BAC4E5F7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BB9DE9F7-0EDA-45F7-BB6A-8E30BAC4E5F7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BB9DE9F7-0EDA-45F7-BB6A-8E30BAC4E5F7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BB9DE9F7-0EDA-45F7-BB6A-8E30BAC4E5F7}.Debug|x64.Build.0 = Debug|Any CPU
+		{BB9DE9F7-0EDA-45F7-BB6A-8E30BAC4E5F7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BB9DE9F7-0EDA-45F7-BB6A-8E30BAC4E5F7}.Debug|x86.Build.0 = Debug|Any CPU
 		{BB9DE9F7-0EDA-45F7-BB6A-8E30BAC4E5F7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BB9DE9F7-0EDA-45F7-BB6A-8E30BAC4E5F7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BB9DE9F7-0EDA-45F7-BB6A-8E30BAC4E5F7}.Release|x64.ActiveCfg = Release|Any CPU
+		{BB9DE9F7-0EDA-45F7-BB6A-8E30BAC4E5F7}.Release|x64.Build.0 = Release|Any CPU
+		{BB9DE9F7-0EDA-45F7-BB6A-8E30BAC4E5F7}.Release|x86.ActiveCfg = Release|Any CPU
+		{BB9DE9F7-0EDA-45F7-BB6A-8E30BAC4E5F7}.Release|x86.Build.0 = Release|Any CPU
+		{858CB1B6-609D-47FA-9A72-DB60C2D60F7C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{858CB1B6-609D-47FA-9A72-DB60C2D60F7C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{858CB1B6-609D-47FA-9A72-DB60C2D60F7C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{858CB1B6-609D-47FA-9A72-DB60C2D60F7C}.Debug|x64.Build.0 = Debug|Any CPU
+		{858CB1B6-609D-47FA-9A72-DB60C2D60F7C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{858CB1B6-609D-47FA-9A72-DB60C2D60F7C}.Debug|x86.Build.0 = Debug|Any CPU
+		{858CB1B6-609D-47FA-9A72-DB60C2D60F7C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{858CB1B6-609D-47FA-9A72-DB60C2D60F7C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{858CB1B6-609D-47FA-9A72-DB60C2D60F7C}.Release|x64.ActiveCfg = Release|Any CPU
+		{858CB1B6-609D-47FA-9A72-DB60C2D60F7C}.Release|x64.Build.0 = Release|Any CPU
+		{858CB1B6-609D-47FA-9A72-DB60C2D60F7C}.Release|x86.ActiveCfg = Release|Any CPU
+		{858CB1B6-609D-47FA-9A72-DB60C2D60F7C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{858CB1B6-609D-47FA-9A72-DB60C2D60F7C} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {D6815176-655E-452D-88AD-F7D534420B6B}

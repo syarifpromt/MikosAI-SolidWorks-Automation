@@ -78,12 +78,26 @@ Jadi Jalur Platform tidak pernah terhalang ketersediaan lisensi CAD.
 
 ## Keputusan yang membuat setup sesederhana ini
 
-### Add-in tidak ada di `MikosAI.sln`
+### Add-in ikut di solution, tapi tidak pernah menggagalkannya
 
-Kalau ikut di solution, `dotnet build` dan `dotnet test` akan gagal di mesin tanpa
-SolidWorks — termasuk CI nanti. Add-in dibangun lewat `scripts/addin.ps1`.
+`MikosAI.Addin` ada di `MikosAI.sln` supaya terlihat di editor. Tapi build nyatanya butuh
+PIA SolidWorks, jadi kalau naif ia akan menggagalkan `dotnet build` dan `dotnet test` di
+mesin tanpa CAD — termasuk CI nanti. Itu pernah terjadi.
 
-Akibatnya `dotnet build` dan `dotnet test` **selalu hijau di mesin mana pun**.
+Jadi csproj-nya mendeteksi PIA sendiri, dan **turun ke mode compile-check** kalau tidak ada:
+
+| Keadaan | Hasil |
+|---|---|
+| SolidWorks terdeteksi | Build nyata ke `bin\Release
+et48\` |
+| Tidak terdeteksi | Compile-check ke `bin\compilecheck\` + **warning** |
+| `-SolidWorksApiDir` diberikan tapi salah | **Error** — tidak dialihkan diam-diam |
+
+Nama assembly dan folder output mode compile-check sengaja berbeda, jadi build stub **tidak
+mungkin** menimpa DLL yang didaftarkan ke SolidWorks.
+
+Efek sampingnya bagus: kode add-in ikut diperiksa tipenya setiap kali `dotnet build`
+dijalankan, di mesin mana pun.
 
 ### Pemanggilan API early-bound, bukan `dynamic`
 

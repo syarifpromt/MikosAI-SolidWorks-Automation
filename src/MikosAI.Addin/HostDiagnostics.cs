@@ -85,6 +85,12 @@ namespace MikosAI.Addin
 
         internal bool DispatcherReady { get; set; }
 
+        /// <summary>
+        /// Apakah objek add-in bisa di-cast ke IDispatch. Wajib true, karena
+        /// SolidWorks memanggil callback berdasarkan nama method.
+        /// </summary>
+        internal bool AddinExposesIDispatch { get; set; }
+
         internal void AddError(string message)
         {
             lock (_lock)
@@ -145,6 +151,7 @@ namespace MikosAI.Addin
                 Field(sb, "solidworksRevision", SolidWorksRevision);
                 FieldInt(sb, "addinCookie", AddinCookie);
                 FieldBool(sb, "dispatcherReady", DispatcherReady);
+                FieldBool(sb, "addinExposesIDispatch", AddinExposesIDispatch);
                 FieldInt(sb, "mainThreadId", MainThreadId);
                 FieldInt(sb, "fileNewEvents", FileNewEvents);
                 FieldInt(sb, "activeDocChangeEvents", ActiveDocChangeEvents);
