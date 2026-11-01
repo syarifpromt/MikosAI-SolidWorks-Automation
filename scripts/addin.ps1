@@ -53,6 +53,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Deteksi lingkungan bersama. SATU implementasi, dipakai setup.ps1 dan
+# doctor.ps1 juga - script ini pernah punya daftar path hardcoded sendiri dan
+# gagal total di mesin yang memasang SolidWorks di drive selain C:.
+. (Join-Path $PSScriptRoot 'lib\MikosAI.Env.ps1')
+
 $AddinGuid = '{7F2A6C14-9D3B-4E58-B1A7-5C0E9D4F2B63}'
 
 $RepoRoot    = Split-Path -Parent $PSScriptRoot
@@ -122,6 +127,16 @@ function Invoke-RegAsm {
 }
 
 function Resolve-SolidWorksApiDir {
+    <#
+        Mendelegasikan ke Get-SolidWorksApiDir di lib/MikosAI.Env.ps1.
+
+        Versi sebelumnya punya daftar path hardcoded sendiri, hanya
+        C:\Program Files - jadi gagal total di mesin yang memasang SolidWorks di
+        drive lain. Dua implementasi deteksi untuk satu kebutuhan, satu benar
+        satu salah; itulah yang terjadi.
+
+        Deteksi berbasis registry di lib adalah satu-satunya yang dipakai.
+    #>
     if ($SolidWorksApiDir) {
         if (-not (Test-Path -LiteralPath $SolidWorksApiDir)) {
             throw "SolidWorksApiDir tidak ada: $SolidWorksApiDir"
@@ -129,31 +144,22 @@ function Resolve-SolidWorksApiDir {
         return $SolidWorksApiDir
     }
 
-    # Tebak dari lokasi umum, tapi TETAP laporkan apa yang dipakai - merujuk
-    # PIA dari versi SolidWorks yang salah menghasilkan kegagalan yang
-    # membingungkan.
-    $candidates = @(
-        'C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist'
-        'C:\Program Files\SolidWorks Corp\SolidWorks\api\redist'
-    )
+    $terdeteksi = Get-SolidWorksApiDir
 
-    foreach ($candidate in $candidates) {
-        if (Test-Path -LiteralPath (Join-Path $candidate 'SolidWorks.Interop.sldworks.dll')) {
-            Write-Host "SolidWorksApiDir tidak diberikan, memakai hasil deteksi:" -ForegroundColor Yellow
-            Write-Host "  $candidate" -ForegroundColor Yellow
-            return $candidate
-        }
+    if ($terdeteksi) {
+        Write-Host "SolidWorksApiDir tidak diberikan, memakai hasil deteksi:" -ForegroundColor Yellow
+        Write-Host "  $terdeteksi" -ForegroundColor Yellow
+        return $terdeteksi
     }
 
     throw @"
-SolidWorksApiDir tidak diberikan dan tidak terdeteksi otomatis.
+SolidWorks tidak terdeteksi.
 
-Berikan eksplisit:
-  -SolidWorksApiDir 'C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist'
-
-Direktori itu harus memuat SolidWorks.Interop.sldworks.dll.
+Jalankan scripts\doctor.ps1 untuk melihat detailnya, atau berikan path eksplisit:
+  -SolidWorksApiDir '<folder yang memuat SolidWorks.Interop.sldworks.dll>'
 "@
 }
+
 
 # ====================================================================
 # CompileCheck - verifikasi tipe tanpa SolidWorks

@@ -207,9 +207,21 @@
       <CommitGit Condition="'$(KodeKeluarGit)' != '0' Or '$(CommitGit)' == ''">(tidak diketahui)</CommitGit>
     </PropertyGroup>
 
+    <!--
+      AssemblyAttribute dengan _Parameter1/_Parameter2 adalah mekanisme SDK yang
+      benar. Percobaan pertama memakai item group AssemblyMetadata, yang BUKAN
+      item yang dikenali SDK - hasilnya assembly tidak punya metadata sama
+      sekali, dan deteksi DLL usang diam-diam tidak berfungsi.
+    -->
     <ItemGroup>
-      <AssemblyMetadata Include="BuildCommit" Value="$(CommitGit)" />
-      <AssemblyMetadata Include="BuildTime" Value="$([System.DateTime]::UtcNow.ToString('o'))" />
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>BuildCommit</_Parameter1>
+        <_Parameter2>$(CommitGit)</_Parameter2>
+      </AssemblyAttribute>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>BuildTime</_Parameter1>
+        <_Parameter2>$([System.DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))</_Parameter2>
+      </AssemblyAttribute>
     </ItemGroup>
   </Target>
 
