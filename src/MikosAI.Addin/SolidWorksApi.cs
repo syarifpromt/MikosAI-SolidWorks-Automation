@@ -78,6 +78,13 @@ namespace MikosAI.Addin
         internal object Raw => _app;
 
         /// <summary>
+        /// Membuat pembaca model. Dipisah supaya SolidWorksApi tetap hanya
+        /// berisi operasi siklus hidup add-in, bukan pembacaan model.
+        /// </summary>
+        internal SolidWorksReader BuatPembaca(HostDiagnostics diagnostics)
+            => new SolidWorksReader(_app, diagnostics);
+
+        /// <summary>
         /// Mendaftarkan callback add-in. Tanpa ini, SolidWorks tidak bisa
         /// memanggil balik method add-in.
         ///

@@ -74,10 +74,18 @@ namespace MikosAI.Core.Tests
         [Fact]
         public async Task tool_yang_belum_terverifikasi_menolak_run_tanpa_menyentuh_model()
         {
+            // SENGAJA memakai tool yang MENULIS. Tool read-only sudah
+            // dipromosikan ke pilot, jadi plan yang hanya membaca kini sah -
+            // dan penolakan harus tetap teruji lewat kemampuan yang memang
+            // belum siap.
             var executor = new FakeToolExecutor();
             var runner = new PlanRunner(ValidatorWithRealLedger(), executor, new FakeAcceptanceEvaluator());
 
-            var result = await runner.RunAsync(Plan(TwoGoodSteps));
+            var planMenulis = Plan(@"
+                { ""id"": ""s1"", ""tool"": ""create_sketch"", ""arguments"": { ""plane"": { ""kind"": ""plane"", ""by"": ""name"", ""name"": ""Top Plane"" } } },
+                { ""id"": ""s2"", ""tool"": ""extrude_boss"", ""arguments"": {}, ""dependsOn"": [""s1""] }");
+
+            var result = await runner.RunAsync(planMenulis);
 
             Assert.False(result.Executed);
             Assert.Equal(PlanRejectionReason.ToolsNotAvailable, result.RejectionReason);

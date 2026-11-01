@@ -186,6 +186,20 @@ if ($Action -eq 'CompileCheck') {
 if ($Action -eq 'Build') {
     $apiDir = Resolve-SolidWorksApiDir
 
+    # SolidWorks mengunci DLL yang sudah dimuat. Diperiksa lebih dulu supaya
+    # pesannya jelas, bukan terkubur di belasan baris retry MSBuild.
+    $sw = Test-SolidWorksRunning
+    if (-not $sw.Lulus) {
+        throw @"
+SolidWorks sedang berjalan ($($sw.Nilai)).
+
+Ia mengunci MikosAI.Addin.dll dan MikosAI.Core.dll yang sudah dimuat, jadi build
+akan gagal dengan "file is locked by SolidWorks".
+
+Tutup SolidWorks sepenuhnya, lalu jalankan ulang perintah ini.
+"@
+    }
+
     Write-Section "Build add-in ($Configuration, net48, x64)"
     Write-Host "PIA: $apiDir"
 

@@ -29,14 +29,32 @@ namespace MikosAI.Core.Tests
         }
 
         [Fact]
-        public void dengan_ledger_sebenarnya_daftar_tool_MCP_kosong()
+        public void dengan_ledger_sebenarnya_hanya_tool_read_only_yang_diekspos()
         {
-            // Keadaan jujur hari ini. Daftar kosong BUKAN error - belum ada
-            // kemampuan yang lulus golden test.
+            // Keadaan jujur hari ini: document_inspection berstatus pilot, jadi
+            // 6 tool read-only terbuka. Seluruh tool yang MENULIS masih
+            // not_implemented dan tidak boleh muncul - itu invarian yang
+            // sebenarnya dijaga, bukan "daftarnya kosong".
             var ledger = CapabilityLedger.Load(RepoFiles.CapabilitiesYaml);
             var catalog = ToolCatalog.Load(RepoFiles.ToolsJson, ledger);
+            var tools = McpToolListBuilder.Build(catalog, ledger);
 
-            Assert.Empty(McpToolListBuilder.Build(catalog, ledger));
+            Assert.Equal(6, tools.Count);
+            Assert.All(tools, t => Assert.False(
+                catalog.Find(t.Name)!.Mutates,
+                $"Tool '{t.Name}' mengubah model tapi sudah diekspos."));
+        }
+
+        [Fact]
+        public void tool_pilot_ditandai_butuh_review_di_deskripsinya()
+        {
+            // AI harus tahu sebelum memanggil, bukan sesudah.
+            var ledger = CapabilityLedger.Load(RepoFiles.CapabilitiesYaml);
+            var catalog = ToolCatalog.Load(RepoFiles.ToolsJson, ledger);
+            var tool = McpToolListBuilder.Build(catalog, ledger)
+                .First(t => t.Name == "get_bounding_box");
+
+            Assert.Contains("[PILOT]", tool.Description);
         }
 
         [Fact]

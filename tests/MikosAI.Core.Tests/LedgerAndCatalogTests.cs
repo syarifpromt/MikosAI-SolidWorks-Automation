@@ -63,11 +63,44 @@ namespace MikosAI.Core.Tests
         }
 
         [Fact]
-        public void karena_itu_belum_ada_tool_yang_diekspos_ke_AI()
+        public void hanya_kemampuan_read_only_yang_sudah_dipromosikan_ke_pilot()
         {
-            // Konsekuensi langsung: daftar tool MCP masih kosong. Itu benar.
-            Assert.Empty(Catalog().ExposableTools());
-            Assert.Empty(Ledger().ExposableToolNames());
+            // document_inspection berstatus pilot: logikanya sudah diuji
+            // otomatis, penerjemahan API-nya terbukti di SW2025. Semua
+            // kemampuan yang MENULIS masih not_implemented.
+            var ledger = Ledger();
+
+            var dipromosikan = ledger.Capabilities
+                .Where(c => c.IsExposable)
+                .Select(c => c.Id)
+                .ToList();
+
+            Assert.Equal(new[] { "document_inspection" }, dipromosikan);
+        }
+
+        [Fact]
+        public void TIDAK_ADA_tool_yang_menulis_yang_diekspos()
+        {
+            // Invarian terpenting di ledger. Tool read-only yang gagal tidak
+            // bisa merusak pekerjaan pengguna; tool yang menulis bisa.
+            var menulisTapiTerbuka = Catalog().ExposableTools()
+                .Where(t => t.Mutates)
+                .Select(t => t.Name)
+                .ToList();
+
+            Assert.Empty(menulisTapiTerbuka);
+        }
+
+        [Fact]
+        public void keenam_tool_read_only_diekspos()
+        {
+            Assert.Equal(
+                new[]
+                {
+                    "get_active_document", "get_bounding_box", "get_mass_properties",
+                    "get_selection", "inspect_sketches", "list_features",
+                },
+                Catalog().ExposableTools().Select(t => t.Name).OrderBy(n => n, StringComparer.Ordinal));
         }
 
         // --- Gating ---------------------------------------------------------

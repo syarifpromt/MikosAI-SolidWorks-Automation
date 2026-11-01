@@ -121,6 +121,45 @@ namespace MikosAI.Core.Tests
         }
 
         [Fact]
+        public void Warn_berarti_BERHASIL_dengan_catatan_bukan_gagal()
+        {
+            // Yang memisahkan "penting" dari "informasional" adalah flag
+            // Required, bukan tingkat verdict. Kalau WARN ikut memblokir
+            // penyelesaian, WARN jadi sama saja dengan FAIL.
+            var result = VerificationGate.Evaluate(new List<VerificationCheck>
+            {
+                VerificationCheck.Pass("feature_exists_in_tree"),
+                new VerificationCheck
+                {
+                    Id = "model_rebuilt",
+                    Verdict = Verdict.Warn,
+                    Required = false,
+                    Message = "Model perlu rebuild.",
+                },
+            });
+
+            Assert.Equal(Verdict.Warn, result.Verdict);
+            Assert.True(result.MayBeMarkedComplete);
+        }
+
+        [Fact]
+        public void Fail_dan_Blocked_TETAP_menahan_penyelesaian()
+        {
+            var gagal = VerificationGate.Evaluate(new List<VerificationCheck>
+            {
+                VerificationCheck.Fail("nonzero_volume", "Volume nol."),
+            });
+
+            var terblokir = VerificationGate.Evaluate(new List<VerificationCheck>
+            {
+                VerificationCheck.Blocked("save_reopen", "Tidak bisa dibuka ulang."),
+            });
+
+            Assert.False(gagal.MayBeMarkedComplete);
+            Assert.False(terblokir.MayBeMarkedComplete);
+        }
+
+        [Fact]
         public void Check_optional_dibatasi_maksimum_Warn()
         {
             // Pemeriksaan tambahan yang gagal tidak boleh memblokir hasil yang

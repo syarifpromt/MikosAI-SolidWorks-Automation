@@ -51,6 +51,7 @@ Set-StrictMode -Version Latest
 $RepoRoot  = Split-Path -Parent $PSScriptRoot
 $Solution  = Join-Path $RepoRoot 'MikosAI.sln'
 $AddinProj = Join-Path $RepoRoot 'src\MikosAI.Addin\MikosAI.Addin.csproj'
+$TestProj  = Join-Path $RepoRoot 'tests\MikosAI.Core.Tests\MikosAI.Core.Tests.csproj'
 $AddinDll  = Join-Path $RepoRoot 'src\MikosAI.Addin\bin\Release\net48\MikosAI.Addin.dll'
 $AddinTlb  = [System.IO.Path]::ChangeExtension($AddinDll, '.tlb')
 $RegAsm    = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe'
@@ -234,7 +235,15 @@ $punyaSolidWorks = -not [string]::IsNullOrWhiteSpace($apiDir)
 # ====================================================================
 Write-Langkah 'Build MikosAI.Core dan jalankan test'
 
-& dotnet build $Solution -c Release --nologo -v q
+# SENGAJA proyek test, bukan $Solution.
+#
+# MikosAI.Addin ikut di solution, dan SolidWorks mengunci DLL-nya saat berjalan.
+# Membangun seluruh solution di sini akan gagal dengan pesan menyesatkan
+# "Build MikosAI.Core gagal" padahal Core tidak ada hubungannya.
+#
+# Proyek test hanya menarik Core, jadi langkah ini tetap jalan walaupun
+# SolidWorks sedang terbuka.
+& dotnet build $TestProj -c Release --nologo -v q
 if ($LASTEXITCODE -ne 0) {
     Stop-Setup 'Build MikosAI.Core gagal.' `
         "Ini tidak butuh SolidWorks sama sekali, jadi kegagalan di sini berarti masalah toolchain.`nPeriksa error compiler di atas."
@@ -245,7 +254,7 @@ if ($SkipTests) {
     Write-Host '  Test dilewati (-SkipTests).' -ForegroundColor Yellow
 }
 else {
-    & dotnet test $Solution -c Release --nologo -v q --no-build
+    & dotnet test $TestProj -c Release --nologo -v q --no-build
     if ($LASTEXITCODE -ne 0) {
         Stop-Setup 'Ada test yang gagal.' `
             "Jangan lanjut sebelum semuanya hijau. Laporkan nama test yang merah."
@@ -285,6 +294,14 @@ if (-not $punyaSolidWorks) {
 }
 
 Write-Langkah 'Build add-in'
+
+$sw = Test-SolidWorksRunning
+if (-not $sw.Lulus) {
+    Stop-Setup "SolidWorks sedang berjalan ($($sw.Nilai))." `
+        ("Ia mengunci DLL add-in yang sudah dimuat, jadi build akan gagal.`n`n" +
+         "Tutup SolidWorks sepenuhnya, lalu jalankan ulang setup.ps1.")
+}
+
 Write-Host "  PIA: $apiDir"
 
 $embed = 'true'

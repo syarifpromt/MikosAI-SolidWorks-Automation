@@ -305,6 +305,28 @@ function Test-IsAdministrator {
         -Saran 'Registrasi add-in butuh administrator. setup.ps1 akan meminta UAC sekali.'
 }
 
+function Test-SolidWorksRunning {
+    <#
+        SolidWorks mengunci DLL add-in yang sudah dimuat, jadi build akan gagal
+        dengan MSB3027 "file is locked by SolidWorks" - pesan yang benar tapi
+        terkubur di antara belasan baris retry MSBuild.
+
+        Diperiksa LEBIH DULU supaya pesannya jelas dan bisa ditindaklanjuti.
+    #>
+    $proses = @(Get-Process -Name 'SLDWORKS' -ErrorAction SilentlyContinue)
+
+    $berjalan = $proses.Count -gt 0
+    $nilai = 'tidak berjalan'
+    if ($berjalan) {
+        $nilai = "berjalan, PID $(($proses | ForEach-Object { $_.Id }) -join ', ')"
+    }
+
+    # Lulus = TIDAK berjalan, karena itu keadaan yang dibutuhkan untuk build.
+    return New-CheckResult -Nama 'SolidWorks tertutup' -Lulus (-not $berjalan) `
+        -Nilai $nilai -Blocker $false `
+        -Saran 'Tutup SolidWorks sebelum build - ia mengunci DLL add-in yang sudah dimuat.'
+}
+
 function Get-AllChecks {
     return @(
         (Test-DotNetFramework48)

@@ -50,7 +50,28 @@ namespace MikosAI.Core.Execution
         /// Satu-satunya tempat yang boleh menjawab "apakah tugas ini selesai".
         /// Sengaja dibuat sebagai properti supaya tidak ada yang menyimpulkan
         /// selesai hanya dari Verdict.
+        ///
+        /// PASS dan WARN sama-sama berarti operasinya BERHASIL. Bedanya, WARN
+        /// menyisakan catatan yang perlu dilihat manusia.
+        ///
+        /// Itu bukan pelonggaran. Yang memisahkan "penting" dari "informasional"
+        /// adalah flag <see cref="VerificationCheck.Required"/>, bukan tingkat
+        /// verdict: pemeriksaan required yang gagal menghasilkan FAIL, dan
+        /// pemeriksaan optional dibatasi maksimum WARN. Kalau WARN ikut
+        /// memblokir penyelesaian, WARN jadi sama saja dengan FAIL dan dua
+        /// tingkat itu tidak ada gunanya.
+        ///
+        /// Ini ditemukan lewat tool read-only: membaca kotak pembatas dokumen
+        /// kosong menghasilkan WARN ("belum ada solid body"), dan dengan aturan
+        /// lama itu dilaporkan ke AI sebagai ERROR - padahal pembacaannya
+        /// sempurna. Satu verdict sedang menjawab dua pertanyaan berbeda:
+        /// apakah operasinya berhasil, dan apakah modelnya sehat.
+        ///
+        /// Yang TIDAK dilonggarkan: FAIL, BLOCKED, dan status yang tidak
+        /// dikenali tetap menahan penyelesaian, begitu juga
+        /// <see cref="ManualReviewRequired"/>.
         /// </summary>
-        public bool MayBeMarkedComplete => Verdict == Verdict.Pass && !ManualReviewRequired;
+        public bool MayBeMarkedComplete
+            => (Verdict == Verdict.Pass || Verdict == Verdict.Warn) && !ManualReviewRequired;
     }
 }

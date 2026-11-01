@@ -4,7 +4,6 @@ using System.IO;
 using MikosAI.Core.Capabilities;
 using MikosAI.Core.Execution;
 using MikosAI.Core.Mcp;
-using MikosAI.Core.Testing;
 using MikosAI.Core.Tools;
 
 namespace MikosAI.Addin
@@ -18,15 +17,12 @@ namespace MikosAI.Addin
     /// pemanggilan fungsi biasa - bukan lewat protokol tambahan. Lihat
     /// docs/adr/0002.
     ///
-    /// EXECUTOR MASIH PALSU, DAN ITU DISENGAJA.
+    /// Executor diberikan dari luar, supaya McpHost tidak perlu tahu apa pun
+    /// tentang SolidWorks - dan supaya executor palsu bisa dipasang kalau
+    /// dibutuhkan untuk diagnosis.
     ///
-    /// Tool CAD nyata adalah pekerjaan Fase 1. Yang dibuktikan tahap ini adalah
-    /// seluruh jalurnya tersambung: SolidWorks memuat add-in, add-in menyalakan
-    /// server MCP, workspace tertulis, dan `agy` bisa memanggil tool. Mengisi
-    /// pipanya lebih mudah daripada membuktikan pipanya ada.
-    ///
-    /// Daftar tool yang diekspos saat ini KOSONG, karena belum ada kemampuan
-    /// berstatus verified atau pilot di capabilities.yaml. Itu benar, bukan bug.
+    /// Daftar tool yang diekspos ditentukan capabilities.yaml. Daftar kosong itu
+    /// sah: berarti belum ada kemampuan berstatus verified atau pilot.
     /// </summary>
     internal sealed class McpHost : IDisposable
     {
@@ -36,9 +32,12 @@ namespace MikosAI.Addin
         private McpHttpServer? _server;
         private bool _disposed;
 
-        internal McpHost(HostDiagnostics diagnostics)
+        private readonly IToolExecutor _executor;
+
+        internal McpHost(HostDiagnostics diagnostics, IToolExecutor executor)
         {
             _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+            _executor = executor ?? throw new ArgumentNullException(nameof(executor));
         }
 
         internal Uri? Endpoint { get; private set; }
@@ -86,9 +85,7 @@ namespace MikosAI.Addin
                 var tools = McpToolListBuilder.Build(katalog, ledger);
                 ToolCount = tools.Count;
 
-                // Executor palsu. Diganti executor nyata di Fase 1.
-                var executor = new FakeToolExecutor();
-                var handler = new McpRequestHandler(tools, executor);
+                var handler = new McpRequestHandler(tools, _executor);
 
                 var token = AgentWorkspace.NewSessionToken();
 

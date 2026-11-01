@@ -51,7 +51,7 @@ capabilities:
   # ---- Fase 1: read-only ------------------------------------------------
   - id: document_inspection
     label: Baca dokumen aktif, fitur, dan properti massa
-    status: not_implemented
+    status: pilot
     phase: 1
     review_required: false
     tools:
@@ -62,8 +62,14 @@ capabilities:
       - inspect_sketches
       - get_selection
     notes: >
-      Read-only. Tidak menulis apa pun ke model. Aman diekspos lebih dulu
-      karena kegagalannya tidak merusak pekerjaan pengguna.
+      Read-only. Tidak menulis apa pun ke model, jadi kegagalannya tidak bisa
+      merusak pekerjaan pengguna - itu alasan kemampuan ini yang pertama
+      diekspos.
+
+      Status `pilot`, BUKAN `verified`. Logika pembentukan hasil dan aturan
+      verifikasinya sudah diuji otomatis di MikosAI.Core, tapi penerjemahan API
+      SolidWorks-nya baru bisa dibuktikan di mesin bermesin CAD. Naikkan ke
+      `verified` hanya setelah golden test lulus tiga kali berturut-turut.
 
   # ---- Fase 3: sketsa ---------------------------------------------------
   - id: sketch_authoring

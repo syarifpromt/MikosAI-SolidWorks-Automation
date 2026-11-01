@@ -1,0 +1,506 @@
+using System;
+using System.Collections.Generic;
+using MikosAI.Core.Tools;
+using SolidWorks.Interop.sldworks;
+
+namespace MikosAI.Addin
+{
+    /// <summary>
+    /// Menerjemahkan API SolidWorks menjadi data polos Core.
+    ///
+    /// Kelas ini SENGAJA tipis dan bodoh. Semua aturan - sketsa over-defined itu
+    /// FAIL, massa tanpa material tidak boleh dikarang, bodyCount nol itu fakta
+    /// sah - tinggal di <see cref="ReadOnlyToolShaper"/> di Core, tempat
+    /// semuanya bisa diuji tanpa membuka CAD.
+    ///
+    /// Yang tersisa di sini hanyalah penerjemahan, yang memang hanya bisa
+    /// diverifikasi di mesin bermesin SolidWorks.
+    ///
+    /// SATUAN: API SolidWorks memakai METER. Konversi ke milimeter terjadi di
+    /// sini dan HANYA di sini.
+    ///
+    /// ATURAN: setiap method harus dipanggil dari thread utama SolidWorks,
+    /// lewat MainThreadDispatcher. Lihat CONTRIBUTING.md aturan 1.
+    /// </summary>
+    internal sealed class SolidWorksReader
+    {
+        private const double MeterKeMm = 1000.0;
+
+        private readonly ISldWorks _app;
+        private readonly HostDiagnostics _diagnostics;
+
+        internal SolidWorksReader(ISldWorks app, HostDiagnostics diagnostics)
+        {
+            _app = app ?? throw new ArgumentNullException(nameof(app));
+            _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+        }
+
+        private IModelDoc2? DokumenAktif()
+        {
+            try
+            {
+                return _app.ActiveDoc as IModelDoc2;
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("ActiveDoc", exception);
+                return null;
+            }
+        }
+
+        // --- get_active_document ---------------------------------------------
+
+        internal DocumentReading BacaDokumen()
+        {
+            var hasil = new DocumentReading();
+
+            try
+            {
+                hasil.SolidWorksRevision = _app.RevisionNumber();
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("RevisionNumber", exception);
+            }
+
+            var model = DokumenAktif();
+            if (model is null)
+            {
+                return hasil;
+            }
+
+            hasil.HasDocument = true;
+
+            Coba("GetTitle", () => hasil.Title = model.GetTitle());
+            Coba("GetPathName", () =>
+            {
+                var path = model.GetPathName();
+                hasil.Path = string.IsNullOrEmpty(path) ? null : path;
+            });
+            Coba("GetType", () => hasil.DocumentType = JenisDokumen(model.GetType()));
+            Coba("GetSaveFlag", () => hasil.IsDirty = model.GetSaveFlag());
+            Coba("ConfigurationManager", () =>
+            {
+                hasil.ActiveConfiguration = model.ConfigurationManager?.ActiveConfiguration?.Name;
+            });
+
+            return hasil;
+        }
+
+        /// <summary>
+        /// swDocumentTypes_e: 1=part, 2=assembly, 3=drawing.
+        ///
+        /// Angka ditulis langsung alih-alih memakai enum swconst, supaya stub
+        /// compile-check tidak perlu memuat seluruh enum SolidWorks.
+        /// </summary>
+        private static string JenisDokumen(int kode)
+        {
+            switch (kode)
+            {
+                case 1: return "part";
+                case 2: return "assembly";
+                case 3: return "drawing";
+                default: return "unknown";
+            }
+        }
+
+        // --- list_features ----------------------------------------------------
+
+        internal FeatureTreeReading BacaFitur()
+        {
+            var hasil = new FeatureTreeReading();
+            var daftar = new List<FeatureReading>();
+
+            var model = DokumenAktif();
+            if (model is null)
+            {
+                return hasil;
+            }
+
+            Coba("GetRebuildState", () =>
+            {
+                // 0 = tidak perlu rebuild.
+                hasil.RebuildRequired = model.Extension.NeedsRebuild2 != 0;
+            });
+
+            try
+            {
+                var fitur = model.FirstFeature() as IFeature;
+                var penjaga = 0;
+
+                while (fitur is not null && penjaga++ < 5000)
+                {
+                    var bacaan = new FeatureReading();
+
+                    Coba("Feature.Name", () => bacaan.Name = fitur.Name ?? string.Empty);
+                    Coba("Feature.GetTypeName2", () => bacaan.TypeName = fitur.GetTypeName2());
+                    Coba("Feature.IsSuppressed", () => bacaan.IsSuppressed = fitur.IsSuppressed());
+
+                    Coba("Feature.GetErrorCode2", () =>
+                    {
+                        // 0 = tidak ada error.
+                        bacaan.HasError = fitur.GetErrorCode2(out _) != 0;
+                    });
+
+                    daftar.Add(bacaan);
+
+                    fitur = fitur.GetNextFeature() as IFeature;
+                }
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("menelusuri FeatureManager tree", exception);
+            }
+
+            hasil.Features = daftar;
+            return hasil;
+        }
+
+        // --- get_bounding_box --------------------------------------------------
+
+        internal BoundingBoxReading BacaKotakPembatas()
+        {
+            var hasil = new BoundingBoxReading();
+
+            var model = DokumenAktif();
+            if (model is null)
+            {
+                return hasil;
+            }
+
+            Coba("GetBodies2", () =>
+            {
+                var part = model as IPartDoc;
+                if (part is null)
+                {
+                    return;
+                }
+
+                // swBodyType_e.swSolidBody = 0, visibleOnly = false.
+                if (part.GetBodies2(0, false) is object[] bodies)
+                {
+                    hasil.BodyCount = bodies.Length;
+                }
+            });
+
+            Coba("GetPartBox", () =>
+            {
+                var part = model as IPartDoc;
+                if (part is null)
+                {
+                    return;
+                }
+
+                // GetPartBox mengembalikan 6 double dalam METER:
+                // xMin, yMin, zMin, xMax, yMax, zMax.
+                if (part.GetPartBox(true) is double[] kotak && kotak.Length >= 6)
+                {
+                    hasil.Min = new Vector3Reading
+                    {
+                        X = kotak[0] * MeterKeMm,
+                        Y = kotak[1] * MeterKeMm,
+                        Z = kotak[2] * MeterKeMm,
+                    };
+                    hasil.Max = new Vector3Reading
+                    {
+                        X = kotak[3] * MeterKeMm,
+                        Y = kotak[4] * MeterKeMm,
+                        Z = kotak[5] * MeterKeMm,
+                    };
+                }
+            });
+
+            return hasil;
+        }
+
+        // --- get_mass_properties ------------------------------------------------
+
+        internal MassPropertiesReading BacaPropertiMassa()
+        {
+            var hasil = new MassPropertiesReading();
+
+            var model = DokumenAktif();
+            if (model is null)
+            {
+                return hasil;
+            }
+
+            Coba("GetMassProperties2", () =>
+            {
+                // Susunan: [cgX, cgY, cgZ, volume, area, massa, ...] dalam SI.
+                var nilai = model.Extension.GetMassProperties2(1, out var status, false) as double[];
+
+                if (nilai is null || nilai.Length < 6)
+                {
+                    return;
+                }
+
+                hasil.CenterOfMass = new Vector3Reading
+                {
+                    X = nilai[0] * MeterKeMm,
+                    Y = nilai[1] * MeterKeMm,
+                    Z = nilai[2] * MeterKeMm,
+                };
+
+                // m^3 -> mm^3, m^2 -> mm^2
+                hasil.VolumeMm3 = nilai[3] * 1e9;
+                hasil.SurfaceAreaMm2 = nilai[4] * 1e6;
+
+                // status != 0 berarti massa tidak bisa dipercaya - mis. material
+                // belum di-assign. JANGAN mengarang angkanya; itu angka yang
+                // dipakai orang untuk keputusan teknik.
+                if (status == 0 && nilai[5] > 0)
+                {
+                    hasil.DensityAssigned = true;
+                    hasil.MassGrams = nilai[5] * 1000.0;   // kg -> gram
+                }
+            });
+
+            return hasil;
+        }
+
+        // --- inspect_sketches ----------------------------------------------------
+
+        internal IReadOnlyList<SketchReading> BacaSketsa(string? namaSketsa)
+        {
+            var daftar = new List<SketchReading>();
+
+            var model = DokumenAktif();
+            if (model is null)
+            {
+                return daftar;
+            }
+
+            try
+            {
+                var fitur = model.FirstFeature() as IFeature;
+                var penjaga = 0;
+
+                while (fitur is not null && penjaga++ < 5000)
+                {
+                    var tipe = string.Empty;
+                    Coba("Feature.GetTypeName2", () => tipe = fitur.GetTypeName2() ?? string.Empty);
+
+                    if (tipe == "ProfileFeature" || tipe == "3DProfileFeature")
+                    {
+                        var nama = string.Empty;
+                        Coba("Feature.Name", () => nama = fitur.Name ?? string.Empty);
+
+                        if (string.IsNullOrEmpty(namaSketsa)
+                            || string.Equals(nama, namaSketsa, StringComparison.OrdinalIgnoreCase))
+                        {
+                            daftar.Add(BacaSatuSketsa(fitur, nama));
+                        }
+                    }
+
+                    fitur = fitur.GetNextFeature() as IFeature;
+                }
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("menelusuri sketsa", exception);
+            }
+
+            return daftar;
+        }
+
+        private SketchReading BacaSatuSketsa(IFeature fitur, string nama)
+        {
+            var bacaan = new SketchReading { Name = nama };
+
+            Coba("Sketch.GetConstrainedStatus", () =>
+            {
+                if (fitur.GetSpecificFeature2() is ISketch sketsa)
+                {
+                    bacaan.ConstrainedStatus = StatusConstraint(sketsa.GetConstrainedStatus());
+
+                    if (sketsa.GetSketchSegments() is object[] segmen)
+                    {
+                        bacaan.EntityCount = segmen.Length;
+                    }
+
+                    // Jumlah dimensi SENGAJA tidak dibaca di sini.
+                    // ISketch tidak mengeksposnya langsung, dan menelusuri
+                    // IDisplayDimension memperluas permukaan API tanpa memberi
+                    // nilai yang sepadan di tahap ini. Dibiarkan 0, dan itu
+                    // jujur - bukan angka karangan.
+                }
+            });
+
+            return bacaan;
+        }
+
+        /// <summary>
+        /// swConstrainedStatus_e. Nilai yang tidak dikenal menjadi Unknown -
+        /// dan Core memperlakukan Unknown sebagai BLOCKED, bukan sehat.
+        /// </summary>
+        private static SketchConstraintStatus StatusConstraint(int kode)
+        {
+            switch (kode)
+            {
+                case 0: return SketchConstraintStatus.Empty;              // swNoSolution? - lihat catatan
+                case 1: return SketchConstraintStatus.UnderDefined;
+                case 2: return SketchConstraintStatus.FullyDefined;
+                case 3: return SketchConstraintStatus.OverDefined;
+                case 4: return SketchConstraintStatus.NoSolution;
+                case 5: return SketchConstraintStatus.Dangling;
+                default: return SketchConstraintStatus.Unknown;
+            }
+        }
+
+        // --- get_selection ---------------------------------------------------------
+
+        internal IReadOnlyList<SelectionReading> BacaSeleksi()
+        {
+            var daftar = new List<SelectionReading>();
+
+            var model = DokumenAktif();
+            if (model is null)
+            {
+                return daftar;
+            }
+
+            try
+            {
+                var mgr = model.SelectionManager as ISelectionMgr;
+                if (mgr is null)
+                {
+                    return daftar;
+                }
+
+                var jumlah = mgr.GetSelectedObjectCount2(-1);
+
+                for (var i = 1; i <= jumlah; i++)
+                {
+                    var bacaan = new SelectionReading();
+                    var indeks = i;
+
+                    Coba("SelectionMgr.GetSelectedObjectType3", () =>
+                    {
+                        var tipe = mgr.GetSelectedObjectType3(indeks, -1);
+                        bacaan.Kind = JenisSeleksi(tipe);
+                        bacaan.TypeName = tipe.ToString();
+                    });
+
+                    Coba("SelectionMgr.GetSelectedObject6", () =>
+                    {
+                        // Cast eksplisit ke object: PIA mendeklarasikan
+                        // kembaliannya sebagai dynamic, dan membiarkannya
+                        // dynamic menarik dependensi Microsoft.CSharp ke dalam
+                        // add-in tanpa memberi manfaat apa pun.
+                        object? objek = (object?)mgr.GetSelectedObject6(indeks, -1);
+                        IsiDetailSeleksi(bacaan, objek);
+                    });
+
+                    daftar.Add(bacaan);
+                }
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("membaca seleksi", exception);
+            }
+
+            return daftar;
+        }
+
+        /// <summary>swSelectType_e yang relevan untuk kita.</summary>
+        private static string JenisSeleksi(int tipe)
+        {
+            switch (tipe)
+            {
+                case 1: return "edge";      // swSelEDGES
+                case 2: return "face";      // swSelFACES
+                case 3: return "vertex";    // swSelVERTICES
+                case 4: return "plane";     // swSelDATUMPLANES
+                case 9: return "sketch";    // swSelSKETCHES
+                case 22: return "feature";  // swSelBODYFEATURES
+                default: return "unknown";
+            }
+        }
+
+        private void IsiDetailSeleksi(SelectionReading bacaan, object? objek)
+        {
+            if (objek is null)
+            {
+                return;
+            }
+
+            // Entitas bernama: bidang, fitur, sketsa.
+            if (objek is IFeature fitur)
+            {
+                Coba("Feature.Name", () => bacaan.Name = fitur.Name);
+                return;
+            }
+
+            if (objek is IFace2 permukaan)
+            {
+                Coba("Face2.Normal", () =>
+                {
+                    if (permukaan.Normal is double[] n && n.Length >= 3)
+                    {
+                        bacaan.Normal = new Vector3Reading { X = n[0], Y = n[1], Z = n[2] };
+                    }
+                });
+
+                Coba("Face2.GetBox", () =>
+                {
+                    // Titik tengah kotak permukaan dipakai sebagai nearPoint.
+                    // Bukan centroid sejati, tapi cukup untuk mencocokkan
+                    // permukaan dan jauh lebih stabil daripada Face1.
+                    if (permukaan.GetBox() is double[] kotak && kotak.Length >= 6)
+                    {
+                        bacaan.Centroid = new Vector3Reading
+                        {
+                            X = (kotak[0] + kotak[3]) / 2 * MeterKeMm,
+                            Y = (kotak[1] + kotak[4]) / 2 * MeterKeMm,
+                            Z = (kotak[2] + kotak[5]) / 2 * MeterKeMm,
+                        };
+                    }
+                });
+
+                return;
+            }
+
+            if (objek is IEdge tepi)
+            {
+                Coba("Edge.GetCurveParams2", () =>
+                {
+                    // Titik tengah tepi: rata-rata titik awal dan akhir.
+                    //
+                    // GetCurveParams2 mengembalikan array double, sedangkan
+                    // GetCurveParams3 mengembalikan CurveParamData - tipe
+                    // terstruktur yang tidak bisa dipola sebagai double[].
+                    // Compiler PIA asli yang memberi tahu itu.
+                    if (tepi.GetCurveParams2() is double[] p && p.Length >= 6)
+                    {
+                        bacaan.Centroid = new Vector3Reading
+                        {
+                            X = (p[0] + p[3]) / 2 * MeterKeMm,
+                            Y = (p[1] + p[4]) / 2 * MeterKeMm,
+                            Z = (p[2] + p[5]) / 2 * MeterKeMm,
+                        };
+                    }
+                });
+            }
+        }
+
+        /// <summary>
+        /// Menjalankan satu pembacaan API dan mencatat kegagalannya.
+        ///
+        /// Satu properti yang tidak terbaca tidak boleh menggagalkan seluruh
+        /// pembacaan - lebih baik hasil parsial yang jujur daripada tidak ada
+        /// hasil sama sekali. Setiap kegagalan tetap muncul di host-status.json.
+        /// </summary>
+        private void Coba(string konteks, Action aksi)
+        {
+            try
+            {
+                aksi();
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError(konteks, exception);
+            }
+        }
+    }
+}

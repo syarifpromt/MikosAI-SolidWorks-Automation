@@ -93,6 +93,7 @@ namespace MikosAI.Addin
         private SolidWorksApi? _sw;
         private MainThreadDispatcher? _dispatcher;
         private McpHost? _mcp;
+        private SolidWorksReader? _pembaca;
         private TaskPaneHost? _panel;
         private SolidWorks.Interop.sldworks.ITaskpaneView? _taskPaneView;
 
@@ -166,12 +167,28 @@ namespace MikosAI.Addin
                 _diagnostics.AddError("baca properti aplikasi", exception);
             }
 
+            // --- Pembaca model ----------------------------------------------
+            try
+            {
+                _pembaca = _sw.BuatPembaca(_diagnostics);
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("membuat SolidWorksReader", exception);
+            }
+
             // --- Nyalakan server MCP ----------------------------------------
             // Di dalam proses SolidWorks, jadi tool handler memanggil executor
             // lewat pemanggilan fungsi biasa. Lihat docs/adr/0002.
             try
             {
-                _mcp = new McpHost(_diagnostics);
+                // Executor nyata: setiap pembacaan dijalankan lewat dispatcher
+                // ke thread utama SolidWorks.
+                var executor = new SolidWorksToolExecutor(
+                    _dispatcher ?? throw new InvalidOperationException("dispatcher belum siap"),
+                    () => _pembaca);
+
+                _mcp = new McpHost(_diagnostics, executor);
                 _diagnostics.McpServer = _mcp.Mulai();
                 _diagnostics.McpEndpoint = _mcp.Endpoint?.ToString();
                 _diagnostics.McpToolCount = _mcp.ToolCount;
@@ -261,6 +278,7 @@ namespace MikosAI.Addin
             finally
             {
                 _mcp = null;
+                _pembaca = null;
                 _diagnostics.McpServer = false;
                 _diagnostics.McpEndpoint = null;
             }

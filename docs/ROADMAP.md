@@ -10,13 +10,13 @@ Terakhir diperbarui 2026-10-31
 | Fase | Isi | Progres |
 |---|---|---|
 | **0** | Fondasi | **add-in TERBUKTI HIDUP** di SW2025 SP01.1, 7/7 gerbang lulus; sisa 4 item test |
-| 1 | MCP server + tool read-only | ~50% — server jalan, 6 tool CAD belum |
+| 1 | MCP server + tool read-only | **kode lengkap**, menunggu verifikasi di SolidWorks |
 | 2 | Provider host (`agy`) | belum mulai |
 | 3 | Jalur tulis | belum mulai |
 | 4 | Pengalaman dua lapis | belum mulai |
 | 5 | Pengemasan | belum mulai |
 
-Sudah jalan: **171 test hijau**, seluruh alur DesignPlan end-to-end dengan executor palsu,
+Sudah jalan: **201 test hijau**, seluruh alur DesignPlan end-to-end dengan executor palsu,
 tanpa SolidWorks.
 
 Belum ada kemampuan berstatus `verified`, jadi daftar tool MCP masih kosong. Itu benar —
@@ -131,7 +131,7 @@ SolidWorks dan punya kanal thread yang benar.
 
 ### Sudah selesai di `MikosAI.Core`
 
-171 test hijau, dibuild dan dijalankan tanpa SolidWorks dan tanpa Visual Studio:
+201 test hijau, dibuild dan dijalankan tanpa SolidWorks dan tanpa Visual Studio:
 
 | Berkas | Isi |
 |---|---|
@@ -189,17 +189,20 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
 - [x] `AgentWorkspace`: folder sendiri di `%LOCALAPPDATA%`, tulis `.agents/mcp_config.json`
       tiap sesi, **jangan sentuh config global pengguna**
 - [x] `McpRequestHandler`: JSON-RPC initialize / tools/list / tools/call / ping
-- [ ] Hubungkan `McpHttpServer` ke add-in di `ConnectToSW`
+- [x] Hubungkan `McpHttpServer` ke add-in di `ConnectToSW`
+- [x] TaskPane + WebView2 dengan panel status
+- [x] `SolidWorksToolExecutor` — semua pembacaan lewat `MainThreadDispatcher`
 
 ### Jalur CAD — 6 tool read-only, aman karena tidak menulis apa pun
 
-- [ ] `get_active_document`
-- [ ] `list_features`
-- [ ] `get_bounding_box`
-- [ ] `get_mass_properties`
-- [ ] `inspect_sketches`
-- [ ] `get_selection` — mengembalikan `EntityRef` semantik, bukan `Face1`
-- [ ] `EntityRef` resolver untuk `by: "name"` dan `by: "normal_and_point"`
+- [x] `get_active_document`
+- [x] `list_features`
+- [x] `get_bounding_box`
+- [x] `get_mass_properties`
+- [x] `inspect_sketches`
+- [x] `get_selection` — mengembalikan `EntityRef` semantik, bukan `Face1`
+- [x] Pembentuk `EntityRef` untuk `name`, `normal_and_point`, dan `midpoint`
+- [ ] `EntityRef` *resolver* (arah sebaliknya: ref → entitas), untuk tool yang menulis
 
 ### Gerbang penerimaan Fase 1
 
