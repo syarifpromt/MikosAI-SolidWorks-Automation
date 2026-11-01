@@ -88,6 +88,25 @@ namespace MikosAI.Addin
                 return null;
             }
 
+            // AssemblyResolve adalah event GLOBAL per-AppDomain, jadi handler ini
+            // dimintai pendapat untuk SETIAP resolusi yang gagal di seluruh
+            // proses SolidWorks - termasuk dependensi add-in lain.
+            //
+            // Terbukti di mesin nyata: kami dimintai DevExpress.Utils.v22.1 dan
+            // SOLIDWORKSInspection.XmlSerializers, yang milik add-in bawaan
+            // SolidWorks.
+            //
+            // Menjawab permintaan yang bukan milik kita itu berbahaya: kalau
+            // sebuah add-in lain butuh assembly yang namanya bertabrakan dengan
+            // berkas di folder kami, kami akan menyerahkan assembly yang SALAH
+            // ke proses mereka. Jadi permintaan yang jelas bukan dari kami
+            // ditolak lebih dulu, tanpa menyentuh disk dan tanpa mengotori
+            // diagnostik.
+            if (!PermintaanDariKami(args.RequestingAssembly))
+            {
+                return null;
+            }
+
             string namaSederhana;
             try
             {
@@ -123,6 +142,45 @@ namespace MikosAI.Addin
             {
                 Catat($"GAGAL MUAT {namaSederhana}: {exception.GetType().Name}: {exception.Message}");
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Apakah permintaan resolusi berasal dari assembly kami.
+        ///
+        /// RequestingAssembly bisa null - CLR tidak selalu mengisinya. Dalam
+        /// kasus itu kami TETAP melayani, karena justru pemuatan dependensi
+        /// paling awal milik kami sering datang tanpa requester. Risikonya
+        /// diterima: pencarian tetap dibatasi ke folder kami sendiri.
+        /// </summary>
+        private static bool PermintaanDariKami(Assembly? peminta)
+        {
+            if (peminta is null)
+            {
+                return true;
+            }
+
+            try
+            {
+                var lokasi = peminta.Location;
+
+                if (string.IsNullOrEmpty(lokasi))
+                {
+                    // Assembly dinamis atau dimuat dari byte array.
+                    return true;
+                }
+
+                var folderPeminta = Path.GetDirectoryName(lokasi);
+
+                return !string.IsNullOrEmpty(folderPeminta)
+                       && string.Equals(folderPeminta, _folderAddin, StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception)
+            {
+                // Location bisa melempar untuk assembly tertentu. Kalau tidak
+                // bisa dipastikan, jangan melayani - lebih aman menolak daripada
+                // menyerahkan assembly yang salah ke add-in lain.
+                return false;
             }
         }
 

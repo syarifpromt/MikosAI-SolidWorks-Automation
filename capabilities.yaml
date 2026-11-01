@@ -13,8 +13,32 @@
 schema_version: "1.0"
 
 # Versi yang diuji. Jangan klaim versi yang belum pernah dijalankan.
+# Versi tempat KEMAMPUAN CAD sudah lulus golden test.
+#
+# SENGAJA masih kosong. Add-in host sudah terbukti hidup di SW2025 (lihat
+# verified_hosts di bawah), tapi itu membuktikan fondasinya - BUKAN bahwa ada
+# satu pun kemampuan CAD yang benar sesuai spesifikasi.
+#
+# Mengisi ini tanpa golden test yang lulus akan melonggarkan arti `verified`,
+# yaitu satu-satunya hal yang melindungi pengguna di proyek ini.
 verified_versions:
-  solidworks: []          # diisi saat golden test pertama lulus, mis. ["2026"]
+  solidworks: []
+
+# Lingkungan tempat add-in host terbukti hidup: ConnectToSW selesai, callback
+# terdaftar, thread utama tertangkap, dan tidak ada error tercatat.
+#
+# Ini terpisah dari verified_versions dengan sengaja. Yang dibuktikan di sini
+# adalah add-in bisa dimuat dan API bisa dipanggil - tidak ada klaim soal
+# kebenaran geometri.
+verified_hosts:
+  - solidworks: "2025"
+    revision: "33.1.1"          # SP01.1
+    verifiedOn: "2026-11-01"
+    gates: 7                    # ketujuh gerbang -Action Probe lulus
+    notes: >
+      Terbukti di dua mesin terpisah, termasuk satu yang memasang SolidWorks di
+      drive selain C:. PIA direferensi dengan EmbedInteropTypes, jadi tidak ada
+      dependensi assembly SolidWorks saat runtime.
 
 tested_providers: []      # diisi di Fase 2, mis. [{id: antigravity, version: "1.0.6"}]
 
