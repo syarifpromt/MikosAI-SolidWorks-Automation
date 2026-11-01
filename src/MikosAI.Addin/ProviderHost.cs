@@ -9,25 +9,12 @@ namespace MikosAI.Addin
     /// <summary>
     /// Mengelola provider AI.
     ///
-    /// TAHAP INI SENGAJA BELUM MENJALANKAN PROSES APA PUN.
+    /// Menemukan `agy`, memeriksa keadaannya, mendaftarkan server MCP kita ke
+    /// konfigurasinya, dan menjalankan permintaan.
     ///
-    /// Yang ada: abstraksi provider, pemeriksaan keadaan, dan jalur onboarding
-    /// yang jujur. Yang BELUM: ConPTY dan pemanggilan `agy` sungguhan.
-    ///
-    /// Itu bukan kelalaian. Delapan item verifikasi di
-    /// docs/integrasi-antigravity.md bagian 7 belum terjawab, dan semuanya
-    /// butuh `agy` nyata - versi terpasang, apakah bug stdout non-TTY masih ada,
-    /// nama field jawaban di envelope JSON, bentuk event stream-json.
-    ///
-    /// Menulis ConPTY di atas asumsi adalah kesalahan yang sama dengan memakai
-    /// `dynamic` untuk memanggil ISldWorks: terdengar benar di atas kertas,
-    /// gagal total di mesin nyata, dan baru ketahuan setelah memakan beberapa
-    /// putaran.
-    ///
-    /// Jadi untuk sekarang: provider dideteksi, keadaannya dilaporkan dengan
-    /// jujur, dan kalau belum siap pengguna diberi tahu persis apa yang harus
-    /// dilakukan. Begitu delapan item terjawab, adapter Antigravity dipasang di
-    /// balik interface yang sama.
+    /// Tidak memakai ConPTY: bug stdout non-TTY yang mewajibkannya terbukti
+    /// tidak ada di agy 1.4.11. Deteksi `provider_silent` tetap ada sebagai
+    /// jaring pengaman. Lihat docs/integrasi-antigravity.md bagian 1.
     /// </summary>
     internal sealed class ProviderHost : IDisposable
     {
@@ -40,6 +27,18 @@ namespace MikosAI.Addin
         internal ProviderHost(HostDiagnostics diagnostics, IAgentProvider? provider = null)
         {
             _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+
+            // Adapter dibuat sendiri kalau agy ditemukan. Parameter provider
+            // tetap ada supaya test dan diagnosis bisa memasang yang lain.
+            if (provider is null)
+            {
+                var path = CariAgy();
+                if (path is not null)
+                {
+                    provider = new AntigravityProvider(path, diagnostics);
+                }
+            }
+
             _provider = provider;
         }
 
@@ -207,6 +206,7 @@ namespace MikosAI.Addin
         internal async Task<AgentResult> JalankanAsync(
             string prompt,
             string workingDirectory,
+            Action<string>? onDelta = null,
             CancellationToken cancellationToken = default)
         {
             if (!ProviderStateRules.MayAttemptRequest(_probe.State))
@@ -242,28 +242,44 @@ namespace MikosAI.Addin
             {
                 Prompt = prompt,
                 WorkingDirectory = workingDirectory,
-                PreferStreaming = true,
+                PreferStreaming = onDelta is not null,
             };
 
             try
             {
-                var perintah = _provider.BuildCommand(permintaan, _probe);
+                if (_provider is AntigravityProvider antigravity)
+                {
+                    var hasil = await antigravity
+                        .KirimAsync(permintaan, _probe, onDelta, cancellationToken)
+                        .ConfigureAwait(false);
 
-                // Eksekusi nyata menyusul bersama adapter. Dibiarkan gagal
-                // eksplisit alih-alih mengembalikan hasil palsu.
+                    // Satu permintaan yang benar-benar mengembalikan hasil
+                    // terstruktur adalah SATU-SATUNYA bukti bahwa eksekusi
+                    // bekerja. Keadaan dinaikkan hanya setelah itu terjadi.
+                    if (hasil.IsSuccessful)
+                    {
+                        _probe.State = ProviderState.ExecutionVerified;
+                    }
+
+                    return hasil;
+                }
+
                 return new AgentResult
                 {
                     Failure = new AgentFailure
                     {
-                        Code = "provider_execution_not_implemented",
-                        Message = $"Perintah tersusun ({perintah.Executable}), tapi eksekusinya belum ada.",
-                        NextAction = "Lihat docs/integrasi-antigravity.md bagian 7.",
+                        Code = "provider_adapter_missing",
+                        Message = $"Adapter untuk {DisplayName} belum ada.",
                     },
                 };
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception exception)
             {
-                _diagnostics.AddError("menyusun perintah provider", exception);
+                _diagnostics.AddError("menjalankan permintaan provider", exception);
 
                 return new AgentResult
                 {
@@ -276,6 +292,78 @@ namespace MikosAI.Addin
             }
         }
 
+        /// <summary>
+        /// Mendaftarkan server MCP kita ke konfigurasi agy.
+        ///
+        /// Memakai jalur resmi `agy mcp add`, yang menurut dokumentasinya
+        /// "Add or update" - jadi memanggilnya setiap sesi menimpa entri lama.
+        /// Itu penting karena port kita ephemeral.
+        ///
+        /// Tidak pernah melempar exception: gagal mendaftar berarti AI tidak
+        /// bisa memanggil tool CAD, tapi add-in tetap berguna.
+        /// </summary>
+        internal async Task<bool> DaftarkanMcpAsync(
+            Uri endpoint,
+            string token,
+            CancellationToken cancellationToken = default)
+        {
+            if (_provider is not AntigravityProvider antigravity)
+            {
+                return false;
+            }
+
+            try
+            {
+                var hasil = await antigravity
+                    .JalankanPerintahAsync(
+                        AntigravityCommand.BuatArgumenDaftarMcp(endpoint, token),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (!hasil)
+                {
+                    _diagnostics.AddError("agy mcp add gagal - AI tidak akan melihat tool CAD kami.");
+                }
+
+                McpTerdaftar = hasil;
+                return hasil;
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("mendaftarkan server MCP ke agy", exception);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Melepas pendaftaran. Dipanggil saat disconnect supaya tidak ada
+        /// entri basi yang menunjuk port mati.
+        /// </summary>
+        internal async Task LepasMcpAsync(CancellationToken cancellationToken = default)
+        {
+            if (_provider is not AntigravityProvider antigravity || !McpTerdaftar)
+            {
+                return;
+            }
+
+            try
+            {
+                await antigravity
+                    .JalankanPerintahAsync(AntigravityCommand.BuatArgumenHapusMcp(), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("melepas pendaftaran MCP dari agy", exception);
+            }
+            finally
+            {
+                McpTerdaftar = false;
+            }
+        }
+
+        internal bool McpTerdaftar { get; private set; }
+
         /// <summary>Ringkasan untuk panel UI.</summary>
         internal IReadOnlyDictionary<string, object?> Ringkasan()
             => new Dictionary<string, object?>(StringComparer.Ordinal)
@@ -286,6 +374,7 @@ namespace MikosAI.Addin
                 ["version"] = _probe.Version,
                 ["connected"] = ProviderStateRules.MayBeShownAsConnected(_probe.State),
                 ["mayAttempt"] = ProviderStateRules.MayAttemptRequest(_probe.State) && _provider is not null,
+                ["mcpRegistered"] = McpTerdaftar,
                 ["description"] = ProviderStateRules.Describe(_probe.State, DisplayName),
                 ["nextAction"] = ProviderStateRules.NextAction(_probe.State, DisplayName)
                                  ?? (_provider is null && _probe.State == ProviderState.Installed

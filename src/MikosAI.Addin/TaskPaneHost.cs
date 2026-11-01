@@ -230,6 +230,48 @@ namespace MikosAI.Addin
             }
         }
 
+        /// <summary>Membuka gelembung jawaban baru yang akan diisi bertahap.</summary>
+        internal void MulaiPesanChat(string kelas) => KirimKeHalaman("chat-mulai", kelas, string.Empty);
+
+        /// <summary>Menambahkan potongan teks ke gelembung yang sedang terbuka.</summary>
+        internal void TambahPotonganChat(string teks) => KirimKeHalaman("chat-potongan", string.Empty, teks);
+
+        /// <summary>Menutup gelembung yang sedang terbuka.</summary>
+        internal void SelesaikanPesanChat() => KirimKeHalaman("chat-selesai", string.Empty, string.Empty);
+
+        private void KirimKeHalaman(string jenis, string kelas, string teks)
+        {
+            try
+            {
+                if (_webView?.CoreWebView2 is null)
+                {
+                    return;
+                }
+
+                var pesan = new JsonObject
+                {
+                    ["jenis"] = jenis,
+                    ["kelas"] = kelas,
+                    ["teks"] = teks,
+                };
+
+                void Kirim() => _webView!.CoreWebView2.PostWebMessageAsJson(pesan.ToJsonString());
+
+                if (InvokeRequired)
+                {
+                    BeginInvoke((Action)Kirim);
+                }
+                else
+                {
+                    Kirim();
+                }
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError($"mengirim {jenis} ke panel UI", exception);
+            }
+        }
+
         private void BukaFolderWorkspace(string? path)
         {
             try

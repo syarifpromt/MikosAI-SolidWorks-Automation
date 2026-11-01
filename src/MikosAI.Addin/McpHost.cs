@@ -46,6 +46,12 @@ namespace MikosAI.Addin
 
         internal string? McpConfigPath { get; private set; }
 
+        /// <summary>
+        /// Token bearer sesi ini. Dipakai mendaftarkan server MCP ke agy.
+        /// Tidak pernah dilaporkan ke panel UI atau ke trace.
+        /// </summary>
+        internal string? SessionToken { get; private set; }
+
         internal int ToolCount { get; private set; }
 
         internal bool IsRunning => _server?.IsRunning == true;
@@ -88,6 +94,7 @@ namespace MikosAI.Addin
                 var handler = new McpRequestHandler(tools, _executor);
 
                 var token = AgentWorkspace.NewSessionToken();
+                SessionToken = token;
 
                 _server = new McpHttpServer(handler, token);
                 _server.Start();
@@ -178,6 +185,8 @@ namespace MikosAI.Addin
             _disposed = true;
 
             Hentikan();
+
+            SessionToken = null;
 
             // Workspace TIDAK dihapus saat disconnect. Pengguna mungkin masih
             // ingin melihat mcp_config.json terakhir, dan folder itu ditulis ulang

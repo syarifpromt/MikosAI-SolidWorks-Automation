@@ -11,12 +11,12 @@ Terakhir diperbarui 2026-10-31
 |---|---|---|
 | **0** | Fondasi | **add-in TERBUKTI HIDUP** di SW2025 SP01.1, 7/7 gerbang lulus; sisa 4 item test |
 | 1 | MCP server + tool read-only | **kode lengkap**, menunggu verifikasi di SolidWorks |
-| 2 | Provider host (`agy`) | 7/8 verifikasi terjawab, parser siap; eksekusi proses belum |
+| 2 | Provider host (`agy`) | **kode lengkap**, menunggu uji di SolidWorks |
 | 3 | Jalur tulis | belum mulai |
 | 4 | Pengalaman dua lapis | belum mulai |
 | 5 | Pengemasan | belum mulai |
 
-Sudah jalan: **255 test hijau**, seluruh alur DesignPlan end-to-end dengan executor palsu,
+Sudah jalan: **264 test hijau**, seluruh alur DesignPlan end-to-end dengan executor palsu,
 tanpa SolidWorks.
 
 Belum ada kemampuan berstatus `verified`, jadi daftar tool MCP masih kosong. Itu benar —
@@ -131,7 +131,7 @@ SolidWorks dan punya kanal thread yang benar.
 
 ### Sudah selesai di `MikosAI.Core`
 
-255 test hijau, dibuild dan dijalankan tanpa SolidWorks dan tanpa Visual Studio:
+264 test hijau, dibuild dan dijalankan tanpa SolidWorks dan tanpa Visual Studio:
 
 | Berkas | Isi |
 |---|---|
@@ -238,14 +238,14 @@ Fase paling berisiko. **Baca `docs/integrasi-antigravity.md` seluruhnya sebelum 
 ### Jalur Platform
 
 - [x] ~~ConPTY~~ → **tidak diperlukan**, pipe biasa cukup di 1.4.11
-- [ ] `ProviderHost` menjalankan proses `agy` sungguhan
+- [x] `ProviderHost` menjalankan proses `agy` sungguhan
 - [x] Pembersih ANSI / spinner / repaint carriage-return (dipertahankan, murah)
-- [ ] Flag probing dijalankan sungguhan saat startup (parser-nya sudah ada)
+- [x] Flag probing dijalankan saat startup
 - [x] Parser `stream-json` dan `json` — diuji terhadap payload nyata
 - [x] **Deteksi `provider_silent`** — exit 0 + stdout kosong adalah kegagalan
 - [x] State machine provider dan tampilannya di UI
 - [x] UI chat: kirim prompt, tampilkan hasil
-- [ ] Progres bertahap di chat — menunggu parser stream-json
+- [x] Progres bertahap di chat lewat `text_delta`
 
 ### Jalur CAD
 

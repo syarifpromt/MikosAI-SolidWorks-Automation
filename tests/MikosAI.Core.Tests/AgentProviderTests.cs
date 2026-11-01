@@ -487,3 +487,126 @@ namespace MikosAI.Core.Tests
         }
     }
 }
+
+namespace MikosAI.Core.Tests
+{
+    public class AntigravityCommandTests
+    {
+        private static MikosAI.Core.Agents.ProviderProbe ProbePenuh()
+            => new MikosAI.Core.Agents.ProviderProbe
+            {
+                State = MikosAI.Core.Agents.ProviderState.AuthUnverified,
+                Version = "1.4.12",
+                SupportedFlags = new[]
+                {
+                    "-p", "--print", "--output-format", "--print-timeout", "--model", "--json-schema",
+                },
+            };
+
+        [Fact]
+        public void prompt_langsung_menyusul_minus_p()
+        {
+            // Urutan ini terverifikasi bekerja terhadap agy 1.4.11.
+            var argumen = MikosAI.Core.Agents.AntigravityCommand.BuatArgumen(
+                new MikosAI.Core.Agents.AgentRequest { Prompt = "buat pelat" }, ProbePenuh());
+
+            Assert.Equal("-p", argumen[0]);
+            Assert.Equal("buat pelat", argumen[1]);
+        }
+
+        [Fact]
+        public void stream_json_dipilih_kalau_minta_progres_bertahap()
+        {
+            var argumen = MikosAI.Core.Agents.AntigravityCommand.BuatArgumen(
+                new MikosAI.Core.Agents.AgentRequest { Prompt = "x", PreferStreaming = true }, ProbePenuh());
+
+            var i = argumen.ToList().IndexOf("--output-format");
+            Assert.Equal("stream-json", argumen[i + 1]);
+        }
+
+        [Fact]
+        public void json_biasa_dipilih_kalau_tidak_minta_progres()
+        {
+            var argumen = MikosAI.Core.Agents.AntigravityCommand.BuatArgumen(
+                new MikosAI.Core.Agents.AgentRequest { Prompt = "x", PreferStreaming = false }, ProbePenuh());
+
+            var i = argumen.ToList().IndexOf("--output-format");
+            Assert.Equal("json", argumen[i + 1]);
+        }
+
+        [Fact]
+        public void flag_yang_TIDAK_ada_di_help_tidak_pernah_dikirim()
+        {
+            // Ada build agy yang menolak --output-format, dan flag tak dikenal
+            // menggagalkan seluruh permintaan.
+            var probeMinim = new MikosAI.Core.Agents.ProviderProbe
+            {
+                SupportedFlags = new[] { "-p", "--print" },
+            };
+
+            var argumen = MikosAI.Core.Agents.AntigravityCommand.BuatArgumen(
+                new MikosAI.Core.Agents.AgentRequest { Prompt = "x", Model = "gemini" }, probeMinim);
+
+            Assert.DoesNotContain("--output-format", argumen);
+            Assert.DoesNotContain("--print-timeout", argumen);
+            Assert.DoesNotContain("--model", argumen);
+            Assert.Equal(new[] { "-p", "x" }, argumen);
+        }
+
+        [Fact]
+        public void batas_waktu_selalu_dikirim_kalau_didukung()
+        {
+            // 0 berarti menunggu selamanya, dan permintaan yang menggantung di
+            // dalam SolidWorks menyisakan proses anak selamanya.
+            var argumen = MikosAI.Core.Agents.AntigravityCommand.BuatArgumen(
+                new MikosAI.Core.Agents.AgentRequest { Prompt = "x" }, ProbePenuh());
+
+            var i = argumen.ToList().IndexOf("--print-timeout");
+            Assert.True(i > 0);
+            Assert.EndsWith("s", argumen[i + 1]);
+        }
+
+        // --- Pendaftaran MCP -------------------------------------------------
+
+        [Fact]
+        public void daftar_mcp_memakai_header_bearer()
+        {
+            var argumen = MikosAI.Core.Agents.AntigravityCommand.BuatArgumenDaftarMcp(
+                new System.Uri("http://127.0.0.1:45678/mcp"), "token-rahasia");
+
+            Assert.Equal(new[]
+            {
+                "mcp", "add",
+                "--header", "Authorization: Bearer token-rahasia",
+                "mikosai-solidworks", "http://127.0.0.1:45678/mcp",
+            }, argumen);
+        }
+
+        [Fact]
+        public void flag_mendahului_nama_server()
+        {
+            // agy menolak flag yang ditaruh setelah nama server.
+            var argumen = MikosAI.Core.Agents.AntigravityCommand.BuatArgumenDaftarMcp(
+                new System.Uri("http://127.0.0.1:1/mcp"), "t").ToList();
+
+            Assert.True(argumen.IndexOf("--header") < argumen.IndexOf("mikosai-solidworks"));
+        }
+
+        [Fact]
+        public void endpoint_non_loopback_ditolak()
+        {
+            // Jaring pengaman yang sama seperti di AgentWorkspace.
+            Assert.Throws<System.ArgumentException>(() =>
+                MikosAI.Core.Agents.AntigravityCommand.BuatArgumenDaftarMcp(
+                    new System.Uri("http://192.168.1.10:8765/mcp"), "t"));
+        }
+
+        [Fact]
+        public void token_kosong_ditolak()
+        {
+            Assert.Throws<System.ArgumentException>(() =>
+                MikosAI.Core.Agents.AntigravityCommand.BuatArgumenDaftarMcp(
+                    new System.Uri("http://127.0.0.1:1/mcp"), "  "));
+        }
+    }
+}

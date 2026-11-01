@@ -207,7 +207,10 @@ namespace MikosAI.Addin
 
                 // Tidak di-await: ConnectToSW harus kembali cepat, dan panel
                 // memperbarui dirinya saat status berikutnya diminta.
-                _ = _provider.PeriksaAsync();
+                // Periksa provider, lalu daftarkan server MCP kita ke
+                // konfigurasinya. Berurutan, karena pendaftaran butuh adapter
+                // yang sudah terdeteksi.
+                _ = PeriksaDanDaftarkanAsync();
             }
             catch (Exception exception)
             {
@@ -280,6 +283,17 @@ namespace MikosAI.Addin
             {
                 _panel = null;
                 _diagnostics.TaskPane = false;
+            }
+
+            try
+            {
+                // Lepas pendaftaran sebelum server MCP dimatikan, supaya tidak
+                // ada entri basi yang menunjuk port mati.
+                _provider?.LepasMcpAsync().GetAwaiter().GetResult();
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("melepas pendaftaran MCP", exception);
             }
 
             try
@@ -423,6 +437,41 @@ namespace MikosAI.Addin
             };
         }
 
+        /// <summary>
+        /// Memeriksa provider, lalu mendaftarkan server MCP kita ke
+        /// konfigurasinya.
+        ///
+        /// Berjalan di latar supaya ConnectToSW kembali cepat. Kegagalan di
+        /// sini tidak boleh menggagalkan pemuatan add-in - add-in tetap berguna
+        /// walaupun AI belum tersambung.
+        /// </summary>
+        private async System.Threading.Tasks.Task PeriksaDanDaftarkanAsync()
+        {
+            try
+            {
+                if (_provider is null)
+                {
+                    return;
+                }
+
+                await _provider.PeriksaAsync().ConfigureAwait(false);
+
+                var endpoint = _mcp?.Endpoint;
+                var token = _mcp?.SessionToken;
+
+                if (endpoint is not null && !string.IsNullOrEmpty(token))
+                {
+                    await _provider.DaftarkanMcpAsync(endpoint, token!).ConfigureAwait(false);
+                }
+
+                _panel?.KirimStatus();
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("memeriksa dan mendaftarkan provider", exception);
+            }
+        }
+
         private JsonObject? RingkasanProvider()
         {
             if (_provider is null)
@@ -464,14 +513,46 @@ namespace MikosAI.Addin
                     return;
                 }
 
+                // Gelembung jawaban dibuat lebih dulu, lalu diisi bertahap
+                // dari text_delta. Chat jadi terasa hidup alih-alih diam lalu
+                // tiba-tiba selesai.
+                var adaPotongan = false;
+
+                void Potongan(string teks)
+                {
+                    if (!adaPotongan)
+                    {
+                        adaPotongan = true;
+                        _panel?.MulaiPesanChat("ai");
+                    }
+
+                    _panel?.TambahPotonganChat(teks);
+                }
+
                 var hasil = await _provider
-                    .JalankanAsync(prompt, _mcp?.WorkspaceDirectory ?? string.Empty)
+                    .JalankanAsync(prompt, _mcp?.WorkspaceDirectory ?? string.Empty, Potongan)
                     .ConfigureAwait(false);
 
                 if (hasil.IsSuccessful)
                 {
-                    _panel?.KirimPesanChat("ai", hasil.Summary ?? "(tidak ada jawaban)");
+                    if (adaPotongan)
+                    {
+                        // Sudah tampil bertahap; tinggal ditutup.
+                        _panel?.SelesaikanPesanChat();
+                    }
+                    else
+                    {
+                        _panel?.KirimPesanChat("ai", hasil.Summary ?? "(tidak ada jawaban)");
+                    }
+
                     return;
+                }
+
+                // Gagal di tengah aliran: tutup gelembungnya supaya teks parsial
+                // tidak menggantung tanpa penjelasan.
+                if (adaPotongan)
+                {
+                    _panel?.SelesaikanPesanChat();
                 }
 
                 var pesan = hasil.Failure!.Message;
