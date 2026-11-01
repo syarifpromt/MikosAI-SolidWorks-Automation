@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MikosAI</title>
+<!--
+  Panel TaskPane MikosAI.
+
+  Dimuat sebagai BERKAS LOKAL oleh WebView2 di dalam SLDWORKS.exe. Tidak ada
+  CDN, tidak ada font eksternal, tidak ada permintaan jaringan - panel ini harus
+  bekerja di mesin yang offline.
+
+  Satu-satunya jalur komunikasi dengan add-in adalah pesan JSON lewat
+  window.chrome.webview. Halaman ini tidak punya akses ke objek host apa pun.
+-->
+<style>
+  :root {
+    --bg: #18181b;
+    --panel: #1f1f23;
+    --garis: #2e2e35;
+    --teks: #f4f4f5;
+    --redup: #a1a1aa;
+    --aksen: #818cf8;
+    --ok: #4ade80;
+    --gagal: #f87171;
+    --tunggu: #fbbf24;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--teks);
+    font: 13px/1.5 "Segoe UI", system-ui, sans-serif;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  body { display: flex; flex-direction: column; }
+
+  header {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--garis);
+    flex: 0 0 auto;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: .2px;
+  }
+
+  .sub { margin-top: 2px; font-size: 11px; color: var(--redup); }
+
+  main { flex: 1 1 auto; overflow-y: auto; padding: 12px 16px 16px; }
+
+  section { margin-bottom: 18px; }
+
+  h2 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: var(--redup);
+  }
+
+  .baris {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, .04);
+  }
+
+  .baris:last-child { border-bottom: 0; }
+
+  .label { flex: 0 0 96px; color: var(--redup); font-size: 12px; }
+
+  .nilai {
+    flex: 1 1 auto;
+    min-width: 0;
+    word-break: break-all;
+    font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: 11.5px;
+  }
+
+  .titik {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: baseline;
+  }
+
+  .ok    { background: var(--ok); }
+  .gagal { background: var(--gagal); }
+  .tunggu{ background: var(--tunggu); }
+
+  .t-ok    { color: var(--ok); }
+  .t-gagal { color: var(--gagal); }
+  .t-redup { color: var(--redup); }
+
+  .kartu {
+    background: var(--panel);
+    border: 1px solid var(--garis);
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+
+  .catatan {
+    margin-top: 8px;
+    font-size: 11.5px;
+    color: var(--redup);
+    line-height: 1.55;
+  }
+
+  button {
+    font: inherit;
+    font-size: 12px;
+    color: var(--teks);
+    background: #27272e;
+    border: 1px solid var(--garis);
+    border-radius: 5px;
+    padding: 5px 11px;
+    cursor: pointer;
+  }
+
+  button:hover { background: #31313a; border-color: #3f3f48; }
+  button:active { background: #232329; }
+
+  .tombol-baris { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+
+  ul.galat {
+    margin: 0;
+    padding-left: 16px;
+    font-size: 11.5px;
+    color: var(--gagal);
+    font-family: Consolas, monospace;
+  }
+
+  ul.galat li { margin-bottom: 4px; word-break: break-word; }
+
+  footer {
+    flex: 0 0 auto;
+    padding: 8px 16px;
+    border-top: 1px solid var(--garis);
+    font-size: 10.5px;
+    color: var(--redup);
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .kosong { color: var(--redup); font-style: italic; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>MikosAI</h1>
+  <div class="sub" id="sub">Menghubungkan…</div>
+</header>
+
+<main>
+  <section>
+    <h2>SolidWorks</h2>
+    <div class="kartu">
+      <div class="baris"><div class="label">Status</div><div class="nilai" id="status">—</div></div>
+      <div class="baris"><div class="label">Revisi</div><div class="nilai" id="revisi">—</div></div>
+      <div class="baris"><div class="label">Dokumen</div><div class="nilai" id="dokumen">—</div></div>
+      <div class="baris"><div class="label">Thread utama</div><div class="nilai" id="thread">—</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Server MCP</h2>
+    <div class="kartu">
+      <div class="baris"><div class="label">Keadaan</div><div class="nilai" id="mcp">—</div></div>
+      <div class="baris"><div class="label">Endpoint</div><div class="nilai" id="endpoint">—</div></div>
+      <div class="baris"><div class="label">Tool</div><div class="nilai" id="tool">—</div></div>
+
+      <div class="catatan" id="catatan-tool"></div>
+
+      <div class="tombol-baris">
+        <button id="btn-salin-endpoint">Salin endpoint</button>
+        <button id="btn-buka-workspace">Buka workspace</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Build</h2>
+    <div class="kartu">
+      <div class="baris"><div class="label">Commit</div><div class="nilai" id="commit">—</div></div>
+      <div class="baris"><div class="label">Waktu</div><div class="nilai" id="waktu">—</div></div>
+    </div>
+  </section>
+
+  <section id="bagian-galat" hidden>
+    <h2>Error tercatat</h2>
+    <div class="kartu"><ul class="galat" id="galat"></ul></div>
+  </section>
+</main>
+
+<footer>
+  <span id="jam">—</span>
+  <button id="btn-segarkan" style="padding:2px 8px;font-size:11px;">Segarkan</button>
+</footer>
+
+<script>
+'use strict';
+
+const el = (id) => document.getElementById(id);
+
+// Jembatan ke add-in. Kalau halaman dibuka di browser biasa (mis. saat
+// mengembangkan tampilan), objek ini tidak ada - halaman harus tetap tampil.
+const jembatan = window.chrome && window.chrome.webview ? window.chrome.webview : null;
+
+function kirim(perintah, tambahan) {
+  if (!jembatan) return;
+  jembatan.postMessage(JSON.stringify(Object.assign({ cmd: perintah }, tambahan || {})));
+}
+
+function titik(kelas, teks) {
+  return '<span class="titik ' + kelas + '"></span>' + teks;
+}
+
+function teksAtau(nilai, pengganti) {
+  if (nilai === null || nilai === undefined || nilai === '') {
+    return '<span class="kosong">' + (pengganti || 'tidak tersedia') + '</span>';
+  }
+  return String(nilai);
+}
+
+let endpointTerakhir = null;
+let workspaceTerakhir = null;
+
+function render(s) {
+  // --- SolidWorks ---
+  const terhubung = s.status === 'connected';
+  el('status').innerHTML = titik(terhubung ? 'ok' : 'gagal', s.status || 'tidak diketahui');
+  el('revisi').innerHTML = teksAtau(s.solidworksRevision);
+  el('dokumen').innerHTML = (s.openDocumentCount === -1 || s.openDocumentCount === undefined)
+    ? '<span class="kosong">tidak terbaca</span>'
+    : String(s.openDocumentCount);
+  el('thread').innerHTML = s.dispatcherReady
+    ? titik('ok', 'tertangkap (id ' + s.mainThreadId + ')')
+    : titik('gagal', 'tidak tertangkap');
+
+  // --- MCP ---
+  const jalan = !!s.mcpRunning;
+  el('mcp').innerHTML = titik(jalan ? 'ok' : 'gagal', jalan ? 'berjalan' : 'tidak berjalan');
+  el('endpoint').innerHTML = teksAtau(s.mcpEndpoint);
+
+  endpointTerakhir = s.mcpEndpoint || null;
+  workspaceTerakhir = s.mcpWorkspace || null;
+
+  const jumlah = s.mcpToolCount;
+  if (jumlah === 0) {
+    el('tool').innerHTML = titik('tunggu', '0 diekspos');
+    el('catatan-tool').textContent =
+      'Daftar kosong itu benar, bukan bug. Belum ada kemampuan berstatus ' +
+      'verified atau pilot di capabilities.yaml, jadi AI secara struktural ' +
+      'tidak bisa memanggil apa pun yang belum diuji.';
+  } else {
+    el('tool').innerHTML = titik('ok', jumlah + ' diekspos');
+    el('catatan-tool').textContent = '';
+  }
+
+  // --- Build ---
+  el('commit').innerHTML = teksAtau(s.buildCommit, 'tidak dicap');
+  el('waktu').innerHTML = teksAtau(s.buildTime);
+
+  // --- Error ---
+  const galat = Array.isArray(s.errors) ? s.errors : [];
+  el('bagian-galat').hidden = galat.length === 0;
+  el('galat').innerHTML = galat.map(function (g) {
+    const div = document.createElement('div');
+    div.textContent = g;
+    return '<li>' + div.innerHTML + '</li>';
+  }).join('');
+
+  // --- Header ---
+  if (terhubung && jalan && galat.length === 0) {
+    el('sub').innerHTML = '<span class="t-ok">Siap</span> · SolidWorks ' + (s.solidworksRevision || '');
+  } else if (terhubung) {
+    el('sub').innerHTML = '<span class="t-gagal">Ada masalah</span> · lihat detail di bawah';
+  } else {
+    el('sub').innerHTML = '<span class="t-gagal">Tidak terhubung</span>';
+  }
+
+  el('jam').textContent = 'Diperbarui ' + new Date().toLocaleTimeString('id-ID');
+}
+
+if (jembatan) {
+  jembatan.addEventListener('message', function (e) {
+    try {
+      render(typeof e.data === 'string' ? JSON.parse(e.data) : e.data);
+    } catch (err) {
+      el('sub').innerHTML = '<span class="t-gagal">Status tidak bisa dibaca</span>';
+    }
+  });
+}
+
+el('btn-segarkan').addEventListener('click', function () { kirim('status'); });
+
+el('btn-salin-endpoint').addEventListener('click', function () {
+  if (!endpointTerakhir) return;
+  // clipboard API butuh konteks aman; berkas lokal tidak selalu memenuhinya,
+  // jadi ada jalur mundur.
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(endpointTerakhir).catch(salinManual);
+  } else {
+    salinManual();
+  }
+});
+
+function salinManual() {
+  const ta = document.createElement('textarea');
+  ta.value = endpointTerakhir || '';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch (e) { /* abaikan */ }
+  document.body.removeChild(ta);
+}
+
+el('btn-buka-workspace').addEventListener('click', function () {
+  if (workspaceTerakhir) kirim('bukaFolder', { path: workspaceTerakhir });
+});
+
+// Minta status pertama, lalu segarkan berkala. Interval panjang: panel ini
+// informasional, tidak perlu real-time.
+kirim('status');
+setInterval(function () { kirim('status'); }, 5000);
+</script>
+
+</body>
+</html>

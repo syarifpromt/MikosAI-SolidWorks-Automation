@@ -49,6 +49,16 @@ namespace SolidWorks.Interop.sldworks
         string RevisionNumber();
 
         int GetDocumentCount();
+
+        ITaskpaneView CreateTaskpaneView2(string Bitmap, string ToolTip);
+    }
+
+    /// <summary>Stub <c>ITaskpaneView</c> KHUSUS COMPILE-CHECK.</summary>
+    public interface ITaskpaneView
+    {
+        bool DisplayWindowFromHandlex64(long Handle);
+
+        bool DeleteView();
     }
 }
 

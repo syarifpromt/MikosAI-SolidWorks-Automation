@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace MikosAI.Addin
@@ -91,6 +92,34 @@ namespace MikosAI.Addin
         /// </summary>
         internal bool AddinExposesIDispatch { get; set; }
 
+        /// <summary>Endpoint server MCP, atau null kalau tidak berjalan.</summary>
+        internal string? McpEndpoint { get; set; }
+
+        /// <summary>Jumlah tool yang diekspos. 0 itu sah - lihat capabilities.yaml.</summary>
+        internal int McpToolCount { get; set; }
+
+        internal string? McpWorkspace { get; set; }
+
+        /// <summary>
+        /// Salinan error yang tercatat, untuk ditampilkan di panel UI.
+        /// Salinan, bukan daftar aslinya - panel tidak boleh bisa mengubahnya.
+        /// </summary>
+        internal IReadOnlyList<string> Errors
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _errors.ToArray();
+                }
+            }
+        }
+
+        /// <summary>Commit git yang dicap saat build. Dipakai deteksi DLL usang.</summary>
+        internal string? BuildCommit => MetadataAssembly("BuildCommit");
+
+        internal string? BuildTime => MetadataAssembly("BuildTime");
+
         internal void AddError(string message)
         {
             lock (_lock)
@@ -148,6 +177,9 @@ namespace MikosAI.Addin
                 FieldBool(sb, "commandGroup", CommandGroup);
                 FieldBool(sb, "taskPane", TaskPane);
                 FieldBool(sb, "mcpServer", McpServer);
+                Field(sb, "mcpEndpoint", McpEndpoint);
+                FieldInt(sb, "mcpToolCount", McpToolCount);
+                Field(sb, "mcpWorkspace", McpWorkspace);
                 Field(sb, "solidworksRevision", SolidWorksRevision);
                 FieldInt(sb, "addinCookie", AddinCookie);
                 FieldBool(sb, "dispatcherReady", DispatcherReady);
@@ -156,8 +188,8 @@ namespace MikosAI.Addin
                 FieldInt(sb, "fileNewEvents", FileNewEvents);
                 FieldInt(sb, "activeDocChangeEvents", ActiveDocChangeEvents);
                 FieldInt(sb, "openDocumentCount", OpenDocumentCount);
-                Field(sb, "buildCommit", MetadataAssembly("BuildCommit"));
-                Field(sb, "buildTime", MetadataAssembly("BuildTime"));
+                Field(sb, "buildCommit", BuildCommit);
+                Field(sb, "buildTime", BuildTime);
                 Field(sb, "addinAssembly", LokasiAssemblyAman());
                 Field(sb, "addinFolder", AssemblyResolver.FolderAddin);
                 FieldBool(sb, "assemblyResolverInstalled", AssemblyResolver.Terpasang);

@@ -113,6 +113,51 @@ namespace MikosAI.Addin
         }
 
         /// <summary>
+        /// Membuat TaskPane dan menempelkan kontrol WinForms ke dalamnya.
+        ///
+        /// Memakai DisplayWindowFromHandlex64, varian 64-bit. SolidWorks modern
+        /// adalah proses 64-bit, dan varian 32-bit akan memotong handle.
+        ///
+        /// Mengembalikan null kalau gagal; penyebabnya tercatat di diagnostik.
+        /// </summary>
+        internal ITaskpaneView? TryCreateTaskPane(string bitmapPath, string tooltip, IntPtr handle)
+        {
+            ITaskpaneView? view = null;
+
+            try
+            {
+                view = _app.CreateTaskpaneView2(bitmapPath, tooltip);
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("CreateTaskpaneView2", exception);
+                return null;
+            }
+
+            if (view is null)
+            {
+                _diagnostics.AddError("CreateTaskpaneView2 mengembalikan null.");
+                return null;
+            }
+
+            try
+            {
+                if (!view.DisplayWindowFromHandlex64(handle.ToInt64()))
+                {
+                    _diagnostics.AddError("DisplayWindowFromHandlex64 mengembalikan false.");
+                    return null;
+                }
+
+                return view;
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("DisplayWindowFromHandlex64", exception);
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Jumlah dokumen terbuka. -1 berarti tidak bisa dibaca - BUKAN nol.
         /// Membedakan keduanya penting: gerbang penerimaan memeriksa
         /// GetDocumentCount()==0 setelah dokumen ditutup, dan "tidak terbaca"

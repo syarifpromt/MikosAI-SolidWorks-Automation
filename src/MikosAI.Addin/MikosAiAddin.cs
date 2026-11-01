@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text.Json.Nodes;
 using Microsoft.Win32;
 using SolidWorks.Interop.swpublished;
 
@@ -91,6 +92,9 @@ namespace MikosAI.Addin
 
         private SolidWorksApi? _sw;
         private MainThreadDispatcher? _dispatcher;
+        private McpHost? _mcp;
+        private TaskPaneHost? _panel;
+        private SolidWorks.Interop.sldworks.ITaskpaneView? _taskPaneView;
 
         // ====================================================================
         // ISwAddin
@@ -162,6 +166,32 @@ namespace MikosAI.Addin
                 _diagnostics.AddError("baca properti aplikasi", exception);
             }
 
+            // --- Nyalakan server MCP ----------------------------------------
+            // Di dalam proses SolidWorks, jadi tool handler memanggil executor
+            // lewat pemanggilan fungsi biasa. Lihat docs/adr/0002.
+            try
+            {
+                _mcp = new McpHost(_diagnostics);
+                _diagnostics.McpServer = _mcp.Mulai();
+                _diagnostics.McpEndpoint = _mcp.Endpoint?.ToString();
+                _diagnostics.McpToolCount = _mcp.ToolCount;
+                _diagnostics.McpWorkspace = _mcp.WorkspaceDirectory;
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("McpHost", exception);
+            }
+
+            // --- Bangun TaskPane --------------------------------------------
+            try
+            {
+                _diagnostics.TaskPane = BangunTaskPane();
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("BangunTaskPane", exception);
+            }
+
             _diagnostics.Status = "connected";
 
             // Pengaman terluar. Kegagalan di sini - mis. JIT tidak bisa
@@ -190,6 +220,51 @@ namespace MikosAI.Addin
         /// </summary>
         public bool DisconnectFromSW()
         {
+            // TaskPane dilepas lebih dulu: ia memegang handle jendela yang
+            // dimiliki SolidWorks, dan melepasnya setelah COM di-release bisa
+            // membuat SolidWorks mengakses jendela yang sudah mati.
+            try
+            {
+                _taskPaneView?.DeleteView();
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("DeleteView TaskPane", exception);
+            }
+            finally
+            {
+                _taskPaneView = null;
+            }
+
+            try
+            {
+                _panel?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("dispose panel", exception);
+            }
+            finally
+            {
+                _panel = null;
+                _diagnostics.TaskPane = false;
+            }
+
+            try
+            {
+                _mcp?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("dispose McpHost", exception);
+            }
+            finally
+            {
+                _mcp = null;
+                _diagnostics.McpServer = false;
+                _diagnostics.McpEndpoint = null;
+            }
+
             try
             {
                 _dispatcher?.Dispose();
@@ -228,6 +303,77 @@ namespace MikosAI.Addin
             GC.WaitForPendingFinalizers();
 
             return true;
+        }
+
+        /// <summary>
+        /// Membuat TaskPane dan menempelkan panel WebView2 ke dalamnya.
+        ///
+        /// Dijalankan di thread utama SolidWorks, karena ConnectToSW berjalan di
+        /// sana - dan kontrol WinForms harus dibuat di thread yang akan
+        /// memompa pesannya.
+        /// </summary>
+        private bool BangunTaskPane()
+        {
+            if (_sw is null)
+            {
+                return false;
+            }
+
+            var bitmap = TaskPaneHost.BuatBitmapIkon(_diagnostics);
+            if (bitmap is null)
+            {
+                return false;
+            }
+
+            _panel = new TaskPaneHost(_diagnostics, StatusUntukPanel);
+
+            // Handle harus sudah ada sebelum diserahkan ke SolidWorks.
+            var handle = _panel.Handle;
+
+            _taskPaneView = _sw.TryCreateTaskPane(bitmap, AddinTitle, handle);
+
+            return _taskPaneView is not null;
+        }
+
+        /// <summary>
+        /// Status yang dikirim ke panel UI.
+        ///
+        /// Dibangun ulang setiap permintaan, bukan di-cache - panel menampilkan
+        /// keadaan sekarang, dan jumlah dokumen bisa berubah kapan saja.
+        /// </summary>
+        private JsonObject StatusUntukPanel()
+        {
+            var dokumen = -1;
+            try
+            {
+                dokumen = _sw?.TryGetDocumentCount() ?? -1;
+            }
+            catch (Exception)
+            {
+                // Biarkan -1: tidak terbaca, bukan nol.
+            }
+
+            var galat = new JsonArray();
+            foreach (var pesan in _diagnostics.Errors)
+            {
+                galat.Add(pesan);
+            }
+
+            return new JsonObject
+            {
+                ["status"] = _diagnostics.Status,
+                ["solidworksRevision"] = _diagnostics.SolidWorksRevision,
+                ["openDocumentCount"] = dokumen,
+                ["dispatcherReady"] = _diagnostics.DispatcherReady,
+                ["mainThreadId"] = _diagnostics.MainThreadId,
+                ["mcpRunning"] = _mcp?.IsRunning == true,
+                ["mcpEndpoint"] = _mcp?.Endpoint?.ToString(),
+                ["mcpToolCount"] = _mcp?.ToolCount ?? 0,
+                ["mcpWorkspace"] = _mcp?.WorkspaceDirectory,
+                ["buildCommit"] = _diagnostics.BuildCommit,
+                ["buildTime"] = _diagnostics.BuildTime,
+                ["errors"] = galat,
+            };
         }
 
         /// <summary>

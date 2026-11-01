@@ -95,6 +95,15 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2592.51" />
+  </ItemGroup>
+
+  <!--
+    Halaman UI TaskPane. Dikopi ke folder output supaya WebView2 bisa
+    menavigasinya sebagai berkas lokal - tidak ada CDN, tidak ada jaringan.
+  -->
+  <ItemGroup>
+    <None Include="web\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -193,6 +202,33 @@
     Dengan cap ini, -Action Probe bisa membandingkan commit DLL yang BERJALAN
     dengan HEAD repo dan langsung bilang "rebuild dulu".
   -->
+  <!--
+    Kopi WebView2Loader.dll native ke root output.
+
+    Paket WebView2 menaruhnya di runtimes\win-x64
+ative\ - konvensi NuGet yang
+    diselesaikan otomatis oleh .NET Core, TAPI net48 tidak melakukannya. Loader
+    WebView2 mencari DLL native itu di folder assembly, jadi tanpa kopi ini
+    panel akan gagal saat runtime dengan "WebView2Loader.dll not found", dan
+    gejalanya cuma panel kosong.
+
+    Terdeteksi saat memeriksa isi folder output, bukan saat build - build sendiri
+    berhasil tanpa keluhan.
+  -->
+  <Target Name="KopiWebView2Loader" AfterTargets="Build">
+    <ItemGroup>
+      <_LoaderWebView2 Include="$(OutputPath)runtimes\win-x64\native\WebView2Loader.dll" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_LoaderWebView2)"
+          DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true"
+          Condition="'@(_LoaderWebView2)' != ''" />
+
+    <Warning Condition="'@(_LoaderWebView2)' == '' And '$(UsePiaStub)' != 'true'"
+             Text="WebView2Loader.dll native tidak ditemukan. Panel TaskPane tidak akan bisa dimuat." />
+  </Target>
+
   <Target Name="CapCommitGit" BeforeTargets="CoreGenerateAssemblyInfo">
     <Exec Command="git -C &quot;$(MSBuildThisFileDirectory)..\..&quot; rev-parse --short HEAD"
           ConsoleToMSBuild="true"
