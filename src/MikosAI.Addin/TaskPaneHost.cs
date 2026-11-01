@@ -28,14 +28,19 @@ namespace MikosAI.Addin
     {
         private readonly HostDiagnostics _diagnostics;
         private readonly Func<JsonObject> _ambilStatus;
+        private readonly Func<string, System.Threading.Tasks.Task>? _tanganiChat;
 
         private WebView2? _webView;
         private Label? _pesanGagal;
 
-        internal TaskPaneHost(HostDiagnostics diagnostics, Func<JsonObject> ambilStatus)
+        internal TaskPaneHost(
+            HostDiagnostics diagnostics,
+            Func<JsonObject> ambilStatus,
+            Func<string, System.Threading.Tasks.Task>? tanganiChat = null)
         {
             _diagnostics = diagnostics;
             _ambilStatus = ambilStatus;
+            _tanganiChat = tanganiChat;
 
             Dock = DockStyle.Fill;
             BackColor = Color.FromArgb(24, 24, 27);
@@ -145,6 +150,16 @@ namespace MikosAI.Addin
                         BukaFolderWorkspace(pesan?["path"]?.GetValue<string>());
                         break;
 
+                    case "chat":
+                        var prompt = pesan?["prompt"]?.GetValue<string>();
+                        if (!string.IsNullOrWhiteSpace(prompt) && _tanganiChat is not null)
+                        {
+                            // Tidak di-await: penanganan chat bisa lama, dan
+                            // callback WebView2 tidak boleh diblokir.
+                            _ = _tanganiChat(prompt!);
+                        }
+                        break;
+
                     default:
                         // Perintah tidak dikenal diabaikan, tidak dilempar.
                         break;
@@ -172,6 +187,46 @@ namespace MikosAI.Addin
             catch (Exception exception)
             {
                 _diagnostics.AddError("mengirim status ke halaman UI", exception);
+            }
+        }
+
+        /// <summary>
+        /// Mengirim satu pesan ke percakapan di panel.
+        ///
+        /// Memakai kanal pesan yang sama dengan status; dibedakan lewat field
+        /// jenis. Aman dipanggil dari thread mana pun - WebView2 menuntut
+        /// pemanggilan di thread UI, jadi di-marshal lewat BeginInvoke.
+        /// </summary>
+        internal void KirimPesanChat(string kelas, string teks)
+        {
+            try
+            {
+                if (_webView?.CoreWebView2 is null)
+                {
+                    return;
+                }
+
+                var pesan = new JsonObject
+                {
+                    ["jenis"] = "chat",
+                    ["kelas"] = kelas,
+                    ["teks"] = teks,
+                };
+
+                void Kirim() => _webView!.CoreWebView2.PostWebMessageAsJson(pesan.ToJsonString());
+
+                if (InvokeRequired)
+                {
+                    BeginInvoke((Action)Kirim);
+                }
+                else
+                {
+                    Kirim();
+                }
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("mengirim pesan chat ke panel UI", exception);
             }
         }
 

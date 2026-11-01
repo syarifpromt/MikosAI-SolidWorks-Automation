@@ -16,7 +16,7 @@ Terakhir diperbarui 2026-10-31
 | 4 | Pengalaman dua lapis | belum mulai |
 | 5 | Pengemasan | belum mulai |
 
-Sudah jalan: **201 test hijau**, seluruh alur DesignPlan end-to-end dengan executor palsu,
+Sudah jalan: **245 test hijau**, seluruh alur DesignPlan end-to-end dengan executor palsu,
 tanpa SolidWorks.
 
 Belum ada kemampuan berstatus `verified`, jadi daftar tool MCP masih kosong. Itu benar —
@@ -131,7 +131,7 @@ SolidWorks dan punya kanal thread yang benar.
 
 ### Sudah selesai di `MikosAI.Core`
 
-201 test hijau, dibuild dan dijalankan tanpa SolidWorks dan tanpa Visual Studio:
+245 test hijau, dibuild dan dijalankan tanpa SolidWorks dan tanpa Visual Studio:
 
 | Berkas | Isi |
 |---|---|
@@ -147,6 +147,10 @@ SolidWorks dan punya kanal thread yang benar.
 | `Threading/IMainThreadDispatcher.cs` | Abstraksi; implementasi nyata di Addin |
 | `Tracing/TraceWriter.cs` | JSONL dengan redaksi, tidak pernah melempar exception |
 | `Testing/FakeToolExecutor.cs` | Executor + evaluator palsu, scriptable |
+| `Agents/ProviderState.cs` | 6 keadaan provider + aturan apa yang boleh diklaim |
+| `Agents/IAgentProvider.cs` | Kontrak provider: command builder + result parser |
+| `Agents/ProviderOutcome.cs` | Deteksi provider diam, pembersih ANSI, normalisasi hasil |
+| `Tools/ReadOnlyToolShaper.cs` | Aturan sehat/tidaknya pembacaan model |
 | `Mcp/McpHttpServer.cs` | HTTP loopback, port ephemeral, bearer token |
 | `Mcp/McpRequestHandler.cs` | Protokol JSON-RPC MCP, terpisah dari transport |
 | `Mcp/McpToolDescriptor.cs` | Daftar tool MCP dari katalog + ledger |
@@ -238,8 +242,9 @@ Fase paling berisiko. **Baca `docs/integrasi-antigravity.md` seluruhnya sebelum 
 - [ ] Flag probing: `--version` + `--help` saat startup
 - [ ] Parser `stream-json`, fallback ke `json`, lalu `text`
 - [ ] **Deteksi `provider_silent`** — exit 0 + stdout kosong adalah kegagalan
-- [ ] State machine provider dan tampilannya di UI
-- [ ] UI chat: kirim prompt, tampilkan progres bertahap, tampilkan hasil
+- [x] State machine provider dan tampilannya di UI
+- [x] UI chat: kirim prompt, tampilkan hasil
+- [ ] Progres bertahap di chat — menunggu parser stream-json
 
 ### Jalur CAD
 
@@ -320,7 +325,7 @@ Verifikasi:
 - [ ] Tombol preset
 - [ ] Contoh prompt
 - [ ] Pesan error yang menjelaskan tindakan manusia, bukan kode internal
-- [ ] Onboarding: deteksi `agy` belum terpasang atau belum login, lalu pandu
+- [x] Onboarding: deteksi `agy` belum terpasang atau belum login, lalu pandu
 
 ### Lapis 2 — overpower
 

@@ -158,6 +158,105 @@
   }
 
   .kosong { color: var(--redup); font-style: italic; }
+
+  /* --- Tab --- */
+  nav.tab {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 2px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--garis);
+  }
+
+  .tab-btn {
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--redup);
+  }
+
+  .tab-btn:hover { background: transparent; color: var(--teks); }
+  .tab-btn.aktif { color: var(--teks); border-bottom-color: var(--aksen); }
+
+  /* --- Chat --- */
+  .percakapan { display: flex; flex-direction: column; gap: 10px; }
+
+  .pesan {
+    max-width: 92%;
+    padding: 8px 11px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .pesan.saya {
+    align-self: flex-end;
+    background: #312e81;
+    border: 1px solid #3f3aa0;
+  }
+
+  .pesan.ai {
+    align-self: flex-start;
+    background: var(--panel);
+    border: 1px solid var(--garis);
+  }
+
+  .pesan.sistem {
+    align-self: stretch;
+    background: transparent;
+    border: 0;
+    border-left: 2px solid var(--garis);
+    border-radius: 0;
+    padding: 2px 0 2px 10px;
+    color: var(--redup);
+    font-size: 11.5px;
+  }
+
+  .pesan.galat {
+    align-self: stretch;
+    background: rgba(248, 113, 113, .08);
+    border: 1px solid rgba(248, 113, 113, .3);
+    color: #fca5a5;
+  }
+
+  .kartu.peringatan {
+    border-color: rgba(251, 191, 36, .35);
+    background: rgba(251, 191, 36, .06);
+  }
+
+  /* --- Form chat --- */
+  form#form-chat {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 7px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--garis);
+    align-items: flex-end;
+  }
+
+  textarea#masukan {
+    flex: 1 1 auto;
+    resize: none;
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--teks);
+    background: #121215;
+    border: 1px solid var(--garis);
+    border-radius: 5px;
+    padding: 7px 9px;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  textarea#masukan:focus { outline: 0; border-color: var(--aksen); }
+  textarea#masukan:disabled { opacity: .5; }
+
+  button:disabled { opacity: .45; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -167,7 +266,35 @@
   <div class="sub" id="sub">Menghubungkan…</div>
 </header>
 
-<main>
+<nav class="tab">
+  <button class="tab-btn aktif" data-tab="chat">Chat</button>
+  <button class="tab-btn" data-tab="status">Status</button>
+</nav>
+
+<main id="tab-chat">
+  <section id="onboarding" class="kartu peringatan" hidden>
+    <h2 style="margin-top:0">Belum bisa dipakai</h2>
+    <div id="onboarding-teks" class="catatan"></div>
+    <div id="onboarding-aksi" class="catatan" style="color:var(--teks);margin-top:8px"></div>
+  </section>
+
+  <div id="percakapan" class="percakapan"></div>
+</main>
+
+<form id="form-chat" autocomplete="off">
+  <textarea id="masukan" rows="2" placeholder="Jelaskan yang ingin dibuat…"></textarea>
+  <button type="submit" id="btn-kirim">Kirim</button>
+</form>
+
+<main id="tab-status" hidden>
+  <section>
+    <h2>Provider AI</h2>
+    <div class="kartu">
+      <div class="baris"><div class="label">Keadaan</div><div class="nilai" id="provider">—</div></div>
+      <div class="baris"><div class="label">Versi</div><div class="nilai" id="provider-versi">—</div></div>
+    </div>
+  </section>
+
   <section>
     <h2>SolidWorks</h2>
     <div class="kartu">
@@ -273,6 +400,8 @@ function render(s) {
     el('catatan-tool').textContent = '';
   }
 
+  renderProvider(s);
+
   // --- Build ---
   el('commit').innerHTML = teksAtau(s.buildCommit, 'tidak dicap');
   el('waktu').innerHTML = teksAtau(s.buildTime);
@@ -301,12 +430,93 @@ function render(s) {
 if (jembatan) {
   jembatan.addEventListener('message', function (e) {
     try {
-      render(typeof e.data === 'string' ? JSON.parse(e.data) : e.data);
+      const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+
+      // Satu kanal, dua jenis pesan. Dibedakan lewat field `jenis`.
+      if (data.jenis === 'chat') {
+        tambahPesan(data.kelas || 'ai', data.teks || '');
+        return;
+      }
+
+      render(data);
     } catch (err) {
       el('sub').innerHTML = '<span class="t-gagal">Status tidak bisa dibaca</span>';
     }
   });
 }
+
+// --- Tab -----------------------------------------------------------------
+const tabs = { chat: ['tab-chat', 'form-chat'], status: ['tab-status'] };
+
+document.querySelectorAll('.tab-btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('aktif'); });
+    btn.classList.add('aktif');
+
+    Object.keys(tabs).forEach(function (nama) {
+      const tampil = nama === btn.dataset.tab;
+      tabs[nama].forEach(function (id) { el(id).hidden = !tampil; });
+    });
+  });
+});
+
+// --- Chat ----------------------------------------------------------------
+let bolehKirim = false;
+
+function tambahPesan(kelas, teks) {
+  const div = document.createElement('div');
+  div.className = 'pesan ' + kelas;
+  div.textContent = teks;
+  el('percakapan').appendChild(div);
+  el('percakapan').scrollTop = el('percakapan').scrollHeight;
+  return div;
+}
+
+function renderProvider(s) {
+  const p = s.provider || {};
+
+  el('provider').innerHTML = p.connected
+    ? titik('ok', p.description || 'siap')
+    : titik(p.state === 'NotInstalled' ? 'gagal' : 'tunggu', p.description || 'tidak diketahui');
+
+  el('provider-versi').innerHTML = teksAtau(p.version);
+
+  bolehKirim = !!p.mayAttempt;
+  el('masukan').disabled = !bolehKirim;
+  el('btn-kirim').disabled = !bolehKirim;
+
+  // Onboarding hanya muncul kalau memang ada yang harus dilakukan manusia.
+  const perluAksi = !bolehKirim;
+  el('onboarding').hidden = !perluAksi;
+
+  if (perluAksi) {
+    el('onboarding-teks').textContent = p.description || 'Provider AI belum siap.';
+    el('onboarding-aksi').textContent = p.nextAction || '';
+    el('masukan').placeholder = 'Provider AI belum siap';
+  } else {
+    el('masukan').placeholder = 'Jelaskan yang ingin dibuat…';
+  }
+}
+
+el('form-chat').addEventListener('submit', function (e) {
+  e.preventDefault();
+  if (!bolehKirim) return;
+
+  const teks = el('masukan').value.trim();
+  if (!teks) return;
+
+  tambahPesan('saya', teks);
+  el('masukan').value = '';
+  kirim('chat', { prompt: teks });
+});
+
+// Enter mengirim, Shift+Enter baris baru - kebiasaan yang diharapkan orang.
+el('masukan').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    el('form-chat').dispatchEvent(new Event('submit'));
+  }
+});
 
 el('btn-segarkan').addEventListener('click', function () { kirim('status'); });
 

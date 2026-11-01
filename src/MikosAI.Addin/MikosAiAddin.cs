@@ -95,6 +95,7 @@ namespace MikosAI.Addin
         private McpHost? _mcp;
         private SolidWorksReader? _pembaca;
         private TaskPaneHost? _panel;
+        private ProviderHost? _provider;
         private SolidWorks.Interop.sldworks.ITaskpaneView? _taskPaneView;
 
         // ====================================================================
@@ -199,6 +200,20 @@ namespace MikosAI.Addin
                 _diagnostics.AddError("McpHost", exception);
             }
 
+            // --- Periksa provider AI ----------------------------------------
+            try
+            {
+                _provider = new ProviderHost(_diagnostics);
+
+                // Tidak di-await: ConnectToSW harus kembali cepat, dan panel
+                // memperbarui dirinya saat status berikutnya diminta.
+                _ = _provider.PeriksaAsync();
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("ProviderHost", exception);
+            }
+
             // --- Bangun TaskPane --------------------------------------------
             try
             {
@@ -265,6 +280,19 @@ namespace MikosAI.Addin
             {
                 _panel = null;
                 _diagnostics.TaskPane = false;
+            }
+
+            try
+            {
+                _provider?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("dispose ProviderHost", exception);
+            }
+            finally
+            {
+                _provider = null;
             }
 
             try
@@ -343,7 +371,7 @@ namespace MikosAI.Addin
                 return false;
             }
 
-            _panel = new TaskPaneHost(_diagnostics, StatusUntukPanel);
+            _panel = new TaskPaneHost(_diagnostics, StatusUntukPanel, TanganiChat);
 
             // Handle harus sudah ada sebelum diserahkan ke SolidWorks.
             var handle = _panel.Handle;
@@ -388,10 +416,78 @@ namespace MikosAI.Addin
                 ["mcpEndpoint"] = _mcp?.Endpoint?.ToString(),
                 ["mcpToolCount"] = _mcp?.ToolCount ?? 0,
                 ["mcpWorkspace"] = _mcp?.WorkspaceDirectory,
+                ["provider"] = RingkasanProvider(),
                 ["buildCommit"] = _diagnostics.BuildCommit,
                 ["buildTime"] = _diagnostics.BuildTime,
                 ["errors"] = galat,
             };
+        }
+
+        private JsonObject? RingkasanProvider()
+        {
+            if (_provider is null)
+            {
+                return null;
+            }
+
+            var objek = new JsonObject();
+
+            foreach (var pasangan in _provider.Ringkasan())
+            {
+                // Bool dipertahankan sebagai bool - panel memakainya untuk
+                // mengaktifkan kotak chat, dan string "False" itu truthy di JS.
+                objek[pasangan.Key] = pasangan.Value switch
+                {
+                    null => null,
+                    bool b => JsonValue.Create(b),
+                    _ => JsonValue.Create(pasangan.Value.ToString()),
+                };
+            }
+
+            return objek;
+        }
+
+        /// <summary>
+        /// Menangani satu pesan chat dari panel.
+        ///
+        /// Selama adapter provider belum terpasang, ini menjawab dengan
+        /// kegagalan yang MENJELASKAN keadaannya - bukan error generik, dan
+        /// bukan pura-pura bekerja.
+        /// </summary>
+        private async System.Threading.Tasks.Task TanganiChat(string prompt)
+        {
+            try
+            {
+                if (_provider is null)
+                {
+                    _panel?.KirimPesanChat("galat", "Provider AI belum siap.");
+                    return;
+                }
+
+                var hasil = await _provider
+                    .JalankanAsync(prompt, _mcp?.WorkspaceDirectory ?? string.Empty)
+                    .ConfigureAwait(false);
+
+                if (hasil.IsSuccessful)
+                {
+                    _panel?.KirimPesanChat("ai", hasil.Summary ?? "(tidak ada jawaban)");
+                    return;
+                }
+
+                var pesan = hasil.Failure!.Message;
+
+                if (!string.IsNullOrWhiteSpace(hasil.Failure.NextAction))
+                {
+                    pesan += Environment.NewLine + Environment.NewLine + hasil.Failure.NextAction;
+                }
+
+                _panel?.KirimPesanChat("galat", pesan);
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("menangani chat", exception);
+                _panel?.KirimPesanChat("galat", "Terjadi kesalahan internal: " + exception.Message);
+            }
         }
 
         /// <summary>
