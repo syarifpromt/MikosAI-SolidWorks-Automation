@@ -104,8 +104,8 @@ SolidWorks dan punya kanal thread yang benar.
 - [x] `Threading/IMainThreadDispatcher.cs` — abstraksi
 - [x] **`MainThreadDispatcher` implementasi nyata** lewat `Control.BeginInvoke` — risiko R4 *(sudah lewat compile-check)*
 - [x] `MikosAI.Addin` mengimplementasikan `ISwAddin` + `SetAddinCallbackInfo2` *(sudah lewat compile-check)*
-- [ ] CommandGroup 3 tombol
-- [ ] TaskPane dengan WebView2 menampilkan halaman statis
+- [ ] CommandGroup (tombol toolbar untuk tampil/sembunyikan panel)
+- [x] TaskPane dengan WebView2 — panel status, bukan halaman statis
 - [x] Penulis diagnostik `host-status.json`
 - [x] Script PowerShell build / register / unregister / probe / status (RegAsm 64-bit + TLB)
 - [x] **`setup.ps1` satu perintah** — periksa, build, test, registrasi, UAC otomatis
