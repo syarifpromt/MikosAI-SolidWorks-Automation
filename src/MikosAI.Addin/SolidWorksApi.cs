@@ -43,11 +43,39 @@ namespace MikosAI.Addin
     {
         private readonly ISldWorks _app;
         private readonly HostDiagnostics _diagnostics;
+        private readonly MainThreadDispatcher _dispatcher;
 
-        private SolidWorksApi(ISldWorks app, HostDiagnostics diagnostics)
+        private SolidWorksApi(ISldWorks app, HostDiagnostics diagnostics, MainThreadDispatcher dispatcher)
         {
             _app = app;
             _diagnostics = diagnostics;
+            _dispatcher = dispatcher;
+        }
+
+        /// <summary>
+        /// Menegakkan aturan nomor 1 CONTRIBUTING.md lewat KODE, bukan review.
+        ///
+        /// Aturannya pernah dilanggar - panel memanggil pembacaan model dari
+        /// thread latar, dan SolidWorks MATI dengan Fault Module kosong. Review
+        /// yang seharusnya menangkapnya adalah saya sendiri.
+        ///
+        /// Dengan assert ini, pelanggaran yang sama menjadi exception yang
+        /// tercatat di host-status.json beserta nama method-nya - bukan crash
+        /// yang menjatuhkan pekerjaan pengguna.
+        /// </summary>
+        private void PastikanThreadUtama(string namaMethod)
+        {
+            if (_dispatcher.IsOnMainThread)
+            {
+                return;
+            }
+
+            var pelanggaran = new MikosAI.Core.Threading.MainThreadViolationException(
+                $"SolidWorksApi.{namaMethod}");
+
+            _diagnostics.AddError("pelanggaran thread utama", pelanggaran);
+
+            throw pelanggaran;
         }
 
         /// <summary>
@@ -55,7 +83,10 @@ namespace MikosAI.Addin
         /// kegagalan cast dicatat ke diagnostik, bukan dilempar, supaya
         /// ConnectToSW tetap bisa menulis laporan.
         /// </summary>
-        internal static SolidWorksApi? Buat(object application, HostDiagnostics diagnostics)
+        internal static SolidWorksApi? Buat(
+            object application,
+            HostDiagnostics diagnostics,
+            MainThreadDispatcher dispatcher)
         {
             if (application is null)
             {
@@ -65,7 +96,7 @@ namespace MikosAI.Addin
 
             try
             {
-                return new SolidWorksApi((ISldWorks)application, diagnostics);
+                return new SolidWorksApi((ISldWorks)application, diagnostics, dispatcher);
             }
             catch (Exception exception)
             {
@@ -82,7 +113,7 @@ namespace MikosAI.Addin
         /// berisi operasi siklus hidup add-in, bukan pembacaan model.
         /// </summary>
         internal SolidWorksReader BuatPembaca(HostDiagnostics diagnostics)
-            => new SolidWorksReader(_app, diagnostics);
+            => new SolidWorksReader(_app, diagnostics, _dispatcher);
 
         /// <summary>
         /// Mendaftarkan callback add-in. Tanpa ini, SolidWorks tidak bisa
@@ -93,6 +124,8 @@ namespace MikosAI.Addin
         /// </summary>
         internal bool TryRegisterCallback(object addin, int cookie)
         {
+            PastikanThreadUtama(nameof(TryRegisterCallback));
+
             try
             {
                 _app.SetAddinCallbackInfo2(0, addin, cookie);
@@ -108,6 +141,8 @@ namespace MikosAI.Addin
         /// <summary>Nomor revisi SolidWorks, mis. "33.1.1" untuk SW2025 SP1.1.</summary>
         internal string? TryGetRevision()
         {
+            PastikanThreadUtama(nameof(TryGetRevision));
+
             try
             {
                 return _app.RevisionNumber();
@@ -129,6 +164,8 @@ namespace MikosAI.Addin
         /// </summary>
         internal ITaskpaneView? TryCreateTaskPane(string bitmapPath, string tooltip, IntPtr handle)
         {
+            PastikanThreadUtama(nameof(TryCreateTaskPane));
+
             ITaskpaneView? view = null;
 
             try
@@ -172,6 +209,8 @@ namespace MikosAI.Addin
         /// </summary>
         internal int TryGetDocumentCount()
         {
+            PastikanThreadUtama(nameof(TryGetDocumentCount));
+
             try
             {
                 return _app.GetDocumentCount();

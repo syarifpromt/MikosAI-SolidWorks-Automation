@@ -28,11 +28,35 @@ namespace MikosAI.Addin
 
         private readonly ISldWorks _app;
         private readonly HostDiagnostics _diagnostics;
+        private readonly MainThreadDispatcher _dispatcher;
 
-        internal SolidWorksReader(ISldWorks app, HostDiagnostics diagnostics)
+        internal SolidWorksReader(
+            ISldWorks app,
+            HostDiagnostics diagnostics,
+            MainThreadDispatcher dispatcher)
         {
             _app = app ?? throw new ArgumentNullException(nameof(app));
             _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+            _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
+        }
+
+        /// <summary>
+        /// Menegakkan aturan nomor 1 CONTRIBUTING.md lewat KODE.
+        /// Lihat SolidWorksApi.PastikanThreadUtama untuk alasannya.
+        /// </summary>
+        private void PastikanThreadUtama(string namaMethod)
+        {
+            if (_dispatcher.IsOnMainThread)
+            {
+                return;
+            }
+
+            var pelanggaran = new MikosAI.Core.Threading.MainThreadViolationException(
+                $"SolidWorksReader.{namaMethod}");
+
+            _diagnostics.AddError("pelanggaran thread utama", pelanggaran);
+
+            throw pelanggaran;
         }
 
         private IModelDoc2? DokumenAktif()
@@ -52,6 +76,8 @@ namespace MikosAI.Addin
 
         internal DocumentReading BacaDokumen()
         {
+            PastikanThreadUtama(nameof(BacaDokumen));
+
             var hasil = new DocumentReading();
 
             try
@@ -108,6 +134,8 @@ namespace MikosAI.Addin
 
         internal FeatureTreeReading BacaFitur()
         {
+            PastikanThreadUtama(nameof(BacaFitur));
+
             var hasil = new FeatureTreeReading();
             var daftar = new List<FeatureReading>();
 
@@ -160,6 +188,8 @@ namespace MikosAI.Addin
 
         internal BoundingBoxReading BacaKotakPembatas()
         {
+            PastikanThreadUtama(nameof(BacaKotakPembatas));
+
             var hasil = new BoundingBoxReading();
 
             var model = DokumenAktif();
@@ -217,6 +247,8 @@ namespace MikosAI.Addin
 
         internal MassPropertiesReading BacaPropertiMassa()
         {
+            PastikanThreadUtama(nameof(BacaPropertiMassa));
+
             var hasil = new MassPropertiesReading();
 
             var model = DokumenAktif();
@@ -263,6 +295,8 @@ namespace MikosAI.Addin
 
         internal IReadOnlyList<SketchReading> BacaSketsa(string? namaSketsa)
         {
+            PastikanThreadUtama(nameof(BacaSketsa));
+
             var daftar = new List<SketchReading>();
 
             var model = DokumenAktif();
@@ -352,6 +386,8 @@ namespace MikosAI.Addin
 
         internal IReadOnlyList<SelectionReading> BacaSeleksi()
         {
+            PastikanThreadUtama(nameof(BacaSeleksi));
+
             var daftar = new List<SelectionReading>();
 
             var model = DokumenAktif();

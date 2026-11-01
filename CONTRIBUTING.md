@@ -49,6 +49,18 @@ API SolidWorks tidak thread-safe. Ada tiga sumber panggilan konkuren di sistem k
 (HttpListener, pembaca pipe provider, callback WebView2). Tidak ada pengecualian untuk
 aturan ini, termasuk untuk "hanya membaca satu properti".
 
+**Aturan ini pernah dilanggar, dan SolidWorks mati.** 2026-11-01: pemeriksaan provider
+berjalan di thread latar, memanggil `KirimStatus()`, yang membaca jumlah dokumen dari
+model. `ConnectToSW` sudah selesai tanpa satu pun error — crash-nya terjadi beberapa detik
+kemudian, dengan Fault Module kosong.
+
+Karena itu aturan ini sekarang **ditegakkan oleh kode**, bukan oleh review:
+`SolidWorksApi` dan `SolidWorksReader` memanggil `PastikanThreadUtama()` di setiap method.
+Pelanggaran menjadi `MainThreadViolationException` yang tercatat di `host-status.json`
+beserta nama method-nya — bukan crash yang menjatuhkan pekerjaan pengguna.
+
+Jangan hapus assert itu. Ia ada karena review gagal sekali.
+
 ### 2. Status tidak dikenal menjadi `BLOCKED`
 
 ```csharp

@@ -116,19 +116,13 @@ namespace MikosAI.Addin
             _diagnostics.Status = "connecting";
             _diagnostics.AddinCookie = Cookie;
 
-            // --- Simpan referensi aplikasi ----------------------------------
-            _sw = SolidWorksApi.Buat(ThisSW, _diagnostics);
-
-            if (_sw is null)
-            {
-                _diagnostics.Status = "failed";
-                try { _diagnostics.Write(); } catch (Exception) { }
-                return false;
-            }
-
             // --- Tangkap thread utama ---------------------------------------
             // Dikerjakan DI SINI dan tidak di tempat lain. Ini satu-satunya
             // titik yang dijamin berjalan di thread utama SolidWorks.
+            //
+            // HARUS mendahului SolidWorksApi: pembungkus API memakai dispatcher
+            // untuk menegakkan aturan thread, jadi tanpa dispatcher ia tidak
+            // bisa melindungi apa pun.
             try
             {
                 _dispatcher = new MainThreadDispatcher();
@@ -138,6 +132,28 @@ namespace MikosAI.Addin
             catch (Exception exception)
             {
                 _diagnostics.AddError("MainThreadDispatcher", exception);
+            }
+
+            if (_dispatcher is null)
+            {
+                // Tanpa dispatcher, setiap panggilan API berisiko menjatuhkan
+                // SolidWorks. Lebih baik menolak dimuat.
+                _diagnostics.AddError(
+                    "Dispatcher thread utama tidak bisa dibuat - add-in menolak dimuat "
+                    + "daripada memanggil API SolidWorks tanpa perlindungan thread.");
+                _diagnostics.Status = "failed";
+                try { _diagnostics.Write(); } catch (Exception) { }
+                return false;
+            }
+
+            // --- Simpan referensi aplikasi ----------------------------------
+            _sw = SolidWorksApi.Buat(ThisSW, _diagnostics, _dispatcher);
+
+            if (_sw is null)
+            {
+                _diagnostics.Status = "failed";
+                try { _diagnostics.Write(); } catch (Exception) { }
+                return false;
             }
 
             // --- Periksa sendiri apakah kita mengekspos IDispatch -----------
@@ -289,7 +305,23 @@ namespace MikosAI.Addin
             {
                 // Lepas pendaftaran sebelum server MCP dimatikan, supaya tidak
                 // ada entri basi yang menunjuk port mati.
-                _provider?.LepasMcpAsync().GetAwaiter().GetResult();
+                //
+                // DisconnectFromSW berjalan di thread utama SolidWorks, dan
+                // operasi ini menjalankan subprocess. Dijalankan di thread pool
+                // dengan batas waktu pendek: memblokir thread utama saat
+                // SolidWorks menutup bisa membuatnya menggantung, dan
+                // GetAwaiter().GetResult() di atas SynchronizationContext
+                // WinForms adalah resep deadlock.
+                //
+                // Kalau lewat batas waktu, entri basi dibiarkan - entri itu akan
+                // tertimpa saat sesi berikutnya mendaftar ulang.
+                var provider = _provider;
+                if (provider is not null)
+                {
+                    System.Threading.Tasks.Task
+                        .Run(() => provider.LepasMcpAsync())
+                        .Wait(TimeSpan.FromSeconds(5));
+                }
             }
             catch (Exception exception)
             {

@@ -177,7 +177,8 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
 - [ ] Test membuktikan: tanpa TLB, add-in **tidak** terinstansiasi walaupun `LoadAddIn=0`
 - [ ] Test membuktikan: handler PMP tanpa `IDispatch` melempar `InvalidCastException`
 - [x] `MainThreadDispatcher` menangkap thread utama — terbukti, `dispatcherReady: true`
-- [ ] `MainThreadDispatcher` punya test yang gagal kalau API SolidWorks dipanggil dari thread lain
+- [x] Pelanggaran thread menjadi exception tercatat, bukan crash — assert di `SolidWorksApi` dan `SolidWorksReader`
+- [ ] Test otomatis untuk assert itu
 - [x] `capabilities.yaml` tervalidasi
 - [ ] 18 skema tool disetujui kedua orang
 
@@ -395,8 +396,8 @@ Urutan mengikuti nilai dibagi risiko, bukan keinginan.
 | R1 | `agy` diam ketika stdout bukan TTY | ~~Kritis~~ → **rendah** | **Diuji 1.4.11: bug TIDAK ADA.** ConPTY tidak diperlukan; deteksi `provider_silent` dipertahankan sebagai jaring pengaman | ✅ **terjawab** |
 | R2 | Flag `agy` berubah antarrilis | Tinggi | Probing `--help` saat startup; pin versi teruji | ⬜ |
 | R3 | ToS: orkestrasi eksternal dengan akun subscription | Tinggi, **legal** | Abstraksi provider; jalur API key; cek ToS sebelum distribusi | ⬜ |
-| R4 | API SolidWorks tidak thread-safe | **Kritis** — crash acak tak bisa direproduksi | `MainThreadDispatcher`; aturan review; test | ✅ **terbukti hidup di SLDWORKS.exe** |
-| R5 | Crash add-in menjatuhkan SolidWorks | Tinggi | Operasi dibungkus guard; verifikasi sebelum klaim sukses | `PlanRunner` menangkap exception ✅ |
+| R4 | API SolidWorks tidak thread-safe | **Kritis** — crash acak tak bisa direproduksi | `MainThreadDispatcher` + **assert di setiap pemanggilan API**; aturan review terbukti TIDAK cukup | ✅ ditegakkan kode |
+| R5 | Crash add-in menjatuhkan SolidWorks | Tinggi | Operasi dibungkus guard | ⚠️ **TERJADI 2026-11-01** — API dipanggil dari thread latar; kini ditegakkan lewat assert |
 | R6 | Referensi `Face1`/`Edge1` rusak saat fitur disisipkan | Tinggi | Referensi semantik; dilarang lewat skema | Skema melarangnya ✅ |
 | R7 | SolidWorks mengunci DLL yang dimuat | Sedang | `UnloadAddIn` sebelum rebuild; didokumentasikan | ✅ terdokumentasi |
 | R8 | Rate limit terasa saat pemakaian interaktif | Sedang | DesignPlan bisa dijalankan ulang tanpa AI | Override parameter ✅; satu permintaan ~4 detik, ~6.8k token input |

@@ -172,6 +172,19 @@ namespace MikosAI.Addin
         }
 
         /// <summary>Mengirim status terkini ke halaman.</summary>
+        /// <summary>
+        /// Mengirim status terkini ke halaman.
+        ///
+        /// WAJIB di-marshal ke thread UI, dan bukan hanya karena WebView2.
+        ///
+        /// Thread UI panel ini ADALAH thread utama SolidWorks, dan
+        /// <c>_ambilStatus()</c> membaca keadaan model. Memanggilnya dari thread
+        /// latar berarti menyentuh API SolidWorks dari thread yang salah - dan
+        /// itu MENJATUHKAN SolidWorks, bukan sekadar melempar exception.
+        ///
+        /// Pernah terjadi: pemeriksaan provider di latar memanggil method ini
+        /// secara langsung, dan SolidWorks mati dengan Fault Module kosong.
+        /// </summary>
         internal void KirimStatus()
         {
             try
@@ -181,8 +194,32 @@ namespace MikosAI.Addin
                     return;
                 }
 
-                var status = _ambilStatus();
-                _webView.CoreWebView2.PostWebMessageAsJson(status.ToJsonString());
+                void Kirim()
+                {
+                    try
+                    {
+                        if (_webView?.CoreWebView2 is null)
+                        {
+                            return;
+                        }
+
+                        var status = _ambilStatus();
+                        _webView.CoreWebView2.PostWebMessageAsJson(status.ToJsonString());
+                    }
+                    catch (Exception exception)
+                    {
+                        _diagnostics.AddError("menyusun status untuk panel UI", exception);
+                    }
+                }
+
+                if (InvokeRequired)
+                {
+                    BeginInvoke((Action)Kirim);
+                }
+                else
+                {
+                    Kirim();
+                }
             }
             catch (Exception exception)
             {
