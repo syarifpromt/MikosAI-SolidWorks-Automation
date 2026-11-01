@@ -7,64 +7,83 @@ yang akan membuat kita menghabiskan berhari-hari kalau tidak diketahui lebih dul
 
 ---
 
-## 0. Peringatan tentang kualitas sumber
+## 0. Status: TERVERIFIKASI di mesin nyata
 
-Antigravity CLI dirilis Google sekitar **Mei 2026** bersama Antigravity 2.0, menggantikan
-Gemini CLI untuk pengguna konsumen. Itu **setelah** batas pengetahuan model yang menulis
-dokumen ini, jadi semua di bawah berasal dari riset web, bukan ingatan.
+Dokumen ini semula berisi asumsi dari riset web pihak ketiga. Pada **2026-11-01**
+seluruhnya diverifikasi langsung terhadap **agy 1.4.11/1.4.12** di mesin bermesin
+SolidWorks 2025.
 
-Riset tidak menemukan halaman dokumentasi resmi Google yang bisa diakses untuk flag CLI.
-Semua detail di bawah berasal dari sumber pihak ketiga: cheat sheet, panduan komunitas,
-README library integrasi, dan satu thread forum Google AI Developers.
+| # | Pertanyaan | Jawaban |
+|---|---|---|
+| 1 | Versi dan flag | **1.4.12.** `-p`/`--print`/`--prompt`, `--output-format`, `--json-schema`, `--print-timeout`, `--model`, `--mode`, `--effort`, `--dangerously-skip-permissions` |
+| 2 | Bug stdout non-TTY | **TIDAK ADA.** Output lewat pipe jalan sempurna |
+| 3 | Nama field jawaban | **`response`** |
+| 4 | `stream-json` | **Didukung.** `text_delta` untuk progres, `event: "result"` untuk hasil akhir |
+| 5 | Custom header untuk bearer token | **Didukung**, lewat `agy mcp add --header` |
+| 6 | Lokasi `mcp_config.json` | **Tidak relevan** — pakai `agy mcp add` |
+| 7 | Rate limit | Belum diuji sampai batas. Satu permintaan: ~4 detik, ~6.8k token input |
+| 8 | ToS orkestrasi eksternal | **Masih belum terjawab.** Risiko legal, bukan teknis |
 
-**Konsekuensi praktis:** setiap angka dan nama flag di dokumen ini harus diverifikasi
-terhadap `agy --help` pada versi yang benar-benar terpasang, **sebelum** dijadikan asumsi
-kode. Lihat bagian 4 soal flag probing — kita memperlakukan drift versi sebagai hal normal,
-bukan kejadian luar biasa.
+Tujuh dari delapan terjawab, dan dua di antaranya **menyederhanakan rancangan
+secara signifikan** — lihat bagian 1 dan 3.
+
+---
+
+## 1. ConPTY TIDAK diperlukan
+
+Rancangan awal mewajibkan ConPTY karena `agy -p` dilaporkan diam total ketika
+stdout bukan terminal — tanpa output, tanpa error, exit 0. Itu risiko R1, dan
+disebut "temuan paling penting dari seluruh riset".
+
+**Laporan itu tidak berlaku untuk 1.4.11.** Diuji dengan output diarahkan ke
+pipe:
+
+```
+exit code: 0
+panjang output: 251 karakter
+{"conversation_id":"1e58604b-...","status":"SUCCESS","response":"merah\n",
+ "duration_seconds":3.94,"num_turns":1,
+ "usage":{"input_tokens":6828,"output_tokens":6,"total_tokens":6834}}
+```
+
+Jadi pipe biasa cukup, dan seluruh kerumitan ConPTY — `CreatePseudoConsole`,
+pembersih ANSI, repaint carriage-return — tidak diperlukan.
+
+**Yang TETAP dipertahankan:** deteksi `provider_silent`. Exit code 0 dengan
+stdout kosong tetap diperlakukan sebagai kegagalan integrasi, bukan jawaban
+kosong. Alasannya: laporan bug itu nyata untuk versi tertentu, dan kalau muncul
+lagi di rilis berikutnya kita akan mengenalinya dalam hitungan detik alih-alih
+berhari-hari. Pembersih ANSI juga dipertahankan — murah, dan tidak merusak apa
+pun kalau keluarannya sudah bersih.
+
+Risiko R1 turun dari **Kritis** menjadi **rendah**.
 
 ---
 
-## 1. Temuan kritis: `agy -p` diam ketika stdout bukan TTY
+## 1b. agy tidak selalu ada di PATH
 
-Ini temuan terpenting dari seluruh riset.
+Ditemukan dengan cara yang mahal. Di mesin uji pertama, `agy --version` gagal
+dengan `CommandNotFoundException` — padahal agy **sudah terpasang dan sudah
+login**.
 
-**Perilaku.** Ketika stdout `agy` bukan terminal sungguhan, `agy -p` dilaporkan
-**tidak mengeluarkan apa pun — tanpa output, tanpa error, exit code `0`**.
+Installer menaruhnya di:
 
-**Kenapa ini berbahaya bagi kita.** Arsitektur kita memanggil `agy` sebagai subprocess dari
-add-in C# dengan pipe yang diredirect. Itu **persis** kondisi pemicunya. Dan mode
-kegagalannya adalah yang terburuk: kelihatan seperti sukses. Exit code 0, stdout kosong.
-Kalau `ProviderHost` naif, kita akan menyimpulkan "AI menjawab string kosong" dan bukan
-"integrasi rusak".
+```
+%USERPROFILE%\.gemini\bin\agy.exe
+```
 
-**Rujukan.** Paket PyPI `agy-headless-bridge` ada khusus untuk mengatasi ini. Deskripsinya
-menyebut `agy` "goes silent — no output, no error, exit 0" ketika stdout bukan terminal, dan
-merujuknya sebagai "upstream bug #76". Catatan: halaman itu tidak memberi URL issue tracker
-langsung, jadi nomor bug itu sendiri belum terverifikasi.
+dan hanya menambahkannya ke PATH kalau pengguna menjalankan `agy install`.
 
-**Solusi: ConPTY.** Alokasikan pseudo-terminal, jalankan `agy` terhubung ke situ, sehingga
-`agy` melihat TTY dan mengeluarkan output.
+Lebih buruk lagi untuk kita: add-in berjalan di dalam `SLDWORKS.exe`, yang bisa
+mewarisi PATH berbeda dari terminal pengguna. Jadi deteksi berbasis PATH saja
+**tidak cukup**, dan urutan pencariannya:
 
-- Di Windows ini berarti **ConPTY** (`CreatePseudoConsole` / `ClosePseudoConsole` di
-  `kernel32`, plus `InitializeProcThreadAttributeList` dengan atribut
-  `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE_ATTRIBUTE` = `0x00020016`). Tersedia sejak
-  Windows 10 1809.
-- Bridge Python yang jadi rujukan memakai `pywinpty` di Windows dan modul `pty` stdlib di
-  Unix. Kita di C#, jadi kita panggil ConPTY langsung — atau, kalau mau menghemat waktu di
-  Fase 2, pakai sidecar Python dengan `pywinpty` sebagai jembatan sementara dan ganti ke
-  ConPTY native nanti.
-- Output pseudo-terminal mengandung escape sequence ANSI, repaint carriage-return, glyph
-  spinner, dan box-drawing. **Semua harus dibersihkan** sebelum di-parse.
+1. `MIKOSAI_AGY_PATH` (override)
+2. `%USERPROFILE%\.gemini\bin\agy.exe`
+3. PATH
 
-**Aturan yang tidak boleh dilanggar:**
-
-> `exit code 0` dengan stdout kosong **bukan** sukses. Klasifikasikan sebagai
-> `provider_silent` dan tampilkan sebagai kegagalan integrasi ke pengguna — bukan sebagai
-> jawaban AI yang kosong.
-
-Kelas error `provider_silent` di `RecoveryAdvisor` ada khusus untuk ini.
-
----
+Berkas lain yang relevan di `~/.gemini/`: `oauth_creds.json` (bukti sudah login),
+`antigravity-cli/` (settings), `bin/`.
 
 ## 2. Mode headless dan format output
 
@@ -105,66 +124,53 @@ bukan diam lalu tiba-tiba selesai. Itu perbedaan besar dalam rasa pemakaian.
 
 ---
 
-## 3. Dukungan MCP client — kabar baik
+## 3. Registrasi MCP: pakai `agy mcp add`, bukan berkas konfigurasi
 
-Antigravity **bisa** menjadi MCP client. Ini yang membuat seluruh rancangan
-"add-in sebagai MCP server" layak.
-
-Lokasi konfigurasi yang didokumentasikan Google saat ini:
-
-- per proyek: `.agents/mcp_config.json`
-- global: `~/.gemini/config/mcp_config.json`
-
-Catatan: halaman Google yang lebih lama menyebut `~/.gemini/antigravity/mcp_config.json`,
-jadi path ini pernah berubah. Installer kita harus mendeteksi, bukan mengasumsikan.
-
-Dua bentuk entry didukung:
-
-- **Server lokal (stdio):** format `mcpServers` dengan `command` dan `args`.
-- **Server remote (HTTP):** memakai field `serverUrl`.
-
-Kita memakai bentuk **`serverUrl`**, karena server MCP kita hidup di dalam `SLDWORKS.exe`
-dan tidak bisa dispawn oleh `agy`.
-
-**Kita menulis konfigurasi per-proyek, bukan global.** Add-in memiliki direktori kerjanya
-sendiri dan men-spawn `agy` dengan cwd diarahkan ke situ:
+Rancangan awal menulis `.agents/mcp_config.json` sendiri, karena format dan
+lokasi berkasnya tidak pasti. **Itu tidak perlu.** agy punya subcommand khusus:
 
 ```
-%LOCALAPPDATA%\MikosAI\agent-workspace\
-└── .agents\
-    └── mcp_config.json      <- ditulis ulang setiap ConnectToSW
+agy mcp add [flags] <name> <commandOrUrl> [args...]
+
+  --type    stdio atau http (default stdio; URL http/https dideteksi otomatis)
+  --header  HTTP header "Key: Value" (repeatable)
+  --env     KEY=value (repeatable)
+
+Contoh resmi:
+  agy mcp add --header "Authorization: Bearer TOKEN" api https://example.com/mcp
 ```
 
-```json
-{
-  "mcpServers": {
-    "mikosai-solidworks": {
-      "serverUrl": "http://127.0.0.1:<port-sesi-ini>/mcp"
-    }
-  }
-}
+Untuk kita:
+
+```
+agy mcp add --header "Authorization: Bearer <token-sesi>" \
+    mikosai-solidworks http://127.0.0.1:<port>/mcp
 ```
 
-Alasannya: konfigurasi global `~/.gemini/config/mcp_config.json` adalah file pribadi
-pengguna. Kalau kita menulis ke sana, kita berisiko menimpa MCP server lain yang mereka
-pakai untuk pekerjaan sendiri, dan uninstall jadi kotor. Dengan folder milik sendiri, kita
-menulis bebas setiap sesi — dan karena itu **port bisa ephemeral**, tidak perlu angka tetap.
+Ini menyelesaikan **dua** pertanyaan terbuka sekaligus:
 
-Dua hal yang perlu diverifikasi (item 6 di bagian 7):
+- **Custom header didukung**, jadi bearer token dipakai sebagaimana mestinya.
+  Fallback token-di-query-string tidak diperlukan.
+- **Tidak ada format berkas yang perlu ditebak**, dan tidak ada risiko merusak
+  konfigurasi pengguna karena kita memakai jalur resmi.
 
-1. Apakah `agy` benar-benar membaca `.agents/mcp_config.json` relatif ke cwd yang kita
-   tentukan, bukan relatif ke lokasi lain.
-2. Apakah konfigurasi per-proyek menggantikan atau digabung dengan yang global.
+### Harga yang dibayar, dan mitigasinya
 
-Kalau ternyata hanya konfigurasi global yang dibaca, fallback-nya adalah **merge
-non-destruktif**: baca file yang ada, tambahkan entri kita, tulis kembali. Jangan pernah
-menimpa entri milik pengguna.
+`agy mcp add` menulis ke konfigurasi **global** pengguna, bukan ke workspace
+milik kita. Itu mengorbankan sebagian alasan `AgentWorkspace` ada.
 
-Autentikasi bearer token juga perlu diverifikasi: apakah entry `serverUrl` Antigravity
-mendukung custom header. Kalau tidak, alternatifnya token di query string (kurang baik tapi
-dapat diterima untuk loopback-only) atau pembuktian kepemilikan lewat file sesi ber-ACL.
+Mitigasinya:
 
----
+- Nama server khusus: `mikosai-solidworks`. Tidak mungkin bertabrakan.
+- `add` dijalankan setiap `ConnectToSW` — dokumentasinya menyebut
+  "Add or **update**", jadi entri lama otomatis tertimpa dan port ephemeral
+  tetap aman.
+- `agy mcp remove mikosai-solidworks` dijalankan saat `DisconnectFromSW`.
+- Kalau SolidWorks crash, entri basi menunjuk port mati — tapi `add` berikutnya
+  memperbaikinya, dan `agy mcp list` memperlihatkannya.
+
+`AgentWorkspace` tetap dipakai sebagai **cwd** saat men-spawn agy, karena `init`
+event melaporkan `cwd` dan agy memakainya sebagai konteks proyek.
 
 ## 4. Drift versi flag: perlakukan sebagai normal
 

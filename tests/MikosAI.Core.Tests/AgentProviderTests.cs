@@ -338,3 +338,152 @@ Usage: agy [options]
         }
     }
 }
+
+namespace MikosAI.Core.Tests
+{
+    /// <summary>
+    /// Test terhadap keluaran NYATA agy 1.4.11, ditangkap dari mesin bermesin
+    /// SolidWorks pada 2026-11-01. Bukan payload karangan.
+    ///
+    /// Semua asumsi di docs/integrasi-antigravity.md sebelumnya berasal dari
+    /// riset web pihak ketiga. Yang di bawah ini fakta.
+    /// </summary>
+    public class AntigravityNyataTests
+    {
+        // Ditangkap dari: agy -p "..." --output-format json
+        private const string EnvelopeJson =
+            @"{""conversation_id"":""1e58604b-b51f-4e65-875c-5f602011508b"",""status"":""SUCCESS"","
+            + @"""response"":""merah\n"",""duration_seconds"":3.9414694,""num_turns"":1,"
+            + @"""usage"":{""input_tokens"":6828,""output_tokens"":6,""thinking_tokens"":0,"
+            + @"""cache_read_tokens"":0,""total_tokens"":6834}}";
+
+        [Fact]
+        public void envelope_json_nyata_terbaca_dan_field_jawabannya_response()
+        {
+            // Nama field ini sebelumnya hanya dugaan dari panduan pihak ketiga.
+            // Sekarang terkonfirmasi.
+            var hasil = MikosAI.Core.Agents.ProviderOutcome.Shape(EnvelopeJson, 0);
+
+            Assert.True(hasil.IsSuccessful);
+            Assert.Equal("merah", hasil.Summary);
+        }
+
+        [Fact]
+        public void baris_newline_di_akhir_jawaban_dipangkas()
+        {
+            // agy mengakhiri response dengan \n. Membiarkannya membuat chat
+            // punya baris kosong menggantung di setiap jawaban.
+            var hasil = MikosAI.Core.Agents.ProviderOutcome.Shape(EnvelopeJson, 0);
+
+            Assert.DoesNotContain("\n", hasil.Summary);
+        }
+
+        [Fact]
+        public void status_selain_SUCCESS_menjadi_kegagalan()
+        {
+            var json = EnvelopeJson.Replace(@"""status"":""SUCCESS""", @"""status"":""ERROR""");
+
+            var hasil = MikosAI.Core.Agents.ProviderOutcome.Shape(json, 0);
+
+            Assert.False(hasil.IsSuccessful);
+            Assert.Equal("provider_reported_failure", hasil.Failure!.Code);
+        }
+
+        [Fact]
+        public void status_yang_tidak_dikenal_juga_menjadi_kegagalan()
+        {
+            // Default aman, sama seperti di VerificationGate: status yang tidak
+            // kita mengerti tidak boleh lolos sebagai berhasil.
+            var json = EnvelopeJson.Replace(@"""status"":""SUCCESS""", @"""status"":""PARTIAL""");
+
+            Assert.False(MikosAI.Core.Agents.ProviderOutcome.Shape(json, 0).IsSuccessful);
+        }
+
+        // Ditangkap dari: agy -p "..." --output-format stream-json
+        private static readonly string[] BarisStream = new[]
+        {
+            @"{""event"":""init"",""conversation_id"":""719446a4"",""init"":{""cwd"":""D:\x"",""tools"":[""ask_question""]}}",
+            @"{""event"":""step_update"",""step_update"":{""step_index"":0,""state"":""DONE"",""step_type"":""user_input""}}",
+            @"{""event"":""step_update"",""step_update"":{""step_index"":1,""state"":""ACTIVE"",""step_type"":""agent_response"",""text_delta"":""Merah\nBir""}}",
+            @"{""event"":""step_update"",""step_update"":{""step_index"":1,""state"":""ACTIVE"",""step_type"":""agent_response"",""text_delta"":""u""}}",
+            @"{""event"":""step_update"",""step_update"":{""step_index"":1,""state"":""DONE"",""step_type"":""agent_response"",""text_delta"":""\n""}}",
+            @"{""event"":""result"",""result"":{""conversation_id"":""719446a4"",""status"":""SUCCESS"",""response"":""Merah\nBiru\n"",""num_turns"":1}}",
+        };
+
+        [Fact]
+        public void potongan_teks_bertahap_terbaca_dari_stream_json()
+        {
+            // Inilah yang membuat chat terasa hidup alih-alih diam lalu
+            // tiba-tiba selesai.
+            var potongan = BarisStream
+                .Select(MikosAI.Core.Agents.ProviderOutcome.AmbilPotonganTeks)
+                .Where(p => p is not null)
+                .ToList();
+
+            Assert.Equal(new[] { "Merah\nBir", "u", "\n" }, potongan);
+            Assert.Equal("Merah\nBiru\n", string.Concat(potongan));
+        }
+
+        [Fact]
+        public void peristiwa_user_input_TIDAK_ditampilkan_sebagai_jawaban()
+        {
+            // Itu gema prompt kita sendiri.
+            var barisUserInput = BarisStream[1];
+
+            Assert.Null(MikosAI.Core.Agents.ProviderOutcome.AmbilPotonganTeks(barisUserInput));
+        }
+
+        [Fact]
+        public void peristiwa_init_bukan_teks_jawaban()
+        {
+            Assert.Null(MikosAI.Core.Agents.ProviderOutcome.AmbilPotonganTeks(BarisStream[0]));
+        }
+
+        [Fact]
+        public void hasil_akhir_diambil_dari_envelope_event_result()
+        {
+            // Hasil akhir bersarang di bawah "result", bukan di tingkat atas -
+            // itu yang membedakannya dari envelope --output-format json.
+            var seluruh = string.Join("\n", BarisStream);
+
+            var hasil = MikosAI.Core.Agents.ProviderOutcome.Shape(seluruh, 0);
+
+            Assert.True(hasil.IsSuccessful);
+            Assert.Equal("Merah\nBiru", hasil.Summary);
+        }
+
+        [Fact]
+        public void peristiwa_progres_tidak_salah_dianggap_hasil_akhir()
+        {
+            // Kalau baris step_update terakhir yang diambil, jawabannya akan
+            // terpotong jadi "\n".
+            var tanpaResult = string.Join("\n", BarisStream.Take(5));
+
+            var hasil = MikosAI.Core.Agents.ProviderOutcome.Shape(tanpaResult, 0);
+
+            // Tidak ada hasil akhir: tidak boleh mengarang jawaban dari progres.
+            Assert.NotEqual("Merah\nBiru", hasil.Summary);
+        }
+
+        [Fact]
+        public void flag_nyata_agy_1_4_11_terbaca_dari_help()
+        {
+            // Dipangkas dari keluaran agy --help yang sebenarnya.
+            var help = @"Usage of agy.exe:
+  --dangerously-skip-permissions  Auto-approve all tool permission requests
+  --json-schema                   Optional JSON schema string or path
+  --output-format                 Output format for print mode (text, json, stream-json)
+  -p                              Short alias for --print
+  --print                         Run a single prompt non-interactively
+  --print-timeout                 Optional time limit for print mode
+  --model                         Model for the current CLI session";
+
+            var flags = MikosAI.Core.Agents.ProviderOutcome.ParseFlags(help);
+
+            Assert.Contains("--output-format", flags);
+            Assert.Contains("--print-timeout", flags);
+            Assert.Contains("--json-schema", flags);
+            Assert.Contains("-p", flags);
+        }
+    }
+}

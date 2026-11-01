@@ -226,27 +226,74 @@ function Test-WebView2Runtime {
         -Nilai $nilai -Blocker $false -Saran $saran
 }
 
-function Test-AntigravityCli {
-    $versi = $null
+function Get-AgyPath {
+    <#
+        Mencari agy.exe.
+
+        PATH SAJA TIDAK CUKUP. Installer Antigravity menaruh CLI di
+        %USERPROFILE%\.gemini\bin\agy.exe dan hanya menambahkannya ke PATH
+        kalau pengguna menjalankan "agy install".
+
+        Di mesin uji pertama kami, agy sudah terpasang DAN sudah login, tapi
+        "agy --version" gagal dengan CommandNotFoundException - deteksi berbasis
+        PATH melewatkannya sepenuhnya.
+
+        Urutan: variabel override, lalu lokasi baku, lalu PATH.
+    #>
+    if ($env:MIKOSAI_AGY_PATH -and (Test-Path -LiteralPath $env:MIKOSAI_AGY_PATH)) {
+        return $env:MIKOSAI_AGY_PATH
+    }
+
+    $baku = Join-Path $env:USERPROFILE (Join-Path '.gemini' (Join-Path 'bin' 'agy.exe'))
+    if (Test-Path -LiteralPath $baku) {
+        return $baku
+    }
+
     try {
         $cmd = Get-Command 'agy' -ErrorAction Stop
-        if ($cmd) {
-            $versi = (& agy --version 2>$null | Select-Object -First 1)
-        }
+        if ($cmd) { return $cmd.Source }
     }
     catch {
-        $versi = $null
+        # Tidak ada di PATH.
+    }
+
+    return $null
+}
+
+function Test-AntigravityCli {
+    $path = Get-AgyPath
+    $versi = $null
+
+    if ($path) {
+        try {
+            $versi = (& $path --version 2>$null | Select-Object -First 1)
+        }
+        catch {
+            $versi = $null
+        }
     }
 
     $lulus = -not [string]::IsNullOrWhiteSpace($versi)
 
     $saran = ''
-    if (-not $lulus) {
-        $saran = 'Pasang Antigravity CLI (agy) lalu login sekali secara interaktif. Belum wajib di Tahap 1.'
-    }
-
     $nilai = 'tidak ditemukan'
-    if ($lulus) { $nilai = $versi.Trim() }
+
+    if ($lulus) {
+        $nilai = "$($versi.Trim())  ($path)"
+
+        # Ada tapi tidak di PATH: add-in bisa menemukannya, tapi pengguna tidak
+        # bisa menjalankannya sendiri dari terminal. Layak disebut.
+        $diPath = $false
+        try { $diPath = [bool](Get-Command 'agy' -ErrorAction Stop) } catch { $diPath = $false }
+
+        if (-not $diPath) {
+            $nilai = "$($versi.Trim())  (tidak di PATH)"
+            $saran = 'agy ditemukan tapi tidak ada di PATH. Jalankan `agy install` kalau mau memakainya dari terminal. Add-in tetap bisa menemukannya.'
+        }
+    }
+    else {
+        $saran = 'Pasang Antigravity CLI lalu login sekali secara interaktif.'
+    }
 
     return New-CheckResult -Nama 'Antigravity CLI (agy)' -Lulus $lulus `
         -Nilai $nilai -Blocker $false -Saran $saran

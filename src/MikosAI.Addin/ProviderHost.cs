@@ -87,14 +87,15 @@ namespace MikosAI.Addin
         /// </summary>
         private ProviderProbe PeriksaTanpaAdapter()
         {
-            var path = CariDiPath("agy.exe") ?? CariDiPath("agy");
+            var path = CariAgy();
 
             if (path is null)
             {
                 return new ProviderProbe
                 {
                     State = ProviderState.NotInstalled,
-                    Message = "Entry `agy` tidak ditemukan di PATH.",
+                    Message = "agy.exe tidak ditemukan, baik di PATH maupun di "
+                              + @"%USERPROFILE%\.gemini\bin.",
                 };
             }
 
@@ -104,6 +105,57 @@ namespace MikosAI.Addin
                 ExecutablePath = path,
                 Message = "Terpasang, tapi adapter provider belum diaktifkan di versi ini.",
             };
+        }
+
+        /// <summary>
+        /// Mencari agy.exe.
+        ///
+        /// PATH SAJA TIDAK CUKUP. Installer Antigravity menaruh CLI di
+        /// <c>%USERPROFILE%\.gemini\bin\agy.exe</c> dan hanya menambahkannya ke
+        /// PATH kalau pengguna menjalankan <c>agy install</c>. Di mesin uji
+        /// pertama kami, `agy` sudah terpasang DAN sudah login, tapi tidak ada
+        /// di PATH - dan deteksi berbasis PATH melewatkannya sepenuhnya.
+        ///
+        /// Lebih buruk lagi: add-in berjalan di dalam SLDWORKS.exe, yang bisa
+        /// mewarisi PATH berbeda dari terminal pengguna. Jadi lokasi bakunya
+        /// diperiksa langsung.
+        ///
+        /// Urutan: variabel lingkungan override, lalu lokasi baku, lalu PATH.
+        /// </summary>
+        private static string? CariAgy()
+        {
+            try
+            {
+                var paksa = Environment.GetEnvironmentVariable("MIKOSAI_AGY_PATH");
+                if (!string.IsNullOrWhiteSpace(paksa) && System.IO.File.Exists(paksa))
+                {
+                    return paksa;
+                }
+            }
+            catch (Exception)
+            {
+                // Lanjut ke kandidat berikutnya.
+            }
+
+            try
+            {
+                var baku = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    ".gemini",
+                    "bin",
+                    "agy.exe");
+
+                if (System.IO.File.Exists(baku))
+                {
+                    return baku;
+                }
+            }
+            catch (Exception)
+            {
+                // Lanjut ke PATH.
+            }
+
+            return CariDiPath("agy.exe") ?? CariDiPath("agy");
         }
 
         private static string? CariDiPath(string namaBerkas)

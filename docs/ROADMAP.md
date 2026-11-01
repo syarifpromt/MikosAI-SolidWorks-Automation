@@ -11,12 +11,12 @@ Terakhir diperbarui 2026-10-31
 |---|---|---|
 | **0** | Fondasi | **add-in TERBUKTI HIDUP** di SW2025 SP01.1, 7/7 gerbang lulus; sisa 4 item test |
 | 1 | MCP server + tool read-only | **kode lengkap**, menunggu verifikasi di SolidWorks |
-| 2 | Provider host (`agy`) | belum mulai |
+| 2 | Provider host (`agy`) | 7/8 verifikasi terjawab, parser siap; eksekusi proses belum |
 | 3 | Jalur tulis | belum mulai |
 | 4 | Pengalaman dua lapis | belum mulai |
 | 5 | Pengemasan | belum mulai |
 
-Sudah jalan: **245 test hijau**, seluruh alur DesignPlan end-to-end dengan executor palsu,
+Sudah jalan: **255 test hijau**, seluruh alur DesignPlan end-to-end dengan executor palsu,
 tanpa SolidWorks.
 
 Belum ada kemampuan berstatus `verified`, jadi daftar tool MCP masih kosong. Itu benar —
@@ -131,7 +131,7 @@ SolidWorks dan punya kanal thread yang benar.
 
 ### Sudah selesai di `MikosAI.Core`
 
-245 test hijau, dibuild dan dijalankan tanpa SolidWorks dan tanpa Visual Studio:
+255 test hijau, dibuild dan dijalankan tanpa SolidWorks dan tanpa Visual Studio:
 
 | Berkas | Isi |
 |---|---|
@@ -226,22 +226,23 @@ Fase paling berisiko. **Baca `docs/integrasi-antigravity.md` seluruhnya sebelum 
 
 ### Verifikasi `agy` nyata — kerjakan SEBELUM menulis kode
 
-- [ ] 1. Versi `agy` terpasang dan flag apa yang ada di `--help`
-- [ ] 2. Apakah bug silent non-TTY masih ada di versi itu
-- [ ] 3. Nama field sebenarnya untuk isi jawaban di envelope `json`
-- [ ] 4. Apakah `stream-json` didukung, dan bentuk event-nya
-- [ ] 5. Apakah entry `serverUrl` mendukung custom header untuk bearer token
+- [x] 1. Versi `agy` terpasang dan flag apa yang ada di `--help`
+- [x] 2. Apakah bug silent non-TTY masih ada di versi itu
+- [x] 3. Nama field sebenarnya untuk isi jawaban di envelope `json`
+- [x] 4. Apakah `stream-json` didukung, dan bentuk event-nya
+- [x] 5. Apakah entry `serverUrl` mendukung custom header untuk bearer token
 - [ ] 6. Apakah `.agents/mcp_config.json` dibaca relatif ke cwd, menggantikan atau menggabung
-- [ ] 7. Rate limit nyata untuk pemakaian interaktif
+- [x] 7. Rate limit — satu permintaan ~4 detik, ~6.8k token input; batas belum diuji
 - [ ] 8. ToS: orkestrasi eksternal dengan pemakaian berbasis akun — **risiko legal, bukan teknis**
 
 ### Jalur Platform
 
-- [ ] `ProviderHost` dengan **ConPTY** (atau sidecar `pywinpty` sementara)
-- [ ] Pembersih ANSI / spinner / repaint carriage-return
-- [ ] Flag probing: `--version` + `--help` saat startup
-- [ ] Parser `stream-json`, fallback ke `json`, lalu `text`
-- [ ] **Deteksi `provider_silent`** — exit 0 + stdout kosong adalah kegagalan
+- [x] ~~ConPTY~~ → **tidak diperlukan**, pipe biasa cukup di 1.4.11
+- [ ] `ProviderHost` menjalankan proses `agy` sungguhan
+- [x] Pembersih ANSI / spinner / repaint carriage-return (dipertahankan, murah)
+- [ ] Flag probing dijalankan sungguhan saat startup (parser-nya sudah ada)
+- [x] Parser `stream-json` dan `json` — diuji terhadap payload nyata
+- [x] **Deteksi `provider_silent`** — exit 0 + stdout kosong adalah kegagalan
 - [x] State machine provider dan tampilannya di UI
 - [x] UI chat: kirim prompt, tampilkan hasil
 - [ ] Progres bertahap di chat — menunggu parser stream-json
@@ -391,14 +392,14 @@ Urutan mengikuti nilai dibagi risiko, bukan keinginan.
 
 | # | Risiko | Dampak | Mitigasi | Status |
 |---|---|---|---|---|
-| R1 | `agy` diam ketika stdout bukan TTY | **Kritis** — kegagalan menyerupai sukses | ConPTY; kelas error `provider_silent`; test yang gagal tanpa ConPTY | Kelas error ✅, ConPTY ⬜ |
+| R1 | `agy` diam ketika stdout bukan TTY | ~~Kritis~~ → **rendah** | **Diuji 1.4.11: bug TIDAK ADA.** ConPTY tidak diperlukan; deteksi `provider_silent` dipertahankan sebagai jaring pengaman | ✅ **terjawab** |
 | R2 | Flag `agy` berubah antarrilis | Tinggi | Probing `--help` saat startup; pin versi teruji | ⬜ |
 | R3 | ToS: orkestrasi eksternal dengan akun subscription | Tinggi, **legal** | Abstraksi provider; jalur API key; cek ToS sebelum distribusi | ⬜ |
 | R4 | API SolidWorks tidak thread-safe | **Kritis** — crash acak tak bisa direproduksi | `MainThreadDispatcher`; aturan review; test | ✅ **terbukti hidup di SLDWORKS.exe** |
 | R5 | Crash add-in menjatuhkan SolidWorks | Tinggi | Operasi dibungkus guard; verifikasi sebelum klaim sukses | `PlanRunner` menangkap exception ✅ |
 | R6 | Referensi `Face1`/`Edge1` rusak saat fitur disisipkan | Tinggi | Referensi semantik; dilarang lewat skema | Skema melarangnya ✅ |
 | R7 | SolidWorks mengunci DLL yang dimuat | Sedang | `UnloadAddIn` sebelum rebuild; didokumentasikan | ✅ terdokumentasi |
-| R8 | Rate limit terasa saat pemakaian interaktif | Sedang | DesignPlan bisa dijalankan ulang tanpa AI; preset tanpa AI | Override parameter ✅ |
+| R8 | Rate limit terasa saat pemakaian interaktif | Sedang | DesignPlan bisa dijalankan ulang tanpa AI | Override parameter ✅; satu permintaan ~4 detik, ~6.8k token input |
 | R9 | Drift versi SolidWorks (2024/2025/2026) | Sedang | Matriks versi di ledger; `verified` selalu menyebut versi | Ledger siap ✅ |
 | R10 | Redistribusi PIA dibatasi lisensi | Sedang | Rujuk instalasi lokal, jangan vendor ke repo | ✅ terdokumentasi |
 | R11 | Dua orang, cakupan membengkak | Tinggi | Gerbang penerimaan per fase; "kecil itu fitur" | ✅ |
@@ -408,6 +409,7 @@ Urutan mengikuti nilai dibagi risiko, bukan keinginan.
 | R15 | API SolidWorks tidak bisa dipanggil lewat `dynamic`/IDispatch | Tinggi — semua panggilan gagal `0x8002802B` | PIA bertipe wajib; `EmbedInteropTypes` mempertahankan keuntungan lintas-versi | ✅ **selesai, `RevisionNumber` terbaca** |
 | R16 | Kelas add-in tanpa IDispatch → `SetAddinCallbackInfo2` gagal `InvalidCastException` | Tinggi — callback SolidWorks tidak bisa didaftarkan | `ClassInterfaceType.AutoDispatch`; uji `Marshal.GetIDispatchForObject` sendiri + gerbang probe | ✅ **selesai, terbukti** |
 | R18 | `AssemblyResolve` global dimintai dependensi add-in LAIN | Sedang — bisa menyerahkan assembly salah ke add-in lain | Permintaan yang bukan dari folder kami ditolak lebih dulu | ✅ |
+| R19 | `agy` terpasang tapi tidak di PATH | Tinggi — deteksi gagal padahal provider siap | Cari `%USERPROFILE%\.geminiingy.exe` langsung, bukan hanya PATH | ✅ **ditemukan di mesin nyata** |
 | R17 | Menguji DLL usang karena `git pull` terlewat | Sedang — mendiagnosis bug yang sudah diperbaiki | Commit dicap ke metadata assembly; probe membandingkan dengan HEAD | ✅ |
 
 R1, R3, R4 yang paling perlu diawasi. R1 dan R4 bisa diselesaikan dengan kode. R3 tidak —

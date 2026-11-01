@@ -127,22 +127,86 @@ namespace MikosAI.Core.Agents
                 };
             }
 
-            var objek = CariObjekJson(bersih);
-            if (objek is null)
+            var mentahObjek = CariObjekJson(bersih);
+            if (mentahObjek is null)
             {
-                // Teks biasa. Sah - tidak semua versi mendukung keluaran JSON.
+                // Teks biasa. Sah - mode keluaran default agy adalah text.
                 return new AgentResult { Summary = bersih };
+            }
+
+            var objek = BukaEnvelope(mentahObjek);
+
+            // agy melaporkan keberhasilan lewat field status. Nilai selain
+            // SUCCESS diperlakukan sebagai kegagalan, dan nilai yang TIDAK
+            // DIKENAL juga - default aman, sama seperti di VerificationGate.
+            var status = AmbilTeks(objek, "status");
+            if (status is not null
+                && !string.Equals(status, "SUCCESS", StringComparison.OrdinalIgnoreCase))
+            {
+                return new AgentResult
+                {
+                    Summary = AmbilTeks(objek, "response", "summary", "message"),
+                    Failure = new AgentFailure
+                    {
+                        Code = "provider_reported_failure",
+                        Message = $"Provider melaporkan status '{status}'.",
+                        NextAction = TebakTindakan(bersih),
+                    },
+                };
             }
 
             return new AgentResult
             {
-                Summary = AmbilTeks(objek, "summary", "response", "text", "message", "output"),
+                Summary = AmbilTeks(objek, "summary", "response", "text", "message", "output")?.TrimEnd('\n'),
                 Plan = objek["plan"]?.DeepClone(),
                 ChangedFiles = AmbilDaftar(objek, "changedFiles"),
                 Verification = AmbilDaftar(objek, "verification"),
                 Risks = AmbilDaftar(objek, "risks"),
                 NextSteps = AmbilDaftar(objek, "nextSteps"),
             };
+        }
+
+        /// <summary>
+        /// Mengambil potongan teks bertahap dari satu baris stream-json.
+        ///
+        /// Dipakai chat untuk menampilkan jawaban sambil mengalir, alih-alih
+        /// diam lalu tiba-tiba selesai. Mengembalikan null kalau baris itu bukan
+        /// peristiwa teks.
+        ///
+        /// Bentuknya, dari keluaran nyata agy 1.4.11:
+        ///   {"event":"step_update","step_update":{"step_type":"agent_response",
+        ///    "text_delta":"Mer"}}
+        /// </summary>
+        public static string? AmbilPotonganTeks(string? barisJsonl)
+        {
+            if (string.IsNullOrWhiteSpace(barisJsonl))
+            {
+                return null;
+            }
+
+            var objek = CobaParse(barisJsonl!.Trim());
+            if (objek is null)
+            {
+                return null;
+            }
+
+            if (objek["step_update"] is not JsonObject langkah)
+            {
+                return null;
+            }
+
+            // Hanya respons agent yang ditampilkan. Peristiwa user_input adalah
+            // gema prompt kita sendiri.
+            var jenis = AmbilTeks(langkah, "step_type");
+            if (!string.Equals(jenis, "agent_response", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            return langkah["text_delta"] is JsonValue nilai
+                   && nilai.TryGetValue<string>(out var teks)
+                ? teks
+                : null;
         }
 
         /// <summary>
@@ -226,11 +290,41 @@ namespace MikosAI.Core.Agents
             return null;
         }
 
+        /// <summary>
+        /// Apakah objek ini memuat hasil akhir, bukan sekadar peristiwa progres.
+        ///
+        /// Bentuk yang dikenali, berdasarkan keluaran NYATA agy 1.4.11:
+        ///
+        ///   --output-format json
+        ///     {"status":"SUCCESS","response":"...","usage":{...}}
+        ///
+        ///   --output-format stream-json
+        ///     {"event":"init","init":{...}}
+        ///     {"event":"step_update","step_update":{...,"text_delta":"..."}}
+        ///     {"event":"result","result":{"status":"SUCCESS","response":"..."}}
+        /// </summary>
         private static bool Berguna(JsonObject objek)
-            => objek.ContainsKey("summary")
-               || objek.ContainsKey("response")
-               || objek.ContainsKey("plan")
-               || objek.ContainsKey("structured_output");
+        {
+            if (objek.ContainsKey("summary")
+                || objek.ContainsKey("response")
+                || objek.ContainsKey("plan")
+                || objek.ContainsKey("structured_output"))
+            {
+                return true;
+            }
+
+            // Envelope stream-json: hasil akhir ada di bawah "result".
+            return objek["event"] is JsonValue ev
+                   && ev.TryGetValue<string>(out var nama)
+                   && string.Equals(nama, "result", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Membuka envelope <c>{"event":"result","result":{...}}</c> dari
+        /// stream-json. Mengembalikan objek yang sama kalau bukan envelope.
+        /// </summary>
+        private static JsonObject BukaEnvelope(JsonObject objek)
+            => objek["result"] is JsonObject dalam ? dalam : objek;
 
         private static JsonObject? CobaParse(string teks)
         {
