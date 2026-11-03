@@ -584,10 +584,13 @@ el('btn-buka-workspace').addEventListener('click', function () {
   if (workspaceTerakhir) kirim('bukaFolder', { path: workspaceTerakhir });
 });
 
-// Minta status pertama, lalu segarkan berkala. Interval panjang: panel ini
-// informasional, tidak perlu real-time.
+// Minta status sekali saat halaman dimuat, supaya panel langsung terisi.
+//
+// TIDAK ADA polling berkala di sini, dan itu disengaja: status didorong oleh
+// timer di sisi add-in. Polling dari halaman berarti arus pesan masuk terus
+// menerus ke host, dan setiap pesan itu menjalankan kode kami dari dalam
+// message pump WebView2 - jalur yang sudah terbukti rapuh di dalam SolidWorks.
 kirim('status');
-setInterval(function () { kirim('status'); }, 5000);
 </script>
 
 </body>

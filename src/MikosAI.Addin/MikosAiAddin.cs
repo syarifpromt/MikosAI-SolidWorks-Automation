@@ -96,6 +96,13 @@ namespace MikosAI.Addin
         private SolidWorksReader? _pembaca;
         private TaskPaneHost? _panel;
         private ProviderHost? _provider;
+        private System.Windows.Forms.Timer? _timerSegar;
+
+        /// <summary>
+        /// Jumlah dokumen terbuka, disegarkan timer di thread utama.
+        /// -1 berarti belum/tidak terbaca - BUKAN nol.
+        /// </summary>
+        private int _jumlahDokumenCache = -1;
         private SolidWorks.Interop.sldworks.ITaskpaneView? _taskPaneView;
 
         // ====================================================================
@@ -319,6 +326,24 @@ namespace MikosAI.Addin
 
             try
             {
+                if (_timerSegar is not null)
+                {
+                    _timerSegar.Stop();
+                    _timerSegar.Tick -= SegarkanCache;
+                    _timerSegar.Dispose();
+                }
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("menghentikan timer penyegar", exception);
+            }
+            finally
+            {
+                _timerSegar = null;
+            }
+
+            try
+            {
                 _panel?.Dispose();
             }
             catch (Exception exception)
@@ -465,6 +490,20 @@ namespace MikosAI.Addin
             // SolidWorks. Lihat TaskPaneHost.Pasang().
             _panel.Pasang();
 
+            // Timer WinForms: tick-nya tiba sebagai WM_TIMER di thread utama,
+            // bukan dari dalam callback WebView2. Inilah satu-satunya tempat
+            // yang aman untuk membaca model demi panel.
+            try
+            {
+                _timerSegar = new System.Windows.Forms.Timer { Interval = 4000 };
+                _timerSegar.Tick += SegarkanCache;
+                _timerSegar.Start();
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("menyalakan timer penyegar", exception);
+            }
+
             return true;
         }
 
@@ -476,15 +515,17 @@ namespace MikosAI.Addin
         /// </summary>
         private JsonObject StatusUntukPanel()
         {
-            var dokumen = -1;
-            try
-            {
-                dokumen = _sw?.TryGetDocumentCount() ?? -1;
-            }
-            catch (Exception)
-            {
-                // Biarkan -1: tidak terbaca, bukan nol.
-            }
+            // SENGAJA memakai nilai CACHE, bukan memanggil API SolidWorks.
+            //
+            // Method ini dipanggil dari handler pesan WebView2 - yaitu dari
+            // DALAM message pump milik WebView2. Memanggil COM SolidWorks dari
+            // sana berarti masuk ke COM lewat message loop bersarang, dan
+            // SolidWorks tidak tahan terhadap re-entrancy seperti itu: ia mati
+            // di kode native, tanpa exception, dengan Fault Module kosong.
+            //
+            // Cache-nya disegarkan oleh timer WinForms, yang tiba sebagai pesan
+            // WM_TIMER biasa di thread utama - bukan panggilan bersarang.
+            var dokumen = _jumlahDokumenCache;
 
             var galat = new JsonArray();
             foreach (var pesan in _diagnostics.Errors)
@@ -548,6 +589,34 @@ namespace MikosAI.Addin
             catch (Exception exception)
             {
                 _diagnostics.AddError("memeriksa dan mendaftarkan provider", exception);
+            }
+        }
+
+        /// <summary>
+        /// Menyegarkan nilai yang dibaca dari model, di thread utama lewat
+        /// WM_TIMER.
+        ///
+        /// Pembacaan model TIDAK BOLEH terjadi di jalur lain - lihat catatan di
+        /// StatusUntukPanel.
+        /// </summary>
+        private void SegarkanCache(object? pengirim, EventArgs e)
+        {
+            try
+            {
+                _jumlahDokumenCache = _sw?.TryGetDocumentCount() ?? -1;
+            }
+            catch (Exception)
+            {
+                _jumlahDokumenCache = -1;
+            }
+
+            try
+            {
+                _panel?.KirimStatus();
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("menyegarkan panel", exception);
             }
         }
 
