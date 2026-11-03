@@ -412,6 +412,20 @@ if ($Action -eq 'Probe') {
 
     Write-Host "Commit   : $commitDll (build DLL)"
 
+    if ($status.PSObject.Properties.Name -contains 'featureFlags' -and $status.featureFlags) {
+        Write-Host "Fitur    : $($status.featureFlags)"
+    }
+
+    # Petunjuk terkuat saat SolidWorks mati: langkah yang sedang BERJALAN,
+    # bukan yang terakhir selesai.
+    if ($status.PSObject.Properties.Name -contains 'lastActivity' -and $status.lastActivity) {
+        $warnaJejak = 'Gray'
+        if ($status.lastActivity -ne 'connect:selesai' -and $status.lastActivity -ne 'latar:selesai') {
+            $warnaJejak = 'Yellow'
+        }
+        Write-Host "Aktivitas terakhir: $($status.lastActivity)" -ForegroundColor $warnaJejak
+    }
+
     if ($commitDll -and $commitRepo) {
         if ($commitDll -eq $commitRepo) {
             Write-Host "           sama dengan HEAD repo - DLL ini mutakhir" -ForegroundColor Green

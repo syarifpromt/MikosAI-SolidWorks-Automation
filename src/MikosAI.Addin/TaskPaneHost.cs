@@ -81,11 +81,15 @@ namespace MikosAI.Addin
 
                 Directory.CreateDirectory(folderData);
 
+                _diagnostics.Jejak("webview:buat-lingkungan");
+
                 var lingkungan = await CoreWebView2Environment
                     .CreateAsync(browserExecutableFolder: null, userDataFolder: folderData)
                     .ConfigureAwait(true);
 
+                _diagnostics.Jejak("webview:ensure-core");
                 await _webView!.EnsureCoreWebView2Async(lingkungan).ConfigureAwait(true);
+                _diagnostics.Jejak("webview:core-siap");
 
                 var core = _webView.CoreWebView2;
 
@@ -109,8 +113,10 @@ namespace MikosAI.Addin
                     return;
                 }
 
+                _diagnostics.Jejak("webview:navigasi");
                 core.Navigate(new Uri(halaman).AbsoluteUri);
                 SiapPakai = true;
+                _diagnostics.Jejak("webview:siap");
             }
             catch (Exception exception)
             {

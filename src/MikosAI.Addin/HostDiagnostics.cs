@@ -87,6 +87,31 @@ namespace MikosAI.Addin
         internal bool DispatcherReady { get; set; }
 
         /// <summary>
+        /// Langkah terakhir yang DIMULAI. Bukan yang selesai.
+        ///
+        /// Kalau SolidWorks mati, nilai ini adalah petunjuk terkuat yang kita
+        /// punya: ia menunjuk tepat ke apa yang sedang berjalan saat proses
+        /// berhenti. ConnectToSW yang selesai bersih tidak memberi tahu apa pun
+        /// soal apa yang terjadi beberapa detik kemudian.
+        /// </summary>
+        internal string? LastActivity { get; private set; }
+
+        internal string? FeatureFlags { get; set; }
+
+        /// <summary>
+        /// Menandai langkah baru dan LANGSUNG menulis berkas.
+        ///
+        /// Penulisannya disengaja langsung, bukan ditunda: kalau proses mati
+        /// setelah ini, yang tersimpan di disk adalah langkah yang sedang
+        /// berjalan saat itu.
+        /// </summary>
+        internal void Jejak(string langkah)
+        {
+            LastActivity = langkah;
+            Write();
+        }
+
+        /// <summary>
         /// Apakah objek add-in bisa di-cast ke IDispatch. Wajib true, karena
         /// SolidWorks memanggil callback berdasarkan nama method.
         /// </summary>
@@ -183,6 +208,8 @@ namespace MikosAI.Addin
                 Field(sb, "solidworksRevision", SolidWorksRevision);
                 FieldInt(sb, "addinCookie", AddinCookie);
                 FieldBool(sb, "dispatcherReady", DispatcherReady);
+                Field(sb, "lastActivity", LastActivity);
+                Field(sb, "featureFlags", FeatureFlags);
                 FieldBool(sb, "addinExposesIDispatch", AddinExposesIDispatch);
                 FieldInt(sb, "mainThreadId", MainThreadId);
                 FieldInt(sb, "fileNewEvents", FileNewEvents);

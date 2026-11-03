@@ -308,3 +308,60 @@ hanya memperbanyak kemungkinan penyebab kalau gagal.
 Kode add-in **sudah lewat compile-check**, jadi ia benar secara tipe. Yang belum terbukti
 adalah perilaku runtime-nya di SolidWorks nyata — dan itu hanya bisa dibuktikan di mesin
 kalian.
+
+---
+
+## Mempersempit crash SolidWorks
+
+Kalau SolidWorks mati setelah add-in dimuat, jangan menebak subsistem mana yang bersalah.
+Matikan satu per satu.
+
+Semua subsistem dikendalikan variabel lingkungan tingkat **User** — harus User, bukan
+proses, karena SolidWorks diluncurkan dari Explorer dan hanya mewarisi variabel User atau
+Machine. Tidak perlu rebuild.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\crash-bisect.ps1 -Mode SafeMode
+```
+
+Lalu **tutup SolidWorks sepenuhnya**, buka lagi, tunggu 30 detik, dan jalankan:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\addin.ps1 -Action Probe
+```
+
+### Urutan yang disarankan
+
+| Langkah | Mode | Kalau TETAP crash | Kalau TIDAK crash |
+|---|---|---|---|
+| 1 | `SafeMode` | Penyebabnya bukan ketiga subsistem — lihat `lastActivity` | Lanjut langkah 2 |
+| 2 | `NoTaskPane` | Bukan WebView2 | **WebView2 tersangkanya** |
+| 3 | `NoProvider` | Bukan subprocess agy | **agy tersangkanya** |
+| 4 | `NoMcp` | Bukan server MCP | **Server MCP tersangkanya** |
+
+Setelah selesai:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\crash-bisect.ps1 -Mode Normal
+```
+
+### Membaca `Aktivitas terakhir`
+
+Probe menampilkan baris **`Aktivitas terakhir`**. Itu langkah yang sedang **berjalan**,
+bukan yang terakhir selesai — ditulis ke disk tepat saat dimulai, jadi kalau proses mati
+setelahnya, nilai itulah yang tersimpan.
+
+| Nilai | Artinya |
+|---|---|
+| `connect:selesai` | `ConnectToSW` beres; crash terjadi sesudahnya |
+| `connect:taskpane-mulai` | Mati saat membangun TaskPane |
+| `webview:ensure-core` | Mati saat menginisialisasi WebView2 |
+| `webview:navigasi` | Mati saat memuat halaman UI |
+| `latar:probe-agy-mulai` | Mati saat menjalankan `agy --version` atau `--help` |
+| `latar:daftar-mcp-mulai` | Mati saat `agy mcp add` |
+| `latar:kirim-status` | Mati saat mengirim status ke panel |
+| `latar:selesai` | Semua latar beres; crash terjadi lebih jauh lagi |
+
+Kalau nilainya `connect:selesai` **dan** mode `SafeMode` aktif, berarti penyebabnya bukan
+WebView2, bukan MCP, bukan agy — dan itu informasi yang sama berharganya, karena
+menyingkirkan tiga tersangka sekaligus.

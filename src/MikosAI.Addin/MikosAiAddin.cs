@@ -115,6 +115,8 @@ namespace MikosAI.Addin
         {
             _diagnostics.Status = "connecting";
             _diagnostics.AddinCookie = Cookie;
+            _diagnostics.FeatureFlags = Fitur.Ringkasan();
+            _diagnostics.Jejak("connect:mulai");
 
             // --- Tangkap thread utama ---------------------------------------
             // Dikerjakan DI SINI dan tidak di tempat lain. Ini satu-satunya
@@ -147,6 +149,7 @@ namespace MikosAI.Addin
             }
 
             // --- Simpan referensi aplikasi ----------------------------------
+            _diagnostics.Jejak("connect:bungkus-api");
             _sw = SolidWorksApi.Buat(ThisSW, _diagnostics, _dispatcher);
 
             if (_sw is null)
@@ -199,17 +202,27 @@ namespace MikosAI.Addin
             // lewat pemanggilan fungsi biasa. Lihat docs/adr/0002.
             try
             {
-                // Executor nyata: setiap pembacaan dijalankan lewat dispatcher
-                // ke thread utama SolidWorks.
-                var executor = new SolidWorksToolExecutor(
-                    _dispatcher ?? throw new InvalidOperationException("dispatcher belum siap"),
-                    () => _pembaca);
+                if (!Fitur.PakaiMcp)
+                {
+                    _diagnostics.AddError("info: server MCP dimatikan lewat saklar fitur.");
+                }
+                else
+                {
+                    _diagnostics.Jejak("connect:mcp-mulai");
 
-                _mcp = new McpHost(_diagnostics, executor);
-                _diagnostics.McpServer = _mcp.Mulai();
-                _diagnostics.McpEndpoint = _mcp.Endpoint?.ToString();
-                _diagnostics.McpToolCount = _mcp.ToolCount;
-                _diagnostics.McpWorkspace = _mcp.WorkspaceDirectory;
+                    // Executor nyata: setiap pembacaan dijalankan lewat dispatcher
+                    // ke thread utama SolidWorks.
+                    var executor = new SolidWorksToolExecutor(
+                        _dispatcher ?? throw new InvalidOperationException("dispatcher belum siap"),
+                        () => _pembaca);
+
+                    _mcp = new McpHost(_diagnostics, executor);
+                    _diagnostics.McpServer = _mcp.Mulai();
+                    _diagnostics.McpEndpoint = _mcp.Endpoint?.ToString();
+                    _diagnostics.McpToolCount = _mcp.ToolCount;
+                    _diagnostics.McpWorkspace = _mcp.WorkspaceDirectory;
+                    _diagnostics.Jejak("connect:mcp-selesai");
+                }
             }
             catch (Exception exception)
             {
@@ -219,14 +232,21 @@ namespace MikosAI.Addin
             // --- Periksa provider AI ----------------------------------------
             try
             {
-                _provider = new ProviderHost(_diagnostics);
+                if (!Fitur.PakaiProvider)
+                {
+                    _diagnostics.AddError("info: provider AI dimatikan lewat saklar fitur.");
+                }
+                else
+                {
+                    _diagnostics.Jejak("connect:provider-mulai");
+                    _provider = new ProviderHost(_diagnostics);
 
-                // Tidak di-await: ConnectToSW harus kembali cepat, dan panel
-                // memperbarui dirinya saat status berikutnya diminta.
-                // Periksa provider, lalu daftarkan server MCP kita ke
-                // konfigurasinya. Berurutan, karena pendaftaran butuh adapter
-                // yang sudah terdeteksi.
-                _ = PeriksaDanDaftarkanAsync();
+                    // Tidak di-await: ConnectToSW harus kembali cepat.
+                    // Memeriksa provider lalu mendaftarkan server MCP kita,
+                    // berurutan - pendaftaran butuh adapter yang sudah
+                    // terdeteksi.
+                    _ = PeriksaDanDaftarkanAsync();
+                }
             }
             catch (Exception exception)
             {
@@ -236,7 +256,16 @@ namespace MikosAI.Addin
             // --- Bangun TaskPane --------------------------------------------
             try
             {
-                _diagnostics.TaskPane = BangunTaskPane();
+                if (!Fitur.PakaiTaskPane)
+                {
+                    _diagnostics.AddError("info: TaskPane dan WebView2 dimatikan lewat saklar fitur.");
+                }
+                else
+                {
+                    _diagnostics.Jejak("connect:taskpane-mulai");
+                    _diagnostics.TaskPane = BangunTaskPane();
+                    _diagnostics.Jejak("connect:taskpane-selesai");
+                }
             }
             catch (Exception exception)
             {
@@ -244,6 +273,7 @@ namespace MikosAI.Addin
             }
 
             _diagnostics.Status = "connected";
+            _diagnostics.Jejak("connect:selesai");
 
             // Pengaman terluar. Kegagalan di sini - mis. JIT tidak bisa
             // menyelesaikan assembly - akan lolos keluar dari ConnectToSW,
@@ -486,17 +516,23 @@ namespace MikosAI.Addin
                     return;
                 }
 
+                _diagnostics.Jejak("latar:probe-agy-mulai");
                 await _provider.PeriksaAsync().ConfigureAwait(false);
+                _diagnostics.Jejak("latar:probe-agy-selesai");
 
                 var endpoint = _mcp?.Endpoint;
                 var token = _mcp?.SessionToken;
 
                 if (endpoint is not null && !string.IsNullOrEmpty(token))
                 {
+                    _diagnostics.Jejak("latar:daftar-mcp-mulai");
                     await _provider.DaftarkanMcpAsync(endpoint, token!).ConfigureAwait(false);
+                    _diagnostics.Jejak("latar:daftar-mcp-selesai");
                 }
 
+                _diagnostics.Jejak("latar:kirim-status");
                 _panel?.KirimStatus();
+                _diagnostics.Jejak("latar:selesai");
             }
             catch (Exception exception)
             {
