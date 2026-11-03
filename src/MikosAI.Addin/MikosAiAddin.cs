@@ -85,6 +85,9 @@ namespace MikosAI.Addin
         /// </summary>
         static MikosAiAddin()
         {
+            // Penangkap crash lebih dulu: kalau resolver sendiri yang meledak,
+            // kita tetap ingin tahu.
+            PenangkapCrash.Pasang();
             AssemblyResolver.Pasang();
         }
 
@@ -381,6 +384,15 @@ namespace MikosAI.Addin
             catch (Exception exception)
             {
                 _diagnostics.AddError("melepas pendaftaran MCP", exception);
+            }
+
+            try
+            {
+                PenangkapCrash.Lepas();
+            }
+            catch (Exception)
+            {
+                // Abaikan saat menutup.
             }
 
             try

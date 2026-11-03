@@ -126,7 +126,17 @@ namespace MikosAI.Addin
                 else
                 {
                     // Handle belum ada: tunggu sampai dibuat.
-                    HandleCreated += (s, e) => BeginInvoke((Action)Buat);
+                    HandleCreated += (s, e) =>
+                    {
+                        try
+                        {
+                            BeginInvoke((Action)Buat);
+                        }
+                        catch (Exception exception)
+                        {
+                            _diagnostics.AddError("menjadwalkan WebView2 setelah handle dibuat", exception);
+                        }
+                    };
                 }
             }
             catch (Exception exception)
@@ -368,7 +378,23 @@ namespace MikosAI.Addin
                     ["teks"] = teks,
                 };
 
-                void Kirim() => _webView!.CoreWebView2.PostWebMessageAsJson(pesan.ToJsonString());
+                // Badan fungsi ini WAJIB punya try/catch sendiri.
+                //
+                // BeginInvoke menjalankannya NANTI, di luar try/catch di bawah.
+                // Kalau _webView sudah null atau CoreWebView2 sudah dilepas saat
+                // itu, exception-nya lolos ke message loop - dan exception yang
+                // lolos di sana menjatuhkan SolidWorks.
+                void Kirim()
+                {
+                    try
+                    {
+                        _webView?.CoreWebView2?.PostWebMessageAsJson(pesan.ToJsonString());
+                    }
+                    catch (Exception exception)
+                    {
+                        _diagnostics.AddError($"mengirim {jenis} (tertunda)", exception);
+                    }
+                }
 
                 if (InvokeRequired)
                 {

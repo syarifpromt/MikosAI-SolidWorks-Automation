@@ -65,6 +65,7 @@ $AddinProj   = Join-Path $RepoRoot 'src\MikosAI.Addin\MikosAI.Addin.csproj'
 $AddinDll    = Join-Path $RepoRoot "src\MikosAI.Addin\bin\$Configuration\net48\MikosAI.Addin.dll"
 $AddinTlb    = [System.IO.Path]::ChangeExtension($AddinDll, '.tlb')
 $StatusFile  = Join-Path $env:LOCALAPPDATA 'MikosAI\host-status.json'
+$CrashFile   = Join-Path $env:LOCALAPPDATA 'MikosAI\crash.log'
 $RegAsm      = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\RegAsm.exe'
 
 function Write-Section($text) {
@@ -447,6 +448,22 @@ if ($Action -eq 'Probe') {
     }
     elseif (-not $commitDll) {
         Write-Host '           (DLL dibangun sebelum cap commit ada - rebuild untuk mengaktifkannya)' -ForegroundColor Yellow
+    }
+
+    # Exception yang lolos ke atas dicatat terpisah, karena ia tidak pernah
+    # lewat try/catch mana pun - itulah sebabnya errors di host-status.json
+    # bisa kosong padahal SolidWorks mati.
+    if (Test-Path -LiteralPath $CrashFile) {
+        $info = Get-Item -LiteralPath $CrashFile
+        Write-Section 'CRASH LOG'
+        Write-Host "  $CrashFile" -ForegroundColor Red
+        Write-Host "  Terakhir diubah: $($info.LastWriteTime)" -ForegroundColor Red
+        Write-Host ''
+
+        # 60 baris terakhir: entri terbaru ada di bawah.
+        Get-Content -LiteralPath $CrashFile -Tail 60 | ForEach-Object {
+            Write-Host "  $_" -ForegroundColor DarkYellow
+        }
     }
 
     Write-Section 'Gerbang penerimaan'
