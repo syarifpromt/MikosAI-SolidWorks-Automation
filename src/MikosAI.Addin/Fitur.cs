@@ -41,6 +41,32 @@ namespace MikosAI.Addin
         /// </summary>
         internal static bool ModeAman => Aktif("MIKOSAI_SAFE_MODE");
 
+        /// <summary>
+        /// Pakai WebView2 untuk panel. OPT-IN, dan defaultnya MATI.
+        ///
+        /// WebView2 menjatuhkan SolidWorks di mesin uji kami, dan bukan lewat
+        /// exception yang bisa ditangkap:
+        ///
+        ///   - Penyempitan saklar fitur: mematikan TaskPane adalah SATU-SATUNYA
+        ///     mode yang tidak crash
+        ///   - Jejak aktivitas berhenti di webview:siap - WebView2 selesai
+        ///     diinisialisasi dan halaman sudah dinavigasi
+        ///   - Log SolidWorks mencatat SWEXH/UNHANDLED
+        ///   - Penangkap AppDomain.UnhandledException TIDAK PERNAH terpicu
+        ///
+        /// Yang terakhir itu yang menentukan: crash-nya tidak lewat CLR sama
+        /// sekali. Itu structured exception native, dan tidak ada try/catch
+        /// managed yang bisa menangkapnya.
+        ///
+        /// Jadi panel WinForms biasa yang dipakai. Lebih sederhana tampilannya,
+        /// tapi tidak menyentuh komponen native mana pun - dan seluruh lapisan
+        /// di bawahnya tidak berubah sedikit pun.
+        ///
+        /// MIKOSAI_ENABLE_WEBVIEW2=1 menyalakannya kembali, untuk mencoba lagi
+        /// di mesin atau versi SolidWorks lain.
+        /// </summary>
+        internal static bool PakaiWebView2 => Aktif("MIKOSAI_ENABLE_WEBVIEW2");
+
         internal static bool PakaiTaskPane => !ModeAman && !TaskPaneMati;
 
         internal static bool PakaiMcp => !ModeAman && !McpMati;
@@ -58,6 +84,7 @@ namespace MikosAI.Addin
             var mati = string.Empty;
 
             if (TaskPaneMati) mati += "taskpane ";
+            if (!PakaiWebView2) mati += "webview2(panel-polos) ";
             if (McpMati) mati += "mcp ";
             if (ProviderMati) mati += "provider ";
 

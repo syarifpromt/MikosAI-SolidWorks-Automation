@@ -34,6 +34,13 @@ namespace MikosAI.Addin
         private Label? _pesanGagal;
         private bool _sudahDipasang;
 
+        // Panel polos: WinForms murni, tanpa satu pun komponen native.
+        private TextBox? _teksStatus;
+        private TextBox? _teksChat;
+        private TextBox? _masukan;
+        private Button? _tombolKirim;
+        private bool _gelembungTerbuka;
+
         internal TaskPaneHost(
             HostDiagnostics diagnostics,
             Func<JsonObject> ambilStatus,
@@ -94,6 +101,17 @@ namespace MikosAI.Addin
                     {
                         _diagnostics.AddError(
                             "panel tidak punya handle saat WebView2 akan dibuat - dilewati.");
+                        return;
+                    }
+
+                    // Default: panel WinForms biasa. WebView2 opt-in, karena ia
+                    // menjatuhkan SolidWorks lewat crash native yang tidak bisa
+                    // ditangkap. Lihat Fitur.PakaiWebView2.
+                    if (!Fitur.PakaiWebView2)
+                    {
+                        _diagnostics.Jejak("panel:polos-mulai");
+                        BangunPanelPolos();
+                        _diagnostics.Jejak("panel:polos-siap");
                         return;
                     }
 
@@ -275,7 +293,7 @@ namespace MikosAI.Addin
         {
             try
             {
-                if (_webView?.CoreWebView2 is null)
+                if (_teksStatus is null && _webView?.CoreWebView2 is null)
                 {
                     return;
                 }
@@ -284,13 +302,15 @@ namespace MikosAI.Addin
                 {
                     try
                     {
-                        if (_webView?.CoreWebView2 is null)
+                        var status = _ambilStatus();
+
+                        if (_teksStatus is not null)
                         {
+                            PerbaruiStatusPolos(status);
                             return;
                         }
 
-                        var status = _ambilStatus();
-                        _webView.CoreWebView2.PostWebMessageAsJson(status.ToJsonString());
+                        _webView?.CoreWebView2?.PostWebMessageAsJson(status.ToJsonString());
                     }
                     catch (Exception exception)
                     {
@@ -324,6 +344,12 @@ namespace MikosAI.Addin
         {
             try
             {
+                if (_teksChat is not null)
+                {
+                    TanganiChatPolos("chat", kelas, teks);
+                    return;
+                }
+
                 if (_webView?.CoreWebView2 is null)
                 {
                     return;
@@ -366,6 +392,12 @@ namespace MikosAI.Addin
         {
             try
             {
+                if (_teksChat is not null)
+                {
+                    TanganiChatPolos(jenis, kelas, teks);
+                    return;
+                }
+
                 if (_webView?.CoreWebView2 is null)
                 {
                     return;
@@ -408,6 +440,284 @@ namespace MikosAI.Addin
             catch (Exception exception)
             {
                 _diagnostics.AddError($"mengirim {jenis} ke panel UI", exception);
+            }
+        }
+
+        // ====================================================================
+        // Panel polos - WinForms murni
+        // ====================================================================
+
+        private static readonly Color WarnaLatar = Color.FromArgb(24, 24, 27);
+        private static readonly Color WarnaTeks = Color.FromArgb(240, 240, 245);
+        private static readonly Color WarnaRedup = Color.FromArgb(150, 150, 160);
+
+        /// <summary>
+        /// Membangun panel tanpa satu pun komponen native.
+        ///
+        /// Urutan penambahan kontrol PENTING di WinForms: kontrol ber-Dock Fill
+        /// harus ditambahkan TERAKHIR, supaya ia mengisi sisa ruang setelah
+        /// yang lain mengambil bagiannya.
+        /// </summary>
+        private void BangunPanelPolos()
+        {
+            var fontMono = new Font("Consolas", 8.25f);
+
+            // --- Baris masukan, di bawah ---
+            var barisMasukan = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 58,
+                BackColor = WarnaLatar,
+                Padding = new Padding(6),
+            };
+
+            _tombolKirim = new Button
+            {
+                Dock = DockStyle.Right,
+                Width = 62,
+                Text = "Kirim",
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(49, 46, 129),
+                ForeColor = WarnaTeks,
+                Enabled = false,
+            };
+            _tombolKirim.FlatAppearance.BorderColor = Color.FromArgb(63, 58, 160);
+            _tombolKirim.Click += (s, e) => KirimDariPanelPolos();
+
+            _masukan = new TextBox
+            {
+                Dock = DockStyle.Fill,
+                Multiline = true,
+                BackColor = Color.FromArgb(18, 18, 21),
+                ForeColor = WarnaTeks,
+                BorderStyle = BorderStyle.FixedSingle,
+                Enabled = false,
+            };
+
+            // Enter mengirim, Shift+Enter baris baru.
+            _masukan.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter && !e.Shift)
+                {
+                    e.SuppressKeyPress = true;
+                    KirimDariPanelPolos();
+                }
+            };
+
+            barisMasukan.Controls.Add(_masukan);
+            barisMasukan.Controls.Add(_tombolKirim);
+
+            // --- Status, di atas ---
+            _teksStatus = new TextBox
+            {
+                Dock = DockStyle.Top,
+                Height = 190,
+                Multiline = true,
+                ReadOnly = true,
+                ScrollBars = ScrollBars.Vertical,
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(31, 31, 35),
+                ForeColor = WarnaRedup,
+                Font = fontMono,
+                Text = "MikosAI" + Environment.NewLine + Environment.NewLine + "Menunggu status...",
+            };
+
+            // --- Percakapan, mengisi sisanya. Ditambahkan TERAKHIR. ---
+            _teksChat = new TextBox
+            {
+                Dock = DockStyle.Fill,
+                Multiline = true,
+                ReadOnly = true,
+                ScrollBars = ScrollBars.Vertical,
+                BorderStyle = BorderStyle.None,
+                BackColor = WarnaLatar,
+                ForeColor = WarnaTeks,
+                Font = fontMono,
+            };
+
+            Controls.Add(_teksChat);
+            Controls.Add(_teksStatus);
+            Controls.Add(barisMasukan);
+
+            SiapPakai = true;
+        }
+
+        private void KirimDariPanelPolos()
+        {
+            try
+            {
+                var teks = _masukan?.Text?.Trim();
+
+                if (string.IsNullOrEmpty(teks) || _tanganiChat is null)
+                {
+                    return;
+                }
+
+                _masukan!.Text = string.Empty;
+                TambahBarisChat(Environment.NewLine + "Anda: " + teks);
+
+                // Tidak di-await: penanganan chat bisa lama, dan thread UI
+                // adalah thread utama SolidWorks - memblokirnya membekukan CAD.
+                _ = _tanganiChat(teks!);
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("mengirim chat dari panel polos", exception);
+            }
+        }
+
+        /// <summary>
+        /// Menambahkan teks ke percakapan. Aman dipanggil dari thread mana pun.
+        /// </summary>
+        private void TambahBarisChat(string teks)
+        {
+            if (_teksChat is null)
+            {
+                return;
+            }
+
+            void Tambah()
+            {
+                try
+                {
+                    _teksChat.AppendText(teks);
+                    _teksChat.SelectionStart = _teksChat.TextLength;
+                    _teksChat.ScrollToCaret();
+                }
+                catch (Exception exception)
+                {
+                    _diagnostics.AddError("menulis ke percakapan panel polos", exception);
+                }
+            }
+
+            try
+            {
+                if (InvokeRequired)
+                {
+                    BeginInvoke((Action)Tambah);
+                }
+                else
+                {
+                    Tambah();
+                }
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("menjadwalkan penulisan percakapan", exception);
+            }
+        }
+
+        private void PerbaruiStatusPolos(JsonObject status)
+        {
+            if (_teksStatus is null)
+            {
+                return;
+            }
+
+            try
+            {
+                _teksStatus.Text = RingkasStatusPolos(status);
+
+                // Kotak chat hanya aktif kalau provider benar-benar siap -
+                // aturan yang sama dengan panel WebView2.
+                var bolehKirim = status["provider"] is JsonObject provider
+                                 && provider["mayAttempt"] is JsonValue nilai
+                                 && nilai.TryGetValue<bool>(out var boleh)
+                                 && boleh;
+
+                if (_masukan is not null) _masukan.Enabled = bolehKirim;
+                if (_tombolKirim is not null) _tombolKirim.Enabled = bolehKirim;
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("memperbarui status panel polos", exception);
+            }
+        }
+
+        private static string RingkasStatusPolos(JsonObject status)
+        {
+            string Ambil(string kunci) => status[kunci]?.ToJsonString()?.Trim('"') ?? "-";
+
+            var sb = new System.Text.StringBuilder();
+
+            sb.AppendLine("SOLIDWORKS");
+            sb.AppendLine("  status    : " + Ambil("status"));
+            sb.AppendLine("  revisi    : " + Ambil("solidworksRevision"));
+            sb.AppendLine("  dokumen   : " + Ambil("openDocumentCount"));
+            sb.AppendLine();
+
+            sb.AppendLine("SERVER MCP");
+            sb.AppendLine("  berjalan  : " + Ambil("mcpRunning"));
+            sb.AppendLine("  endpoint  : " + Ambil("mcpEndpoint"));
+            sb.AppendLine("  tool      : " + Ambil("mcpToolCount"));
+            sb.AppendLine();
+
+            if (status["provider"] is JsonObject provider)
+            {
+                string AmbilP(string kunci) => provider[kunci]?.ToJsonString()?.Trim('"') ?? "-";
+
+                sb.AppendLine("PROVIDER AI");
+                sb.AppendLine("  keadaan   : " + AmbilP("description"));
+                sb.AppendLine("  versi     : " + AmbilP("version"));
+                sb.AppendLine("  tool MCP  : " + AmbilP("mcpRegistered"));
+
+                var tindakan = provider["nextAction"]?.ToJsonString()?.Trim('"');
+                if (!string.IsNullOrEmpty(tindakan) && tindakan != "null")
+                {
+                    sb.AppendLine("  -> " + tindakan);
+                }
+
+                sb.AppendLine();
+            }
+
+            if (status["errors"] is JsonArray galat && galat.Count > 0)
+            {
+                sb.AppendLine("ERROR");
+                foreach (var item in galat)
+                {
+                    sb.AppendLine("  " + item?.ToJsonString()?.Trim('"'));
+                }
+            }
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Menerjemahkan pesan chat ke panel polos.
+        ///
+        /// Jawaban yang mengalir ditulis potongan demi potongan ke kotak yang
+        /// sama, tanpa label berulang - hasilnya terbaca seperti satu paragraf
+        /// yang tumbuh, bukan deretan baris terpisah.
+        /// </summary>
+        private void TanganiChatPolos(string jenis, string kelas, string teks)
+        {
+            switch (jenis)
+            {
+                case "chat-mulai":
+                    _gelembungTerbuka = true;
+                    TambahBarisChat(Environment.NewLine + "AI: ");
+                    break;
+
+                case "chat-potongan":
+                    TambahBarisChat(teks);
+                    break;
+
+                case "chat-selesai":
+                    _gelembungTerbuka = false;
+                    TambahBarisChat(Environment.NewLine);
+                    break;
+
+                default:
+                    // Pesan utuh. Kalau ada gelembung terbuka, tutup dulu.
+                    if (_gelembungTerbuka)
+                    {
+                        _gelembungTerbuka = false;
+                        TambahBarisChat(Environment.NewLine);
+                    }
+
+                    var awalan = kelas == "galat" ? "GALAT: " : "AI: ";
+                    TambahBarisChat(Environment.NewLine + awalan + teks + Environment.NewLine);
+                    break;
             }
         }
 

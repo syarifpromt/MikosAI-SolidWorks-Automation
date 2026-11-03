@@ -365,3 +365,34 @@ setelahnya, nilai itulah yang tersimpan.
 Kalau nilainya `connect:selesai` **dan** mode `SafeMode` aktif, berarti penyebabnya bukan
 WebView2, bukan MCP, bukan agy — dan itu informasi yang sama berharganya, karena
 menyingkirkan tiga tersangka sekaligus.
+
+---
+
+## Kenapa panelnya WinForms biasa, bukan WebView2
+
+Rancangan awal memakai WebView2 supaya UI-nya halaman web — tidak perlu form designer,
+dan iterasi tampilan cukup mengedit HTML.
+
+**WebView2 menjatuhkan SolidWorks**, dan buktinya berlapis:
+
+| Bukti | Artinya |
+|---|---|
+| Penyempitan saklar fitur: hanya `NoTaskPane` yang selamat | Penyebabnya di TaskPane |
+| `lastActivity: webview:siap` | WebView2 selesai diinisialisasi, halaman sudah dinavigasi |
+| Log SolidWorks: `<SWEXH><UNHANDLED>` | Structured exception |
+| `AppDomain.UnhandledException` **tidak pernah terpicu** | **Crash-nya native, bukan CLR** |
+
+Yang terakhir itu yang menentukan. Tidak ada `try/catch` managed yang bisa menangkap
+access violation di kode native, jadi tidak ada perbaikan dari sisi kami.
+
+Panel WinForms biasa tidak menyentuh komponen native mana pun. Tampilannya lebih sederhana,
+tapi **seluruh lapisan di bawahnya tidak berubah** — server MCP, 6 tool read-only, dan
+integrasi `agy` sama persis.
+
+Mau mencoba WebView2 lagi di mesin atau versi SolidWorks lain:
+
+```powershell
+[Environment]::SetEnvironmentVariable('MIKOSAI_ENABLE_WEBVIEW2','1','User')
+```
+
+Lalu buka ulang SolidWorks. Halaman HTML-nya masih ada dan tetap dirawat.

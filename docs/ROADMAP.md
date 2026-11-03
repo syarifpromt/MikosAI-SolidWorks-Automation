@@ -105,7 +105,7 @@ SolidWorks dan punya kanal thread yang benar.
 - [x] **`MainThreadDispatcher` implementasi nyata** lewat `Control.BeginInvoke` — risiko R4 *(sudah lewat compile-check)*
 - [x] `MikosAI.Addin` mengimplementasikan `ISwAddin` + `SetAddinCallbackInfo2` *(sudah lewat compile-check)*
 - [ ] CommandGroup (tombol toolbar untuk tampil/sembunyikan panel)
-- [x] TaskPane dengan WebView2 — panel status, bukan halaman statis
+- [x] TaskPane — panel WinForms biasa (WebView2 menjatuhkan SolidWorks, jadi opt-in)
 - [x] Penulis diagnostik `host-status.json`
 - [x] Script PowerShell build / register / unregister / probe / status (RegAsm 64-bit + TLB)
 - [x] **`setup.ps1` satu perintah** — periksa, build, test, registrasi, UAC otomatis
@@ -410,7 +410,7 @@ Urutan mengikuti nilai dibagi risiko, bukan keinginan.
 | R15 | API SolidWorks tidak bisa dipanggil lewat `dynamic`/IDispatch | Tinggi — semua panggilan gagal `0x8002802B` | PIA bertipe wajib; `EmbedInteropTypes` mempertahankan keuntungan lintas-versi | ✅ **selesai, `RevisionNumber` terbaca** |
 | R16 | Kelas add-in tanpa IDispatch → `SetAddinCallbackInfo2` gagal `InvalidCastException` | Tinggi — callback SolidWorks tidak bisa didaftarkan | `ClassInterfaceType.AutoDispatch`; uji `Marshal.GetIDispatchForObject` sendiri + gerbang probe | ✅ **selesai, terbukti** |
 | R18 | `AssemblyResolve` global dimintai dependensi add-in LAIN | Sedang — bisa menyerahkan assembly salah ke add-in lain | Permintaan yang bukan dari folder kami ditolak lebih dulu | ✅ |
-| R20 | WebView2 diikat ke handle yang dibuat ulang saat reparent TaskPane | **Kritis** — crash native, Fault Module kosong | WebView2 dibuat SETELAH SolidWorks memasang kontrol, lewat `BeginInvoke`; handle recreation dicatat | ⬜ menunggu verifikasi |
+| R20 | **WebView2 menjatuhkan SolidWorks** — crash native, tidak tertangkap CLR | **Kritis** | Panel WinForms biasa jadi default; WebView2 opt-in lewat `MIKOSAI_ENABLE_WEBVIEW2` | ✅ dihindari |
 | R19 | `agy` terpasang tapi tidak di PATH | Tinggi — deteksi gagal padahal provider siap | Cari `%USERPROFILE%\.geminiingy.exe` langsung, bukan hanya PATH | ✅ **ditemukan di mesin nyata** |
 | R17 | Menguji DLL usang karena `git pull` terlewat | Sedang — mendiagnosis bug yang sudah diperbaiki | Commit dicap ke metadata assembly; probe membandingkan dengan HEAD | ✅ |
 
