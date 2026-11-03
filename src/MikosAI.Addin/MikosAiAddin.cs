@@ -454,7 +454,18 @@ namespace MikosAI.Addin
 
             _taskPaneView = _sw.TryCreateTaskPane(bitmap, AddinTitle, handle);
 
-            return _taskPaneView is not null;
+            if (_taskPaneView is null)
+            {
+                return false;
+            }
+
+            // WebView2 baru dibuat SEKARANG - setelah SolidWorks memasang
+            // kontrolnya. Membuatnya lebih dulu berarti mengikatnya ke handle
+            // yang bisa dibuat ulang saat reparent, dan itu menjatuhkan
+            // SolidWorks. Lihat TaskPaneHost.Pasang().
+            _panel.Pasang();
+
+            return true;
         }
 
         /// <summary>

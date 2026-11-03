@@ -397,7 +397,7 @@ Urutan mengikuti nilai dibagi risiko, bukan keinginan.
 | R2 | Flag `agy` berubah antarrilis | Tinggi | Probing `--help` saat startup; pin versi teruji | ⬜ |
 | R3 | ToS: orkestrasi eksternal dengan akun subscription | Tinggi, **legal** | Abstraksi provider; jalur API key; cek ToS sebelum distribusi | ⬜ |
 | R4 | API SolidWorks tidak thread-safe | **Kritis** — crash acak tak bisa direproduksi | `MainThreadDispatcher` + **assert di setiap pemanggilan API**; aturan review terbukti TIDAK cukup | ✅ ditegakkan kode |
-| R5 | Crash add-in menjatuhkan SolidWorks | Tinggi | Operasi dibungkus guard | ⚠️ **TERJADI 2026-11-01** — API dipanggil dari thread latar; kini ditegakkan lewat assert |
+| R5 | Crash add-in menjatuhkan SolidWorks | Tinggi | Guard di setiap operasi; saklar fitur untuk mempersempit | ⚠️ **TERJADI 2026-11-01** — dipersempit ke WebView2 di TaskPane; inisialisasi kini ditunda sampai kontrol terpasang |
 | R6 | Referensi `Face1`/`Edge1` rusak saat fitur disisipkan | Tinggi | Referensi semantik; dilarang lewat skema | Skema melarangnya ✅ |
 | R7 | SolidWorks mengunci DLL yang dimuat | Sedang | `UnloadAddIn` sebelum rebuild; didokumentasikan | ✅ terdokumentasi |
 | R8 | Rate limit terasa saat pemakaian interaktif | Sedang | DesignPlan bisa dijalankan ulang tanpa AI | Override parameter ✅; satu permintaan ~4 detik, ~6.8k token input |
@@ -410,6 +410,7 @@ Urutan mengikuti nilai dibagi risiko, bukan keinginan.
 | R15 | API SolidWorks tidak bisa dipanggil lewat `dynamic`/IDispatch | Tinggi — semua panggilan gagal `0x8002802B` | PIA bertipe wajib; `EmbedInteropTypes` mempertahankan keuntungan lintas-versi | ✅ **selesai, `RevisionNumber` terbaca** |
 | R16 | Kelas add-in tanpa IDispatch → `SetAddinCallbackInfo2` gagal `InvalidCastException` | Tinggi — callback SolidWorks tidak bisa didaftarkan | `ClassInterfaceType.AutoDispatch`; uji `Marshal.GetIDispatchForObject` sendiri + gerbang probe | ✅ **selesai, terbukti** |
 | R18 | `AssemblyResolve` global dimintai dependensi add-in LAIN | Sedang — bisa menyerahkan assembly salah ke add-in lain | Permintaan yang bukan dari folder kami ditolak lebih dulu | ✅ |
+| R20 | WebView2 diikat ke handle yang dibuat ulang saat reparent TaskPane | **Kritis** — crash native, Fault Module kosong | WebView2 dibuat SETELAH SolidWorks memasang kontrol, lewat `BeginInvoke`; handle recreation dicatat | ⬜ menunggu verifikasi |
 | R19 | `agy` terpasang tapi tidak di PATH | Tinggi — deteksi gagal padahal provider siap | Cari `%USERPROFILE%\.geminiingy.exe` langsung, bukan hanya PATH | ✅ **ditemukan di mesin nyata** |
 | R17 | Menguji DLL usang karena `git pull` terlewat | Sedang — mendiagnosis bug yang sudah diperbaiki | Commit dicap ke metadata assembly; probe membandingkan dengan HEAD | ✅ |
 

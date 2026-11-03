@@ -32,6 +32,7 @@ namespace MikosAI.Addin
 
         private WebView2? _webView;
         private Label? _pesanGagal;
+        private bool _sudahDipasang;
 
         internal TaskPaneHost(
             HostDiagnostics diagnostics,
@@ -46,22 +47,91 @@ namespace MikosAI.Addin
             BackColor = Color.FromArgb(24, 24, 27);
             Padding = new Padding(0);
 
+            // WebView2 SENGAJA TIDAK dibuat di sini. Lihat Pasang().
+        }
+
+        /// <summary>
+        /// Membuat dan menginisialisasi WebView2, SETELAH kontrol ini
+        /// benar-benar terpasang di TaskPane SolidWorks.
+        ///
+        /// KENAPA DIPISAH DARI KONSTRUKTOR - INI MENJATUHKAN SOLIDWORKS.
+        ///
+        /// Versi pertama membuat WebView2 di konstruktor. Urutannya jadi:
+        /// kontrol dibuat, handle dipaksa ada, lalu handle itu diserahkan ke
+        /// SolidWorks lewat DisplayWindowFromHandlex64 - yang me-REPARENT
+        /// kontrol kita ke hierarki jendela SolidWorks.
+        ///
+        /// Di WinForms, reparent bisa memicu PEMBUATAN ULANG HANDLE. Sementara
+        /// itu inisialisasi WebView2 berjalan asinkron dan mengikat dirinya ke
+        /// HWND yang lama. WebView2 lalu beroperasi di atas jendela yang sudah
+        /// mati, dan matinya di kode native - SolidWorks berhenti dengan Fault
+        /// Module kosong.
+        ///
+        /// Dipersempit dengan saklar fitur: mematikan TaskPane menghentikan
+        /// crash, mematikan subsistem lain tidak.
+        ///
+        /// Sekarang: SolidWorks memasang kontrol lebih dulu, baru WebView2
+        /// dibuat - dan itu pun lewat BeginInvoke, supaya SolidWorks selesai
+        /// menata jendelanya dalam siklus pesan ini sebelum kita menyentuh
+        /// apa pun.
+        ///
+        /// JANGAN pindahkan pembuatan WebView2 kembali ke konstruktor.
+        /// </summary>
+        internal void Pasang()
+        {
+            if (_sudahDipasang)
+            {
+                return;
+            }
+
+            _sudahDipasang = true;
+
+            void Buat()
+            {
+                try
+                {
+                    if (IsDisposed || !IsHandleCreated)
+                    {
+                        _diagnostics.AddError(
+                            "panel tidak punya handle saat WebView2 akan dibuat - dilewati.");
+                        return;
+                    }
+
+                    _diagnostics.Jejak("webview:buat-kontrol");
+
+                    _webView = new WebView2 { Dock = DockStyle.Fill };
+                    Controls.Add(_webView);
+
+                    // Asinkron, tidak di-await: menunggu di thread utama
+                    // SolidWorks akan membekukan UI-nya.
+                    MulaiWebView();
+                }
+                catch (Exception exception)
+                {
+                    _diagnostics.AddError("membuat kontrol WebView2", exception);
+                    TampilkanPesanGagal(
+                        "WebView2 tidak bisa dibuat.\r\n\r\n" +
+                        "Pasang WebView2 Evergreen Runtime dari Microsoft, lalu buka ulang SolidWorks.");
+                }
+            }
+
             try
             {
-                _webView = new WebView2 { Dock = DockStyle.Fill };
-                Controls.Add(_webView);
-
-                // Inisialisasi WebView2 asinkron. Tidak di-await: ConnectToSW
-                // harus kembali cepat, dan menunggu di thread utama SolidWorks
-                // bisa membekukan UI-nya.
-                MulaiWebView();
+                if (IsHandleCreated)
+                {
+                    // Ditunda ke siklus pesan berikutnya, supaya SolidWorks
+                    // selesai menata jendelanya lebih dulu.
+                    BeginInvoke((Action)Buat);
+                }
+                else
+                {
+                    // Handle belum ada: tunggu sampai dibuat.
+                    HandleCreated += (s, e) => BeginInvoke((Action)Buat);
+                }
             }
             catch (Exception exception)
             {
-                _diagnostics.AddError("membuat kontrol WebView2", exception);
-                TampilkanPesanGagal(
-                    "WebView2 tidak bisa dibuat.\r\n\r\n" +
-                    "Pasang WebView2 Evergreen Runtime dari Microsoft, lalu buka ulang SolidWorks.");
+                _diagnostics.AddError("menjadwalkan pembuatan WebView2", exception);
             }
         }
 
@@ -409,6 +479,27 @@ namespace MikosAI.Addin
             {
                 diagnostics.AddError("membuat bitmap ikon TaskPane", exception);
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Handle dibuat ulang setelah WebView2 terikat ke yang lama.
+        ///
+        /// Ini keadaan yang MENJATUHKAN SolidWorks di versi sebelumnya. Tidak
+        /// bisa diperbaiki dari sini - WebView2 sudah terikat ke jendela yang
+        /// mati. Yang bisa dilakukan: mencatatnya, supaya kalau terjadi lagi
+        /// penyebabnya terlihat alih-alih jadi crash tanpa jejak.
+        /// </summary>
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+
+            if (_webView is not null)
+            {
+                _diagnostics.AddError(
+                    "handle panel dibuat ULANG setelah WebView2 terpasang - "
+                    + "WebView2 kini terikat ke jendela yang sudah tidak berlaku.");
+                _diagnostics.Jejak("webview:handle-dibuat-ulang");
             }
         }
 
