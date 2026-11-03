@@ -510,8 +510,39 @@ if ($Action -eq 'Probe') {
         }
     }
 
-    Write-Section 'Belum diuji di tahap ini'
-    Write-Host '  commandGroup, taskPane, mcpServer - belum diimplementasikan, wajar false.'
+    # taskPane dan mcpServer SUDAH diimplementasikan, jadi false di situ berarti
+    # ada yang salah - kecuali saklar fiturnya memang mematikannya. Tanpa
+    # konteks itu, angka-angkanya menyesatkan.
+    Write-Section 'Subsistem'
+
+    $flags = if ($status.PSObject.Properties.Name -contains 'featureFlags') { [string]$status.featureFlags } else { '' }
+    if ($flags) {
+        Write-Host "  Saklar fitur: $flags" -ForegroundColor Gray
+    }
+
+    $subsistem = @(
+        @{ Nama = 'taskPane';  Nilai = [bool]$status.taskPane;  Dimatikan = ($flags -match 'mode-aman|taskpane') }
+        @{ Nama = 'mcpServer'; Nilai = [bool]$status.mcpServer; Dimatikan = ($flags -match 'mode-aman|\bmcp\b') }
+    )
+
+    foreach ($sub in $subsistem) {
+        if ($sub.Nilai) {
+            Write-Host "  HIDUP  $($sub.Nama)" -ForegroundColor Green
+        }
+        elseif ($sub.Dimatikan) {
+            Write-Host "  MATI   $($sub.Nama) - dimatikan lewat saklar fitur, wajar" -ForegroundColor Yellow
+        }
+        else {
+            Write-Host "  GAGAL  $($sub.Nama) - seharusnya hidup, periksa errors di atas" -ForegroundColor Red
+        }
+    }
+
+    if ($status.PSObject.Properties.Name -contains 'lastActivity' -and $status.lastActivity) {
+        Write-Host "  Aktivitas terakhir: $($status.lastActivity)" -ForegroundColor Gray
+    }
+
+    Write-Section 'Belum diimplementasikan'
+    Write-Host '  commandGroup - tombol di toolbar, wajar false.'
     Write-Host '  Hitungan event file_new - butuh langganan event, menyusul.'
 
     Write-Host ''
