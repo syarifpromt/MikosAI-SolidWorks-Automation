@@ -33,12 +33,26 @@ verified_versions:
 verified_hosts:
   - solidworks: "2025"
     revision: "33.1.1"          # SP01.1
-    verifiedOn: "2026-11-01"
+    verifiedOn: "2026-11-04"
     gates: 7                    # ketujuh gerbang -Action Probe lulus
+    taskpane: polos             # WinForms biasa; WebView2 menjatuhkan host ini
     notes: >
       Terbukti di dua mesin terpisah, termasuk satu yang memasang SolidWorks di
       drive selain C:. PIA direferensi dengan EmbedInteropTypes, jadi tidak ada
       dependensi assembly SolidWorks saat runtime.
+
+      Sesi penuh terbukti selesai bersih pada 2026-11-04: TaskPane terpasang,
+      server MCP hidup, lalu SolidWorks ditutup normal dan DisconnectFromSW
+      berjalan sampai habis. Buktinya status "disconnected" di host-status.json
+      dan crash.log yang kosong dari exception - bukan sekadar tidak adanya
+      laporan crash.
+
+      TaskPane WAJIB panel WinForms biasa di host ini. WebView2 menjatuhkan
+      SolidWorks lewat structured exception native yang tidak lewat CLR sama
+      sekali, jadi tidak ada try/catch managed yang bisa menangkapnya. Ia tetap
+      ada di balik MIKOSAI_ENABLE_WEBVIEW2 untuk dicoba di host lain, dan sampai
+      ada host yang membuktikannya aman, panel polos adalah satu-satunya jalur
+      yang didukung.
 
 tested_providers: []      # diisi di Fase 2, mis. [{id: antigravity, version: "1.0.6"}]
 

@@ -69,10 +69,41 @@
     andal daripada pencocokan path di sini.
   -->
   <PropertyGroup Condition="'$(UsePiaStub)' != 'true' And '$(SolidWorksApiDir)' == ''">
+    <!--
+      1. Variabel lingkungan. MSBuild mengekspos env var sebagai properti, jadi
+         MIKOSAI_SW_API_DIR bisa menunjuk instalasi tidak standar tanpa perlu
+         menyentuh berkas ini.
+    -->
+    <SolidWorksApiDir Condition="'$(MIKOSAI_SW_API_DIR)' != '' And Exists('$(MIKOSAI_SW_API_DIR)\SolidWorks.Interop.swpublished.dll')">$(MIKOSAI_SW_API_DIR)</SolidWorksApiDir>
+
+    <!--
+      2. Registry, lewat rantai yang sama dengan Get-SolidWorksApiDir di
+         scripts\lib\MikosAI.Env.ps1:
+
+           CLSID SldWorks.Application -> LocalServer32 -> folder exe -> api\redist
+
+         Ditambahkan setelah pencocokan path saja terbukti tidak cukup:
+         SolidWorks di mesin pengembang terpasang di D:, jadi kedua kandidat
+         "C:\Program Files" di bawah selalu gagal dan `dotnet build` DIAM-DIAM
+         turun ke mode compile-check - padahal build nyata sebenarnya mungkin.
+
+         Bug yang sama pernah ada di addin.ps1 dan sudah diperbaiki di sana
+         dengan mendelegasikan ke lib; di sini ia tetap hidup sampai sekarang.
+    -->
+    <PiaClsid>$([MSBuild]::GetRegistryValueFromView('HKEY_LOCAL_MACHINE\SOFTWARE\Classes\SldWorks.Application\CLSID', null, null, RegistryView.Registry64, RegistryView.Default))</PiaClsid>
+    <PiaExe Condition="'$(SolidWorksApiDir)' == '' And '$(PiaClsid)' != ''">$([MSBuild]::GetRegistryValueFromView('HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\$(PiaClsid)\LocalServer32', null, null, RegistryView.Registry64, RegistryView.Default))</PiaExe>
+
+    <!-- LocalServer32 menyimpan path yang dikutip. Tanda kutipnya harus dilepas. -->
+    <PiaExe Condition="'$(PiaExe)' != ''">$(PiaExe.Replace('&quot;', '').Trim())</PiaExe>
+    <PiaDirRegistry Condition="'$(PiaExe)' != ''">$([System.IO.Path]::GetDirectoryName('$(PiaExe)'))</PiaDirRegistry>
+
+    <SolidWorksApiDir Condition="'$(SolidWorksApiDir)' == '' And '$(PiaDirRegistry)' != '' And Exists('$(PiaDirRegistry)\api\redist\SolidWorks.Interop.swpublished.dll')">$(PiaDirRegistry)\api\redist</SolidWorksApiDir>
+
+    <!-- 3. Path umum, sebagai usaha terakhir. -->
     <PiaKandidat1>C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist</PiaKandidat1>
     <PiaKandidat2>C:\Program Files\SolidWorks Corp\SolidWorks\api\redist</PiaKandidat2>
 
-    <SolidWorksApiDir Condition="Exists('$(PiaKandidat1)\SolidWorks.Interop.swpublished.dll')">$(PiaKandidat1)</SolidWorksApiDir>
+    <SolidWorksApiDir Condition="'$(SolidWorksApiDir)' == '' And Exists('$(PiaKandidat1)\SolidWorks.Interop.swpublished.dll')">$(PiaKandidat1)</SolidWorksApiDir>
     <SolidWorksApiDir Condition="'$(SolidWorksApiDir)' == '' And Exists('$(PiaKandidat2)\SolidWorks.Interop.swpublished.dll')">$(PiaKandidat2)</SolidWorksApiDir>
 
     <!-- Masih tidak ada: turun ke stub, jangan gagalkan solution. -->

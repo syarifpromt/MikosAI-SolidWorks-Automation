@@ -59,10 +59,14 @@ Tidak ada satu pun yang bisa dibagi antar anggota tim.
 - [ ] Windows 10 1809+ (ConPTY butuh versi ini)
 - [ ] SolidWorks + seat lisensi — per mesin, tidak bisa headless
 - [ ] .NET Framework 4.8 SDK
-- [ ] WebView2 Runtime
 - [ ] `agy` terpasang — per mesin, kita tidak mendistribusikannya
 - [ ] Login `agy` — **per akun Google**, kuota dan rate limit terpisah per orang
 - [ ] Registrasi add-in Machine — butuh UAC sekali
+
+~~WebView2 Runtime~~ **tidak lagi dibutuhkan.** Panelnya WinForms biasa sejak
+WebView2 terbukti menjatuhkan SolidWorks lewat crash native yang tidak lewat CLR.
+Itu menghapus satu prasyarat, satu runtime, dan satu DLL native dari setup.
+Detailnya di `docs/setup.md`.
 
 Yang masuk repo: kode, skema, `capabilities.yaml`, dokumen.
 Yang tidak boleh: `session.json`, agent-workspace, kredensial, path mesin, nama user
@@ -179,6 +183,10 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
 - [x] `MainThreadDispatcher` menangkap thread utama — terbukti, `dispatcherReady: true`
 - [x] Pelanggaran thread menjadi exception tercatat, bukan crash — assert di `SolidWorksApi` dan `SolidWorksReader`
 - [ ] Test otomatis untuk assert itu
+- [x] **Sesi penuh selesai bersih** — TaskPane terpasang, MCP hidup, lalu
+      SolidWorks ditutup normal dan `DisconnectFromSW` berjalan sampai habis.
+      Dibuktikan `status: disconnected` di `host-status.json` dan `crash.log`
+      kosong dari exception — bukan sekadar tidak adanya laporan crash.
 - [x] `capabilities.yaml` tervalidasi
 - [ ] 18 skema tool disetujui kedua orang
 
@@ -195,7 +203,7 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
       tiap sesi, **jangan sentuh config global pengguna**
 - [x] `McpRequestHandler`: JSON-RPC initialize / tools/list / tools/call / ping
 - [x] Hubungkan `McpHttpServer` ke add-in di `ConnectToSW`
-- [x] TaskPane + WebView2 dengan panel status
+- [x] TaskPane dengan panel status — WinForms biasa, WebView2 opt-in
 - [x] `SolidWorksToolExecutor` — semua pembacaan lewat `MainThreadDispatcher`
 
 ### Jalur CAD — 6 tool read-only, aman karena tidak menulis apa pun
@@ -397,7 +405,7 @@ Urutan mengikuti nilai dibagi risiko, bukan keinginan.
 | R2 | Flag `agy` berubah antarrilis | Tinggi | Probing `--help` saat startup; pin versi teruji | ⬜ |
 | R3 | ToS: orkestrasi eksternal dengan akun subscription | Tinggi, **legal** | Abstraksi provider; jalur API key; cek ToS sebelum distribusi | ⬜ |
 | R4 | API SolidWorks tidak thread-safe | **Kritis** — crash acak tak bisa direproduksi | `MainThreadDispatcher` + **assert di setiap pemanggilan API**; aturan review terbukti TIDAK cukup | ✅ ditegakkan kode |
-| R5 | Crash add-in menjatuhkan SolidWorks | Tinggi | Guard di setiap operasi; saklar fitur untuk mempersempit | ⚠️ **TERJADI 2026-11-01** — dipersempit ke WebView2 di TaskPane; inisialisasi kini ditunda sampai kontrol terpasang |
+| R5 | Crash add-in menjatuhkan SolidWorks | Tinggi | Guard di setiap operasi; saklar fitur untuk mempersempit | ✅ **TERJADI 2026-11-01, selesai 2026-11-04** — penyebabnya WebView2 (lihat R20). Menunda inisialisasi, mencabut polling, dan menutup re-entrancy COM semuanya TIDAK menolong; yang menyelesaikannya adalah membuang WebView2. Sesi penuh kini selesai bersih. |
 | R6 | Referensi `Face1`/`Edge1` rusak saat fitur disisipkan | Tinggi | Referensi semantik; dilarang lewat skema | Skema melarangnya ✅ |
 | R7 | SolidWorks mengunci DLL yang dimuat | Sedang | `UnloadAddIn` sebelum rebuild; didokumentasikan | ✅ terdokumentasi |
 | R8 | Rate limit terasa saat pemakaian interaktif | Sedang | DesignPlan bisa dijalankan ulang tanpa AI | Override parameter ✅; satu permintaan ~4 detik, ~6.8k token input |

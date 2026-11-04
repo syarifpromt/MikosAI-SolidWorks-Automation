@@ -24,7 +24,7 @@
     Build saja, jangan registrasi. Menghindari prompt UAC.
 
 .PARAMETER SkipTests
-    Lewati 171 test. Tidak disarankan.
+    Lewati seluruh test unit. Tidak disarankan.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\setup.ps1

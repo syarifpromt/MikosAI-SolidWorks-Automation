@@ -61,7 +61,7 @@ $pia = $checks | Where-Object { $_.Nama -eq 'PIA SolidWorks' }
 $sdk = $checks | Where-Object { $_.Nama -eq 'dotnet SDK' }
 
 if ($sdk.Lulus) {
-    Write-Host '  OK    MikosAI.Core + 171 test - tidak butuh SolidWorks' -ForegroundColor Green
+    Write-Host '  OK    MikosAI.Core + seluruh test unit - tidak butuh SolidWorks' -ForegroundColor Green
     Write-Host '        dotnet test'
 }
 else {

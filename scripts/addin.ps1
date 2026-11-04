@@ -520,17 +520,40 @@ if ($Action -eq 'Probe') {
         Write-Host "  Saklar fitur: $flags" -ForegroundColor Gray
     }
 
+    # Teardown menyetel taskPane/mcpServer kembali ke false sebelum menulis
+    # berkasnya, jadi sesi yang sudah ditutup HARUS dinilai dari penanda
+    # "pernah hidup" - kalau tidak, sesi yang berhasil terlihat seperti gagal.
+    $ditutup = ($status.status -eq 'disconnected')
+
+    if ($ditutup) {
+        Write-Host '  SolidWorks sudah ditutup. Dinilai dari titik tertinggi sesi.' -ForegroundColor Gray
+    }
+
+    if ($ditutup) {
+        $hidupTaskPane = [bool]$status.taskPanePernahHidup
+        $hidupMcp      = [bool]$status.mcpServerPernahHidup
+    }
+    else {
+        $hidupTaskPane = [bool]$status.taskPane
+        $hidupMcp      = [bool]$status.mcpServer
+    }
+
     $subsistem = @(
-        @{ Nama = 'taskPane';  Nilai = [bool]$status.taskPane;  Dimatikan = ($flags -match 'mode-aman|taskpane') }
-        @{ Nama = 'mcpServer'; Nilai = [bool]$status.mcpServer; Dimatikan = ($flags -match 'mode-aman|\bmcp\b') }
+        @{ Nama = 'taskPane';  Nilai = $hidupTaskPane; Dimatikan = ($flags -match 'mode-aman|taskpane') }
+        @{ Nama = 'mcpServer'; Nilai = $hidupMcp;      Dimatikan = ($flags -match 'mode-aman|\bmcp\b') }
     )
+
+    $label = if ($ditutup) { 'PERNAH' } else { 'HIDUP ' }
 
     foreach ($sub in $subsistem) {
         if ($sub.Nilai) {
-            Write-Host "  HIDUP  $($sub.Nama)" -ForegroundColor Green
+            Write-Host "  $label $($sub.Nama)" -ForegroundColor Green
         }
         elseif ($sub.Dimatikan) {
             Write-Host "  MATI   $($sub.Nama) - dimatikan lewat saklar fitur, wajar" -ForegroundColor Yellow
+        }
+        elseif ($ditutup) {
+            Write-Host "  GAGAL  $($sub.Nama) - tidak pernah hidup sama sekali di sesi ini" -ForegroundColor Red
         }
         else {
             Write-Host "  GAGAL  $($sub.Nama) - seharusnya hidup, periksa errors di atas" -ForegroundColor Red

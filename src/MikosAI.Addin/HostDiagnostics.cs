@@ -67,9 +67,31 @@ namespace MikosAI.Addin
 
         internal bool CommandGroup { get; set; }
 
-        internal bool TaskPane { get; set; }
+        /// <summary>
+        /// Hidup SEKARANG. Disetel false oleh teardown.
+        ///
+        /// Untuk menjawab "apakah sesi ini berhasil", pakai
+        /// <see cref="TaskPanePernahHidup"/> - lihat alasannya di sana.
+        /// </summary>
+        internal bool TaskPane
+        {
+            get => _taskPane;
+            set
+            {
+                _taskPane = value;
+                if (value) _taskPanePernah = true;
+            }
+        }
 
-        internal bool McpServer { get; set; }
+        internal bool McpServer
+        {
+            get => _mcpServer;
+            set
+            {
+                _mcpServer = value;
+                if (value) _mcpServerPernah = true;
+            }
+        }
 
         internal string? SolidWorksRevision { get; set; }
 
@@ -84,7 +106,47 @@ namespace MikosAI.Addin
 
         internal int MainThreadId { get; set; }
 
-        internal bool DispatcherReady { get; set; }
+        internal bool DispatcherReady
+        {
+            get => _dispatcherReady;
+            set
+            {
+                _dispatcherReady = value;
+                if (value) _dispatcherPernah = true;
+            }
+        }
+
+        // --- Titik tertinggi sesi -------------------------------------------
+        //
+        // KENAPA ADA.
+        //
+        // DisconnectFromSW menyetel TaskPane, McpServer, dan DispatcherReady
+        // kembali ke false, lalu menulis berkasnya. Jadi sesi yang BERHASIL dan
+        // sesi yang TaskPane-nya tidak pernah muncul meninggalkan berkas yang
+        // terlihat sama persis - tepat ketika bedanya paling ingin diketahui.
+        //
+        // Penanda ini hanya bisa naik. Tidak ada jalur kode yang bisa
+        // menurunkannya, jadi true di sini berarti subsistem itu BENAR-BENAR
+        // pernah hidup di sesi ini. Itu bukti, bukan laporan diri.
+        //
+        // Umurnya satu sesi: objek ini dibuat ulang setiap kali add-in
+        // diinstansiasi, jadi tidak ada risiko nilai basi dari sesi sebelumnya.
+
+        private bool _taskPane;
+        private bool _mcpServer;
+        private bool _dispatcherReady;
+        private bool _taskPanePernah;
+        private bool _mcpServerPernah;
+        private bool _dispatcherPernah;
+
+        /// <summary>TaskPane pernah terpasang di sesi ini. Hanya bisa naik.</summary>
+        internal bool TaskPanePernahHidup => _taskPanePernah;
+
+        /// <summary>Server MCP pernah menerima koneksi di sesi ini. Hanya bisa naik.</summary>
+        internal bool McpServerPernahHidup => _mcpServerPernah;
+
+        /// <summary>Dispatcher thread utama pernah siap di sesi ini. Hanya bisa naik.</summary>
+        internal bool DispatcherPernahSiap => _dispatcherPernah;
 
         /// <summary>
         /// Langkah terakhir yang DIMULAI. Bukan yang selesai.
@@ -210,6 +272,9 @@ namespace MikosAI.Addin
                 FieldBool(sb, "dispatcherReady", DispatcherReady);
                 Field(sb, "lastActivity", LastActivity);
                 Field(sb, "featureFlags", FeatureFlags);
+                FieldBool(sb, "taskPanePernahHidup", TaskPanePernahHidup);
+                FieldBool(sb, "mcpServerPernahHidup", McpServerPernahHidup);
+                FieldBool(sb, "dispatcherPernahSiap", DispatcherPernahSiap);
                 FieldBool(sb, "addinExposesIDispatch", AddinExposesIDispatch);
                 FieldInt(sb, "mainThreadId", MainThreadId);
                 FieldInt(sb, "fileNewEvents", FileNewEvents);

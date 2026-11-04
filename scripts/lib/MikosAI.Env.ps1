@@ -191,7 +191,22 @@ testnya tetap jalan, jadi pengembangan Jalur Platform tidak terhalang.
 }
 
 function Test-WebView2Runtime {
-    # TaskPane akan memakai WebView2 di tahap berikutnya.
+    <#
+        WebView2 TIDAK dipakai secara default.
+
+        Panelnya WinForms biasa sejak WebView2 terbukti menjatuhkan SolidWorks
+        lewat structured exception native - crash yang tidak lewat CLR sama
+        sekali, jadi tidak ada try/catch managed yang bisa menangkapnya.
+
+        Karena itu runtime-nya bukan lagi prasyarat, dan melaporkannya "tidak
+        lulus" di mesin yang tidak memasangnya adalah salah: ia akan terlihat
+        seperti masalah yang perlu dibereskan, padahal tidak ada yang rusak.
+
+        Pemeriksaan ini hanya berarti kalau MIKOSAI_ENABLE_WEBVIEW2 disetel.
+        Di situ barulah ketidakhadirannya jadi kegagalan sungguhan.
+    #>
+    $diminta = $env:MIKOSAI_ENABLE_WEBVIEW2 -in @('1', 'true', 'yes', 'on')
+
     $guid  = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
     $paths = @(
         "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$guid"
@@ -212,17 +227,31 @@ function Test-WebView2Runtime {
         }
     }
 
-    $lulus = -not [string]::IsNullOrWhiteSpace($versi)
+    $ada = -not [string]::IsNullOrWhiteSpace($versi)
+
+    if (-not $diminta) {
+        # Tidak diminta: hasilnya lulus apa pun isinya, karena memang tidak dipakai.
+        $nilai = 'tidak dipakai (panel polos)'
+        if ($ada) { $nilai = "terpasang $versi, tapi tidak dipakai (panel polos)" }
+
+        return New-CheckResult -Nama 'WebView2 Runtime' -Lulus $true `
+            -Nilai $nilai -Blocker $false -Saran ''
+    }
 
     $saran = ''
-    if (-not $lulus) {
-        $saran = 'Pasang WebView2 Evergreen Runtime dari Microsoft. Belum wajib di Tahap 1.'
+    if (-not $ada) {
+        $saran = 'MIKOSAI_ENABLE_WEBVIEW2 disetel tapi runtime-nya tidak ada. ' +
+                 'Pasang WebView2 Evergreen Runtime, atau hapus variabel itu untuk kembali ke panel polos.'
+    }
+    else {
+        $saran = 'WebView2 dinyalakan lewat MIKOSAI_ENABLE_WEBVIEW2. Ia pernah menjatuhkan SolidWorks 2025 SP01.1 - ' +
+                 'hapus variabel itu kalau SolidWorks mati saat panel dibuka.'
     }
 
     $nilai = 'tidak ditemukan'
-    if ($lulus) { $nilai = $versi }
+    if ($ada) { $nilai = "$versi (dinyalakan lewat saklar)" }
 
-    return New-CheckResult -Nama 'WebView2 Runtime' -Lulus $lulus `
+    return New-CheckResult -Nama 'WebView2 Runtime' -Lulus $ada `
         -Nilai $nilai -Blocker $false -Saran $saran
 }
 
