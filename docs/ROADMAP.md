@@ -221,15 +221,26 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
       initialize, tools/list, 6x tools/call, dan token salah ditolak 401.
       Diuji terhadap `tools\MikosAI.McpHarness` (server produksi, executor palsu):
       9 lulus 0 gagal. Dua uji negatif membuktikan verifikatornya bisa merah.
-- [ ] Hal yang sama terhadap add-in SUNGGUHAN di dalam SolidWorks — sama perintahnya,
-      tanpa `-SessionFile`
+- [x] Hal yang sama terhadap add-in SUNGGUHAN di dalam SolidWorks — 9 lulus 0 gagal,
+      dua kali: dokumen kosong, lalu part dengan solid body. Memeriksa isi jawabannya
+      menemukan dua cacat yang gerbang transport TIDAK BISA tangkap — ukuran nol yang
+      dikarang, dan massa dari densitas default. Keduanya sudah ditutup test.
 - [ ] `agy` memanggil tool kita sendiri — `mcp-roundtrip.ps1 -Agy` (memakai kuota)
 - [x] Semua 6 tool dieksekusi lewat dispatcher — dibuktikan test, bukan inspeksi mata
 - [x] Tool berstatus `reference_only` **tidak muncul** di daftar MCP
 - [x] Request tanpa bearer token ditolak
-- [ ] Server hanya bind loopback — diverifikasi dari mesin lain di jaringan
-- [ ] Config global `~/.gemini/config/mcp_config.json` **tidak berubah** setelah add-in
+- [x] Server hanya bind loopback — ~~butuh mesin lain di jaringan~~ **tidak**: kalau
+      listener-nya bind `0.0.0.0`, ia menerima koneksi ke IP LAN mesin ini sendiri.
+      Jadi menembak IP sendiri sudah membedakan `127.0.0.1` dari `0.0.0.0`.
+      Diuji terhadap 3 alamat non-loopback sungguhan, dan satu test terpisah
+      membuktikan **detektornya tidak hampa**: sebuah listener sengaja dibind ke
+      `0.0.0.0` dan detektor yang sama HARUS menemukannya. Yang tetap tidak
+      terjangkau cuma firewall dan NAT — dan itu bukan properti kode kita.
+- [x] Config global `~/.gemini/config/mcp_config.json` **tidak berubah** setelah add-in
       berjalan — dibuktikan dengan hash sebelum dan sesudah
+- [x] URL non-loopback ditolak sebelum ditulis ke konfigurasi AI — jaring pengamannya
+      sudah ada di kode sejak awal, sampai sekarang tidak ada yang membuktikannya jalan
+- [x] Token sesi tidak pernah berulang dan panjangnya cukup — 200 iterasi
 
 ---
 
