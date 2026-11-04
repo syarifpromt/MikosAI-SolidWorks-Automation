@@ -150,17 +150,34 @@ namespace MikosAI.Core.Tools
                 Z = reading.Max.Z - reading.Min.Z,
             };
 
+            var adaUkuran = ukuran.X > 1e-9 || ukuran.Y > 1e-9 || ukuran.Z > 1e-9;
+
+            // HITUNGAN NOL ITU FAKTA. UKURAN NOL ITU KARANGAN.
+            //
+            // bodyCount = 0 benar: memang tidak ada body. Tapi kotak pembatasnya
+            // BUKAN 0x0x0 - ia TIDAK ADA, dan itu dua pernyataan yang berbeda.
+            //
+            // Nol adalah angka yang tampak masuk akal. Model yang membacanya
+            // punya segala alasan melaporkan "part-nya 0 x 0 x 0 mm" alih-alih
+            // "tidak ada body", dan laporan itu akan terdengar persis seperti
+            // pengukuran sungguhan.
+            //
+            // Disiplin ini sudah dipegang untuk massGrams di MassProperties,
+            // lengkap dengan catatan bahwa massa tidak dikarang. Di sini ia
+            // terlewat.
+            var adaYangBisaDiukur = reading.BodyCount > 0 || adaUkuran;
+
             var data = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["min"] = Vektor(reading.Min),
-                ["max"] = Vektor(reading.Max),
-                ["size"] = Vektor(ukuran),
+                ["min"] = adaYangBisaDiukur ? Vektor(reading.Min) : null,
+                ["max"] = adaYangBisaDiukur ? Vektor(reading.Max) : null,
+                ["size"] = adaYangBisaDiukur ? Vektor(ukuran) : null,
+
+                // Tetap angka, bukan null: ini hitungan, dan nol benar.
                 ["bodyCount"] = reading.BodyCount,
             };
 
             var checks = new List<VerificationCheck>();
-
-            var adaUkuran = ukuran.X > 1e-9 || ukuran.Y > 1e-9 || ukuran.Z > 1e-9;
 
             if (reading.BodyCount == 0)
             {
@@ -196,12 +213,29 @@ namespace MikosAI.Core.Tools
         {
             if (reading is null) throw new ArgumentNullException(nameof(reading));
 
+            // Aturan yang sama dengan BoundingBox: ukuran yang tidak ada
+            // dilaporkan null, bukan nol.
+            //
+            // Body dengan volume nol tidak ada, jadi nol di situ tidak pernah
+            // pengukuran yang sah - null tidak menghilangkan informasi apa pun.
+            var adaVolume = reading.VolumeMm3 > 1e-9;
+            var adaArea = reading.SurfaceAreaMm2 > 1e-9;
+
             var data = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["volumeMm3"] = reading.VolumeMm3,
+                ["volumeMm3"] = adaVolume ? (double?)Bulatkan(reading.VolumeMm3) : null,
                 ["massGrams"] = reading.MassGrams,
-                ["surfaceAreaMm2"] = reading.SurfaceAreaMm2,
-                ["centerOfMass"] = Vektor(reading.CenterOfMass),
+
+                // Area diperiksa sendiri, bukan ikut volume: surface body punya
+                // area tanpa volume, dan itu pembacaan sungguhan.
+                ["surfaceAreaMm2"] = adaArea ? (double?)Bulatkan(reading.SurfaceAreaMm2) : null,
+
+                // centerOfMass TIDAK boleh dinilai dari isinya sendiri: {0,0,0}
+                // adalah nilai yang SAH untuk part simetris di titik asal.
+                // Jadi ia digantungkan pada volume - tanpa massa, titik pusat
+                // massa tidak punya arti.
+                ["centerOfMass"] = adaVolume ? Vektor(reading.CenterOfMass) : null,
+
                 ["densityAssigned"] = reading.DensityAssigned,
             };
 

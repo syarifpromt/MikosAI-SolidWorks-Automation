@@ -61,12 +61,12 @@
         "properties": {}
       },
       "outputData": {
-        "min": "Vector3D (mm)",
-        "max": "Vector3D (mm)",
-        "size": "Vector3D (mm)",
+        "min": "Vector3D (mm)|null",
+        "max": "Vector3D (mm)|null",
+        "size": "Vector3D (mm)|null",
         "bodyCount": "integer"
       },
-      "notes": "bodyCount=0 berarti belum ada solid. Itu fakta sah, bukan error."
+      "notes": "bodyCount=0 berarti belum ada solid. Itu fakta sah, bukan error. Saat tidak ada yang bisa diukur, min/max/size adalah null - BUKAN nol. Kotak pembatas yang tidak ada berbeda dari kotak pembatas berukuran 0x0x0, dan nol adalah angka yang tampak masuk akal. bodyCount tetap angka karena ia hitungan: nol di situ benar."
     },
 
     {
@@ -81,13 +81,13 @@
         "properties": {}
       },
       "outputData": {
-        "volumeMm3": "number",
+        "volumeMm3": "number|null",
         "massGrams": "number|null",
-        "surfaceAreaMm2": "number",
-        "centerOfMass": "Vector3D (mm)",
+        "surfaceAreaMm2": "number|null",
+        "centerOfMass": "Vector3D (mm)|null",
         "densityAssigned": "boolean"
       },
-      "notes": "massGrams null kalau material belum di-assign. JANGAN mengarang massa dari densitas default lalu menyajikannya sebagai fakta."
+      "notes": "massGrams null kalau material belum di-assign. JANGAN mengarang massa dari densitas default lalu menyajikannya sebagai fakta. Aturan yang sama berlaku untuk volumeMm3, surfaceAreaMm2, dan centerOfMass: ukuran yang tidak ada dilaporkan null, bukan nol. surfaceAreaMm2 dinilai sendiri karena surface body punya area tanpa volume. centerOfMass digantungkan pada volume, BUKAN pada isinya sendiri - {0,0,0} adalah pusat massa yang sah untuk part simetris di titik asal."
     },
 
     {
