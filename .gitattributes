@@ -1,0 +1,38 @@
+# Normalisasi line ending.
+#
+# KENAPA ADA.
+#
+# Tanpa berkas ini, line ending di working tree bergantung pada core.autocrlf
+# tiap orang. Akibatnya dua orang bisa punya isi berkas yang BERBEDA dari commit
+# yang sama - dan itu bukan soal kosmetik.
+#
+# Satu test di repo ini memakai literal JSON multi-baris sebagai data uji. Ketika
+# berkasnya ditulis ulang dengan CRLF, data ujinya ikut berubah - dan itu
+# membongkar bug lama di pembersih keluaran provider yang menghancurkan hampir
+# seluruh teks CRLF. Bug-nya nyata dan sudah diperbaiki, tapi cara ia
+# tersembunyi lalu muncul adalah masalahnya sendiri: hasil test berubah karena
+# line ending, bukan karena kode.
+#
+# `text=auto` membuat git menyimpan LF di repo dan menyesuaikan di working tree,
+# terlepas dari setelan git siapa pun. Satu commit, satu arti.
+#
+# Pelajaran yang tetap berlaku: data uji yang memuat line ending harus
+# menuliskannya EKSPLISIT ("\r\n" di dalam string), bukan mengandalkan literal
+# multi-baris. Lihat tests/MikosAI.Core.Tests/CrlfKeluaranProviderTests.cs.
+
+* text=auto
+
+# Biner - jangan pernah dinormalisasi.
+*.bmp   binary
+*.png   binary
+*.ico    binary
+*.dll   binary
+*.exe   binary
+*.pdb   binary
+*.snk   binary
+*.tlb   binary
+
+# Berkas SolidWorks.
+*.sldprt binary
+*.sldasm binary
+*.slddrw binary
