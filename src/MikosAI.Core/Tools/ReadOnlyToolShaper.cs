@@ -376,7 +376,13 @@ namespace MikosAI.Core.Tools
                     ["constrainedStatus"] = s.ConstrainedStatus.ToString(),
                     ["entityCount"] = s.EntityCount,
                     ["consumedByFeatures"] = s.ConsumedByFeatures,
-                    ["dependents"] = s.Dependents,
+                    ["dependents"] = s.Dependents?
+                        .Select(d => new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["name"] = d.Name,
+                            ["typeName"] = d.TypeName,
+                        })
+                        .ToList(),
                     ["drivingDimensionCount"] = s.DrivingDimensionCount,
                     ["drivenDimensionCount"] = s.DrivenDimensionCount,
                     ["unknownDrivenStateCount"] = s.UnknownDrivenStateCount,

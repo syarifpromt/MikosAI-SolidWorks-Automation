@@ -98,7 +98,11 @@ namespace MikosAI.Core.Tests
                 {
                     Name = "Sketch1",
                     ConsumedByFeatures = new[] { "Boss-Extrude1" },
-                    Dependents = new[] { "Boss-Extrude1", "Sketch2" },
+                    Dependents = new[]
+                    {
+                        new DependentReading { Name = "Boss-Extrude1", TypeName = "Extrusion" },
+                        new DependentReading { Name = "Sketch2", TypeName = "ProfileFeature" },
+                    },
                 },
             });
 

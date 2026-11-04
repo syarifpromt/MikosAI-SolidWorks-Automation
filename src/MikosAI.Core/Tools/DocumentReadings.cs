@@ -155,6 +155,29 @@ namespace MikosAI.Core.Tools
         InvalidSolution = 5,
     }
 
+    /// <summary>
+    /// Satu child sebuah sketsa, beserta TIPENYA.
+    ///
+    /// typeName BUKAN hiasan. Ia satu-satunya hal yang membuat klasifikasi
+    /// konsumen bisa dilakukan dengan bukti: tanpa itu, laporan fixture hanya
+    /// berbunyi "ada child bernama Plane1" tanpa cara mengetahui apa itu.
+    ///
+    /// Versi pertama implementasi ini menyimpan nama saja, padahal kontraknya
+    /// sejak awal menyebut {name, typeName}. Daftar putih tipe konsumen diisi
+    /// dari pengamatan nama tipe di model nyata, jadi membuang typeName berarti
+    /// membuang satu-satunya jalan mengisinya.
+    /// </summary>
+    public sealed class DependentReading
+    {
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Dari <c>IFeature.GetTypeName2()</c>. null berarti tipenya tidak
+        /// terbaca - bukan "tidak punya tipe".
+        /// </summary>
+        public string? TypeName { get; set; }
+    }
+
     public sealed class SketchReading
     {
         public string Name { get; set; } = string.Empty;
@@ -182,7 +205,7 @@ namespace MikosAI.Core.Tools
         /// Itu sebabnya field ini tidak pernah terisi sejak awal - pembacanya
         /// memang tidak pernah punya aksesnya.
         /// </summary>
-        public IReadOnlyList<string>? Dependents { get; set; }
+        public IReadOnlyList<DependentReading>? Dependents { get; set; }
 
         /// <summary>
         /// Dimensi yang MENGUNCI geometri. <c>swDimensionDriving = 2</c>.

@@ -1,0 +1,82 @@
+{
+  "_catatan": [
+    "Nilai harapan untuk fixture-konsumen.SLDPRT.",
+    "",
+    "Berbeda dari plat-referensi.json, tidak semua angka di sini diturunkan",
+    "dari geometri. Sebagian adalah HIPOTESIS tentang perilaku API yang belum",
+    "pernah kami amati, dan itu ditandai eksplisit di bawah.",
+    "",
+    "Hipotesis yang salah BUKAN kegagalan test - ia hasil yang kami cari.",
+    "Laporan run akan menyebut mana yang terbukti dan mana yang tidak, lalu",
+    "kontraknya disesuaikan dengan bukti."
+  ],
+
+  "part": {
+    "berkas": "fixture-konsumen.SLDPRT",
+    "judul": "fixture-konsumen.SLDPRT",
+    "tipe": "part"
+  },
+
+  "body": {
+    "_catatan": [
+      "Diturunkan dari geometri, bukan hipotesis.",
+      "Boss 0..10 dikurangi cut 0..3 menyisakan plat 100 x 60 x 7.",
+      "100 * 60 * 7 = 42000 mm3. Plane1 tidak menambah material."
+    ],
+    "volumeMm3": 42000.0,
+    "size": { "x": 100.0, "y": 60.0, "z": 7.0 },
+    "bodyCount": 1
+  },
+
+  "sketch1": {
+    "constrainedStatus": "FullyDefined",
+    "consumedByFeatures": ["Boss-Extrude1", "Cut-Extrude1"],
+    "drivingDimensionCount": 2,
+    "drivenDimensionCount": 0,
+    "unknownDrivenStateCount": 0,
+    "dimensionCountRead": 2,
+
+    "_hipotesis": [
+      "dependents memuat Sketch2 dan Plane1 selain kedua fitur.",
+      "",
+      "Kalau Sketch2 TIDAK muncul, GetChildren ternyata hanya mengembalikan",
+      "konsumen, dan pemisahan consumedByFeatures/dependents tidak dibutuhkan.",
+      "Kontraknya disederhanakan, dan itu hasil yang sah.",
+      "",
+      "Kalau Plane1 muncul di consumedByFeatures, daftar putih tipe konsumen",
+      "salah dan harus diperbaiki SEBELUM delete_feature ditulis."
+    ],
+    "dependentsMemuat": ["Boss-Extrude1", "Cut-Extrude1", "Sketch2", "Plane1"],
+    "dependentsTidakMemuat": [],
+    "consumedByFeaturesTidakMemuat": ["Sketch2", "Plane1"]
+  },
+
+  "sketch2": {
+    "constrainedStatus": "FullyDefined",
+    "consumedByFeatures": [],
+    "drivingDimensionCount": 1,
+    "drivenDimensionCount": 1,
+    "unknownDrivenStateCount": 0,
+    "dimensionCountRead": 2
+  },
+
+  "sensusTipe": {
+    "_catatan": [
+      "BUKAN assertion. Ini yang dilaporkan untuk dibaca manusia.",
+      "",
+      "typeName untuk Cut-Extrude1 dan Plane1 BELUM PERNAH kami lihat. Daftar",
+      "putih tipe konsumen diisi dari sini - dengan bukti, bukan dari ingatan.",
+      "",
+      "Syarat masuk daftar tetap dua: nama teramati DAN ada fixture yang",
+      "membuktikan perannya memakai sketsa sebagai profil dengan efek yang",
+      "terverifikasi. Cut-Extrude1 memenuhi keduanya lewat part ini; Plane1",
+      "memenuhi yang pertama saja, dan memang TIDAK boleh masuk daftar."
+    ],
+    "laporkanTypeNameUntuk": ["Boss-Extrude1", "Cut-Extrude1", "Sketch2", "Plane1"]
+  },
+
+  "toleransi": {
+    "panjangMm": 1e-6,
+    "volumeMm3": 1e-3
+  }
+}

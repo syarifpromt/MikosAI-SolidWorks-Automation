@@ -464,7 +464,7 @@ namespace MikosAI.Addin
         {
             var berhasil = false;
             var konsumen = new List<string>();
-            var dependent = new List<string>();
+            var dependent = new List<DependentReading>();
 
             Coba("Feature.GetChildren", () =>
             {
@@ -483,10 +483,25 @@ namespace MikosAI.Addin
                     var namaAnak = anak.Name;
                     if (string.IsNullOrEmpty(namaAnak)) continue;
 
-                    dependent.Add(namaAnak);
+                    var tipe = anak.GetTypeName2();
 
-                    var tipe = anak.GetTypeName2() ?? string.Empty;
-                    if (tipe != "ProfileFeature" && tipe != "3DProfileFeature")
+                    dependent.Add(new DependentReading
+                    {
+                        Name = namaAnak,
+                        TypeName = tipe,
+                    });
+
+                    // DAFTAR PUTIH, bukan daftar hitam, dan bukan lagi
+                    // "child yang bukan sketsa".
+                    //
+                    // Aturan lama itu terlalu lebar: reference plane yang
+                    // dibuat lewat sebuah garis sketsa juga muncul sebagai
+                    // child non-sketsa, dan ia jelas bukan konsumen.
+                    //
+                    // Syarat masuk daftar ada di TipeKonsumenSketsa, dan
+                    // sengaja menuntut DUA bukti - nama yang teramati saja
+                    // tidak cukup.
+                    if (TipeKonsumenSketsa.Dikenal(tipe))
                     {
                         konsumen.Add(namaAnak);
                     }
