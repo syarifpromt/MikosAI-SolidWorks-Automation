@@ -56,6 +56,19 @@ venv/
 *.slddrw
 ~$*
 *.bak
+# Part acuan golden test. Satu-satunya berkas CAD yang MEMANG milik repo:
+# nilai harapan di plat-referensi.json diturunkan dari geometrinya, jadi tanpa
+# berkas ini golden test tidak bisa dijalankan siapa pun selain yang membuatnya.
+!tests/golden/*.SLDPRT
+!tests/golden/*.sldprt
+
+# ...TAPI bukan berkas kunci SolidWorks. Pengecualian di atas berada SETELAH
+# aturan `~$*`, dan di gitignore aturan belakangan menang - jadi tanpa baris
+# ini, `~$plat-referensi.SLDPRT` yang dibuat SolidWorks saat part terbuka ikut
+# ter-commit. Berkas itu berumur sependek sesi dan tidak berarti apa-apa bagi
+# orang lain.
+tests/golden/~$*
+
 !tests/fixtures/**/*.SLDPRT
 !tests/fixtures/**/*.SLDASM
 

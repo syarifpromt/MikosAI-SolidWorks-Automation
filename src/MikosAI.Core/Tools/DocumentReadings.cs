@@ -125,20 +125,20 @@ namespace MikosAI.Core.Tools
         /// <summary>Tidak bisa ditentukan. Diperlakukan sebagai masalah, bukan diabaikan.</summary>
         Unknown = 0,
 
+        /// <summary>swUnderConstrained.</summary>
         UnderDefined = 1,
+
+        /// <summary>swFullyConstrained.</summary>
         FullyDefined = 2,
 
-        /// <summary>Terlalu banyak constraint - sketsa tidak sehat.</summary>
+        /// <summary>swOverConstrained - terlalu banyak constraint, sketsa tidak sehat.</summary>
         OverDefined = 3,
 
-        /// <summary>Ada relasi menggantung - sketsa tidak sehat.</summary>
-        Dangling = 4,
+        /// <summary>swNoSolution - solver tidak menemukan solusi.</summary>
+        NoSolution = 4,
 
-        /// <summary>Tidak terselesaikan.</summary>
-        NoSolution = 5,
-
-        /// <summary>Kosong, belum ada geometri.</summary>
-        Empty = 6,
+        /// <summary>swInvalidSolution - ada solusi, tapi tidak sah.</summary>
+        InvalidSolution = 5,
     }
 
     public sealed class SketchReading

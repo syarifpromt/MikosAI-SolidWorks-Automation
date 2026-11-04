@@ -92,8 +92,27 @@ capabilities:
 
       Status `pilot`, BUKAN `verified`. Logika pembentukan hasil dan aturan
       verifikasinya sudah diuji otomatis di MikosAI.Core, tapi penerjemahan API
-      SolidWorks-nya baru bisa dibuktikan di mesin bermesin CAD. Naikkan ke
-      `verified` hanya setelah golden test lulus tiga kali berturut-turut.
+      SolidWorks-nya baru bisa dibuktikan di mesin bermesin CAD.
+
+      Golden test ada di `scripts/golden-document.ps1` dengan acuan
+      `tests/golden/plat-referensi.SLDPRT` - plat 100x80x10 yang seluruh nilai
+      harapannya DITURUNKAN DARI GEOMETRI, bukan disalin dari keluaran tool.
+
+      Pada 2026-11-05 golden test itu langsung membongkar satu bug nyata:
+      pemetaan `swConstrainedStatus_e` bergeser satu, sehingga sketsa fully
+      defined dilaporkan OverDefined - dan sketsa under-defined dilaporkan
+      FullyDefined. Arah kedua itu yang berbahaya, karena sketsa yang belum
+      terdefinisi lolos sebagai sehat.
+
+      Itu sekaligus jawaban kenapa status ini tidak dinaikkan lebih awal: empat
+      tool membaca dengan benar bukan berarti keenamnya benar.
+
+      BATAS YANG DIKETAHUI: `get_selection` tidak tercakup golden test, karena
+      hasilnya bergantung pada apa yang sedang dipilih pengguna dan part acuan
+      tidak bisa membawa seleksi. Yang diuji hanya bahwa jalurnya hidup.
+
+      Naikkan ke `verified` hanya setelah golden test lulus penuh pada add-in
+      yang memuat perbaikan pemetaan itu.
 
   # ---- Fase 3: sketsa ---------------------------------------------------
   - id: sketch_authoring

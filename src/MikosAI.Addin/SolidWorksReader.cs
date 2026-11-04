@@ -417,19 +417,53 @@ namespace MikosAI.Addin
         }
 
         /// <summary>
-        /// swConstrainedStatus_e. Nilai yang tidak dikenal menjadi Unknown -
-        /// dan Core memperlakukan Unknown sebagai BLOCKED, bukan sehat.
+        /// Memetakan swConstrainedStatus_e ke status domain kita.
+        ///
+        /// NILAI DI BAWAH DIREFLEKSIKAN DARI swconst ASLI, BUKAN DITEBAK:
+        ///
+        ///   swUnknownConstraint = 1
+        ///   swUnderConstrained  = 2
+        ///   swFullyConstrained  = 3
+        ///   swOverConstrained   = 4
+        ///   swNoSolution        = 5
+        ///   swInvalidSolution   = 6
+        ///   swAutosolveOff      = 7
+        ///
+        /// VERSI SEBELUMNYA BERGESER SATU - ia memetakan 1 ke UnderDefined,
+        /// 2 ke FullyDefined, 3 ke OverDefined. Akibatnya:
+        ///
+        ///   sketsa FULLY DEFINED dilaporkan OverDefined -> FAIL palsu
+        ///   sketsa UNDER DEFINED dilaporkan FullyDefined -> RUSAK TERLIHAT SEHAT
+        ///
+        /// Arah kedua itu yang berbahaya, dan itu alasan bug ini mahal: ia
+        /// memberi lampu hijau pada sketsa yang belum terdefinisi, yaitu
+        /// persis keadaan yang akan membuat tool tulis Fase 3 menghasilkan
+        /// geometri yang bergeser tanpa ada yang memperingatkan.
+        ///
+        /// Ditemukan oleh golden test pada plat 100x80x10 yang jelas-jelas
+        /// fully defined. Itu gunanya acuan yang jawabannya sudah diketahui
+        /// lebih dulu.
+        ///
+        /// Nilai yang tidak dikenal menjadi Unknown, dan Core memperlakukan
+        /// Unknown sebagai BLOCKED - bukan sehat.
         /// </summary>
-        private static SketchConstraintStatus StatusConstraint(int kode)
+        internal static SketchConstraintStatus StatusConstraint(int kode)
         {
             switch (kode)
             {
-                case 0: return SketchConstraintStatus.Empty;              // swNoSolution? - lihat catatan
-                case 1: return SketchConstraintStatus.UnderDefined;
-                case 2: return SketchConstraintStatus.FullyDefined;
-                case 3: return SketchConstraintStatus.OverDefined;
-                case 4: return SketchConstraintStatus.NoSolution;
-                case 5: return SketchConstraintStatus.Dangling;
+                case 1: return SketchConstraintStatus.Unknown;         // swUnknownConstraint
+                case 2: return SketchConstraintStatus.UnderDefined;    // swUnderConstrained
+                case 3: return SketchConstraintStatus.FullyDefined;    // swFullyConstrained
+                case 4: return SketchConstraintStatus.OverDefined;     // swOverConstrained
+                case 5: return SketchConstraintStatus.NoSolution;      // swNoSolution
+                case 6: return SketchConstraintStatus.InvalidSolution; // swInvalidSolution
+
+                // swAutosolveOff: SolidWorks sedang TIDAK menyelesaikan
+                // constraint, jadi status apa pun tidak berarti apa-apa.
+                // "Tidak tahu" adalah satu-satunya jawaban yang jujur, dan
+                // Unknown membuatnya BLOCKED alih-alih lolos sebagai sehat.
+                case 7: return SketchConstraintStatus.Unknown;
+
                 default: return SketchConstraintStatus.Unknown;
             }
         }

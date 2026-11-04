@@ -386,8 +386,8 @@ namespace MikosAI.Core.Tools
 
             var rusak = readings
                 .Where(s => s.ConstrainedStatus == SketchConstraintStatus.OverDefined
-                            || s.ConstrainedStatus == SketchConstraintStatus.Dangling
-                            || s.ConstrainedStatus == SketchConstraintStatus.NoSolution)
+                            || s.ConstrainedStatus == SketchConstraintStatus.NoSolution
+                            || s.ConstrainedStatus == SketchConstraintStatus.InvalidSolution)
                 .ToList();
 
             if (rusak.Count > 0)

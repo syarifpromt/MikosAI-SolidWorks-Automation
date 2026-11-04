@@ -67,6 +67,25 @@
     "rebuildRequired": false
   },
 
+  "sketsa": {
+    "_catatan": [
+      "entityCount TIDAK dipatok ke angka pasti.",
+      "",
+      "Center Rectangle menghasilkan 4 garis + 2 garis konstruksi diagonal = 6,",
+      "sementara Corner Rectangle menghasilkan 4. Keduanya sah sebagai plat yang",
+      "sama. Yang bisa diturunkan dari geometri: persegi tertutup butuh MINIMAL",
+      "4 segmen.",
+      "",
+      "Yang benar-benar penting di sini adalah statusnya FullyDefined - dan itu",
+      "yang membongkar pemetaan swConstrainedStatus_e yang bergeser satu."
+    ],
+    "sketchCount": 1,
+    "fullyDefinedCount": 1,
+    "constrainedStatus": "FullyDefined",
+    "entityCountMinimal": 4,
+    "hasOpenContour": false
+  },
+
   "toleransi": {
     "_catatan": [
       "Prisma persegi dihitung eksak oleh SolidWorks, jadi toleransinya ketat.",

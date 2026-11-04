@@ -224,7 +224,7 @@ namespace MikosAI.Core.Tests
 
         [Theory]
         [InlineData(SketchConstraintStatus.OverDefined)]
-        [InlineData(SketchConstraintStatus.Dangling)]
+        [InlineData(SketchConstraintStatus.InvalidSolution)]
         [InlineData(SketchConstraintStatus.NoSolution)]
         public void sketsa_rusak_menghasilkan_Fail_bukan_Warn(SketchConstraintStatus status)
         {

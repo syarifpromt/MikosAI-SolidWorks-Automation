@@ -286,6 +286,82 @@ foreach ($wajib in $h.fitur.harusAda) {
 Bandingkan-Angka 'suppressedCount' (Get-Properti $dataFt 'suppressedCount') ([double]$h.fitur.suppressedCount) 0
 Bandingkan-Angka 'errorCount'      (Get-Properti $dataFt 'errorCount')      ([double]$h.fitur.errorCount)      0
 
+# --- Sketsa ----------------------------------------------------------------
+#
+# Di sinilah golden test membayar dirinya sendiri. Pemetaan
+# swConstrainedStatus_e kami bergeser satu, sehingga sketsa yang fully defined
+# dilaporkan OverDefined - dan, jauh lebih berbahaya, sketsa under-defined
+# dilaporkan FullyDefined. Tidak ada yang bisa menangkapnya tanpa acuan yang
+# jawabannya sudah diketahui lebih dulu.
+
+Write-Judul 'Sketsa'
+
+$sk = Invoke-Tool 'inspect_sketches'
+$dataSk = Get-Properti $sk 'data'
+$daftarSk = @(Get-Properti $dataSk 'sketches')
+
+Bandingkan-Angka 'sketchCount'       (Get-Properti $dataSk 'sketchCount')       ([double]$h.sketsa.sketchCount)       0
+Bandingkan-Angka 'fullyDefinedCount' (Get-Properti $dataSk 'fullyDefinedCount') ([double]$h.sketsa.fullyDefinedCount) 0
+
+if ($daftarSk.Count -lt 1) {
+    Write-Gagal 'tidak ada sketsa terbaca'
+}
+else {
+    $s1 = $daftarSk[0]
+
+    Bandingkan-Teks 'constrainedStatus' (Get-Properti $s1 'constrainedStatus') $h.sketsa.constrainedStatus
+
+    $jumlahEntitas = Get-Properti $s1 'entityCount'
+    $minimal = [int]$h.sketsa.entityCountMinimal
+
+    if ($null -ne $jumlahEntitas -and [int]$jumlahEntitas -ge $minimal) {
+        Write-Lulus "entityCount = $jumlahEntitas (minimal $minimal untuk persegi tertutup)"
+    }
+    else {
+        Write-Gagal "entityCount : $jumlahEntitas, diharapkan minimal $minimal"
+    }
+
+    $kontur = Get-Properti $s1 'hasOpenContour'
+    if ([bool]$kontur -eq [bool]$h.sketsa.hasOpenContour) {
+        Write-Lulus "hasOpenContour = $kontur"
+    }
+    else {
+        Write-Gagal "hasOpenContour : diharapkan $($h.sketsa.hasOpenContour), diterima $kontur"
+    }
+}
+
+$verdictSk = Get-Properti (Get-Properti $sk 'verification') 'verdict'
+if ($verdictSk -ceq 'PASS') {
+    Write-Lulus 'verdict inspect_sketches = PASS'
+}
+else {
+    Write-Gagal "verdict inspect_sketches = $verdictSk, diharapkan PASS"
+}
+
+# --- get_selection ---------------------------------------------------------
+#
+# BATAS YANG DISEBUTKAN, BUKAN DISEMBUNYIKAN.
+#
+# get_selection bergantung pada apa yang sedang DIPILIH pengguna, dan part
+# acuan tidak bisa membawa seleksi. Jadi yang diuji di sini hanya bahwa
+# jalurnya hidup dan amplopnya utuh - bukan isinya.
+#
+# Menuliskannya begini supaya tidak ada yang mengira capability ini sudah
+# terbukti seluruhnya. Lihat capabilities.yaml.
+
+Write-Judul 'Seleksi (hanya uji jalur, isinya bergantung pengguna)'
+
+$sel = Invoke-Tool 'get_selection'
+$cekSel = Get-Properti (Get-Properti $sel 'verification') 'checks'
+$bacaSel = @($cekSel) | Where-Object { $_.id -ceq 'selection_read' }
+
+if ($bacaSel -and $bacaSel.verdict -ceq 'PASS') {
+    Write-Lulus 'selection_read = PASS (jalur hidup)'
+}
+else {
+    Write-Gagal 'selection_read tidak PASS - jalur get_selection bermasalah'
+}
+
 # --- Pengulangan -----------------------------------------------------------
 #
 # Sekali benar bisa kebetulan. Yang diuji di sini: pembacaan tidak bergantung
