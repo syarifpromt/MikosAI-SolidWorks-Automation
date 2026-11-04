@@ -203,6 +203,42 @@ namespace MikosAI.Addin
         }
 
         /// <summary>
+        /// CommandManager untuk cookie add-in ini.
+        ///
+        /// Lewat sini, bukan lewat <see cref="Raw"/>, supaya assert thread
+        /// utama ikut berlaku. CommandManager adalah objek COM SolidWorks biasa:
+        /// menyentuhnya dari thread latar adalah pelanggaran yang sama seperti
+        /// pembacaan model, dan pelanggaran itu pernah menjatuhkan SolidWorks
+        /// tanpa exception.
+        ///
+        /// Tanda tangan direfleksikan dari PIA asli:
+        ///   CommandManager GetCommandManager(Int32 Cookie)
+        ///
+        /// null berarti gagal; sebabnya tercatat di diagnostik.
+        /// </summary>
+        internal ICommandManager? TryGetCommandManager(int cookie)
+        {
+            PastikanThreadUtama(nameof(TryGetCommandManager));
+
+            try
+            {
+                var manager = _app.GetCommandManager(cookie);
+
+                if (manager is null)
+                {
+                    _diagnostics.AddError("GetCommandManager mengembalikan null.");
+                }
+
+                return manager;
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("GetCommandManager", exception);
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Jumlah dokumen terbuka. -1 berarti tidak bisa dibaca - BUKAN nol.
         /// Membedakan keduanya penting: gerbang penerimaan memeriksa
         /// GetDocumentCount()==0 setelah dokumen ditutup, dan "tidak terbaca"

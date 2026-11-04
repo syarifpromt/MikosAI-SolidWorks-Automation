@@ -67,7 +67,17 @@ namespace MikosAI.Addin
         /// </summary>
         internal static bool PakaiWebView2 => Aktif("MIKOSAI_ENABLE_WEBVIEW2");
 
+        /// <summary>Matikan tombol toolbar/menu.</summary>
+        internal static bool CommandGroupMati => Aktif("MIKOSAI_DISABLE_COMMANDGROUP");
+
         internal static bool PakaiTaskPane => !ModeAman && !TaskPaneMati;
+
+        /// <summary>
+        /// Tombol toolbar hanya berguna kalau ada panel untuk ditampilkan,
+        /// jadi ia ikut mati bersama TaskPane. Tombol yang mengarah ke panel
+        /// yang tidak ada lebih buruk daripada tidak ada tombol.
+        /// </summary>
+        internal static bool PakaiCommandGroup => PakaiTaskPane && !CommandGroupMati;
 
         internal static bool PakaiMcp => !ModeAman && !McpMati;
 

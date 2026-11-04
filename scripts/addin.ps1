@@ -565,19 +565,44 @@ if ($Action -eq 'Probe') {
         Write-Host '  SolidWorks sudah ditutup. Dinilai dari titik tertinggi sesi.' -ForegroundColor Gray
     }
 
+    # KENAPA PENANDANYA commandGroupPernahHidup, BUKAN commandGroup.
+    #
+    # Field `commandGroup` sudah ada di berkas status jauh sebelum tombolnya
+    # diimplementasikan - nilainya selalu false. Menilai dari field itu membuat
+    # Probe melaporkan "GAGAL commandGroup - seharusnya hidup" pada add-in yang
+    # memang belum punya tombol. Itu alarm palsu, dan Probe pernah melakukan
+    # kesalahan jenis yang sama sebelumnya.
+    #
+    # `commandGroupPernahHidup` lahir BERSAMA fiturnya, jadi keberadaannya
+    # adalah pembeda yang jujur antara "build ini belum punya tombol" dan
+    # "tombolnya ada tapi gagal".
+    $punyaFieldTombol = $status.PSObject.Properties.Name -contains 'commandGroupPernahHidup'
+
     if ($ditutup) {
         $hidupTaskPane = [bool]$status.taskPanePernahHidup
         $hidupMcp      = [bool]$status.mcpServerPernahHidup
+        $hidupTombol   = ($status.PSObject.Properties.Name -contains 'commandGroupPernahHidup') -and
+                         [bool]$status.commandGroupPernahHidup
     }
     else {
         $hidupTaskPane = [bool]$status.taskPane
         $hidupMcp      = [bool]$status.mcpServer
+        $hidupTombol   = ($status.PSObject.Properties.Name -contains 'commandGroup') -and
+                         [bool]$status.commandGroup
     }
 
     $subsistem = @(
         @{ Nama = 'taskPane';  Nilai = $hidupTaskPane; Dimatikan = ($flags -match 'mode-aman|taskpane') }
         @{ Nama = 'mcpServer'; Nilai = $hidupMcp;      Dimatikan = ($flags -match 'mode-aman|\bmcp\b') }
     )
+
+    if ($punyaFieldTombol) {
+        $subsistem += @{
+            Nama      = 'commandGroup'
+            Nilai     = $hidupTombol
+            Dimatikan = ($flags -match 'mode-aman|taskpane|commandgroup')
+        }
+    }
 
     $label = if ($ditutup) { 'PERNAH' } else { 'HIDUP ' }
 
@@ -600,8 +625,11 @@ if ($Action -eq 'Probe') {
         Write-Host "  Aktivitas terakhir: $($status.lastActivity)" -ForegroundColor Gray
     }
 
+    if (-not $punyaFieldTombol) {
+        Write-Host '  commandGroup - tidak ada di berkas status ini (add-in versi lama).' -ForegroundColor Gray
+    }
+
     Write-Section 'Belum diimplementasikan'
-    Write-Host '  commandGroup - tombol di toolbar, wajar false.'
     Write-Host '  Hitungan event file_new - butuh langganan event, menyusul.'
 
     Write-Host ''

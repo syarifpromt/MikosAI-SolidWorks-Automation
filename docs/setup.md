@@ -356,6 +356,13 @@ powershell -ExecutionPolicy Bypass -File scripts\addin.ps1 -Action Probe
 | 3 | `NoProvider` | Bukan subprocess agy | **agy tersangkanya** |
 | 4 | `NoMcp` | Bukan server MCP | **Server MCP tersangkanya** |
 
+Ada satu saklar lagi yang tidak masuk tabel karena bukan tersangka crash:
+`MIKOSAI_DISABLE_COMMANDGROUP=1` mematikan tombol toolbar dan menu. Gunanya kalau
+tombolnya bertabrakan dengan tata letak toolbar yang kamu pakai - panelnya tetap
+bisa dibuka dari daftar TaskPane di sisi kanan SolidWorks. Tombol ikut mati sendiri
+kalau TaskPane dimatikan, karena tombol yang mengarah ke panel yang tidak ada lebih
+buruk daripada tidak ada tombol.
+
 Setelah selesai:
 
 ```powershell
@@ -372,6 +379,7 @@ setelahnya, nilai itulah yang tersimpan.
 |---|---|
 | `connect:selesai` | `ConnectToSW` beres; crash terjadi sesudahnya |
 | `connect:taskpane-mulai` | Mati saat membangun TaskPane |
+| `connect:commandgroup-mulai` | Mati saat membangun tombol toolbar |
 | `webview:ensure-core` | Mati saat menginisialisasi WebView2 |
 | `webview:navigasi` | Mati saat memuat halaman UI |
 | `latar:probe-agy-mulai` | Mati saat menjalankan `agy --version` atau `--help` |

@@ -56,6 +56,9 @@ namespace SolidWorks.Interop.sldworks
         int GetDocumentCount();
 
         ITaskpaneView CreateTaskpaneView2(string Bitmap, string ToolTip);
+
+        // Direfleksikan: CommandManager GetCommandManager(Int32 Cookie)
+        CommandManager GetCommandManager(int Cookie);
     }
 
     public interface ITaskpaneView
@@ -63,6 +66,108 @@ namespace SolidWorks.Interop.sldworks
         bool DisplayWindowFromHandlex64(long Handle);
 
         bool DeleteView();
+
+        bool ShowView();
+
+        bool HideView();
+
+        // Satu-satunya pertanyaan keadaan yang disediakan SolidWorks. TIDAK
+        // ada "apakah panel terlihat" - lihat MikosAiAddin.MikosAiTogglePanel.
+        bool IsActiveTab();
+    }
+
+    // ------------------------------------------------------------------------
+    // CommandManager.
+    //
+    // Pewarisannya DICOCOKKAN dengan PIA asli, bukan disederhanakan:
+    //
+    //   CommandManager : ICommandManager
+    //   CommandGroup   : ICommandGroup
+    //
+    // Itu penting. GetCommandManager mengembalikan CommandManager sementara
+    // kode kita memegang ICommandManager; kalau stub meratakan keduanya menjadi
+    // satu tipe, compile-check akan lulus untuk kode yang tidak bisa dibangun
+    // terhadap PIA sungguhan. Stub yang terlalu longgar lebih buruk daripada
+    // tidak ada stub, karena ia memberi keyakinan yang salah.
+    // ------------------------------------------------------------------------
+
+    public interface ICommandManager
+    {
+        // Direfleksikan:
+        //   CommandGroup CreateCommandGroup2(Int32 UserID, String Title,
+        //       String ToolTip, String Hint, Int32 Position,
+        //       Boolean IgnorePreviousVersion, ref Int32 Errors)
+        //
+        // `ref`, BUKAN `out`. Parameternya [In][Out] di PIA asli. Stub ini
+        // sempat memakai `out`, sehingga compile-check LULUS untuk kode yang
+        // kemudian ditolak build nyata dengan CS1620. Itu persis mode kegagalan
+        // yang paling berbahaya dari sebuah stub.
+        CommandGroup CreateCommandGroup2(
+            int UserID,
+            string Title,
+            string ToolTip,
+            string Hint,
+            int Position,
+            bool IgnorePreviousVersion,
+            ref int Errors);
+
+        // Direfleksikan: Int32 RemoveCommandGroup2(Int32 UserID, Boolean RuntimeOnly)
+        int RemoveCommandGroup2(int UserID, bool RuntimeOnly);
+    }
+
+    public interface CommandManager : ICommandManager
+    {
+    }
+
+    public interface ICommandGroup
+    {
+        // Direfleksikan:
+        //   Int32 AddCommandItem2(String Name, Int32 Position, String HintString,
+        //       String ToolTip, Int32 ImageListIndex, String CallbackFunction,
+        //       String EnableMethod, Int32 UserID, Int32 MenuTBOption)
+        int AddCommandItem2(
+            string Name,
+            int Position,
+            string HintString,
+            string ToolTip,
+            int ImageListIndex,
+            string CallbackFunction,
+            string EnableMethod,
+            int UserID,
+            int MenuTBOption);
+
+        bool Activate();
+
+        bool HasToolbar { get; set; }
+
+        bool HasMenu { get; set; }
+
+        // object, BUKAN string[]. PIA asli mendeklarasikannya sebagai Object
+        // karena ia menyeberang COM sebagai VARIANT berisi SAFEARRAY.
+        object IconList { get; set; }
+
+        object MainIconList { get; set; }
+    }
+
+    public interface CommandGroup : ICommandGroup
+    {
+    }
+
+    /// <summary>
+    /// ADA DI SINI SEMATA-MATA SEBAGAI JEBAKAN, dan itu disengaja.
+    ///
+    /// PIA sungguhan punya SolidWorks.Interop.sldworks.Environment. Dengan
+    /// `using SolidWorks.Interop.sldworks`, setiap pemakaian `Environment`
+    /// tanpa kualifikasi menjadi ambigu (CS0104) - dan itu benar-benar terjadi
+    /// pada CommandGroupHost, lolos dari compile-check karena stub tidak punya
+    /// tipe ini.
+    ///
+    /// Jadi tipe ini ADA supaya compile-check memakai System.Environment secara
+    /// eksplisit, sama seperti build nyata menuntutnya. Stub yang lebih bersih
+    /// daripada kenyataan bukan stub yang lebih baik.
+    /// </summary>
+    public interface Environment
+    {
     }
 
     public interface IModelDoc2

@@ -98,6 +98,7 @@ namespace MikosAI.Addin
         private McpHost? _mcp;
         private SolidWorksReader? _pembaca;
         private TaskPaneHost? _panel;
+        private CommandGroupHost? _tombol;
         private ProviderHost? _provider;
         private System.Windows.Forms.Timer? _timerSegar;
 
@@ -282,6 +283,38 @@ namespace MikosAI.Addin
                 _diagnostics.AddError("BangunTaskPane", exception);
             }
 
+            // --- Tombol toolbar ---------------------------------------------
+            // SETELAH TaskPane, dan itu wajib: callback tombol memanggil
+            // _taskPaneView, jadi membangunnya lebih dulu berarti membuat
+            // tombol yang bisa diklik sebelum ada yang bisa ditampilkan.
+            try
+            {
+                if (!Fitur.PakaiCommandGroup)
+                {
+                    _diagnostics.AddError("info: tombol toolbar dimatikan lewat saklar fitur.");
+                }
+                else if (_taskPaneView is null)
+                {
+                    // Bukan "info": tombolnya memang hilang, dan pengguna akan
+                    // mencarinya. Disebutkan beserta sebabnya.
+                    _diagnostics.AddError(
+                        "tombol toolbar tidak dibangun karena TaskPane gagal dibuat - "
+                        + "tidak ada panel yang bisa ditampilkannya.");
+                }
+                else
+                {
+                    _diagnostics.Jejak("connect:commandgroup-mulai");
+                    _tombol = new CommandGroupHost(_diagnostics);
+                    _diagnostics.CommandGroup = _tombol.Bangun(
+                        _sw.TryGetCommandManager(Cookie), AddinTitle);
+                    _diagnostics.Jejak("connect:commandgroup-selesai");
+                }
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("membangun CommandGroup", exception);
+            }
+
             _diagnostics.Status = "connected";
             _diagnostics.Jejak("connect:selesai");
 
@@ -311,7 +344,25 @@ namespace MikosAI.Addin
         /// </summary>
         public bool DisconnectFromSW()
         {
-            // TaskPane dilepas lebih dulu: ia memegang handle jendela yang
+            // Tombol dilepas PALING dulu: callback-nya menyentuh _taskPaneView,
+            // jadi ia harus berhenti bisa dipanggil sebelum view itu dihapus.
+            // Urutan sebaliknya membuka jendela sempit di mana klik pengguna
+            // mendarat di view yang sudah mati.
+            try
+            {
+                _tombol?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("melepas CommandGroup", exception);
+            }
+            finally
+            {
+                _tombol = null;
+                _diagnostics.CommandGroup = false;
+            }
+
+            // TaskPane dilepas berikutnya: ia memegang handle jendela yang
             // dimiliki SolidWorks, dan melepasnya setelah COM di-release bisa
             // membuat SolidWorks mengakses jendela yang sudah mati.
             try
@@ -728,6 +779,97 @@ namespace MikosAI.Addin
             {
                 _diagnostics.AddError("menangani chat", exception);
                 _panel?.KirimPesanChat("galat", "Terjadi kesalahan internal: " + exception.Message);
+            }
+        }
+
+        // ====================================================================
+        // Callback tombol toolbar
+        //
+        // DUA METHOD DI BAWAH DIPANGGIL SOLIDWORKS BERDASARKAN NAMA, lewat
+        // IDispatch, memakai string yang diberikan ke AddCommandItem2. Compiler
+        // tidak pernah melihat hubungan itu.
+        //
+        // Konsekuensinya konkret:
+        //   - harus public, dan harus instance method di kelas yang diserahkan
+        //     ke SetAddinCallbackInfo2 - yaitu kelas INI
+        //   - mengganti namanya tanpa mengganti string akan menghasilkan tombol
+        //     yang DIAM, bukan error build
+        //
+        // Karena itu CommandGroupHost memakai nameof(...) untuk kedua string,
+        // dan karena itu pula namanya diawali "MikosAi": ruang nama callback
+        // ini DATAR dan dibagi dengan seluruh add-in lain di proses yang sama.
+        // Nama generik seperti "TogglePanel" adalah tabrakan yang menunggu
+        // terjadi, dan tabrakannya akan tampak sebagai tombol add-in lain yang
+        // memanggil kode kita.
+        //
+        // Keduanya TIDAK BOLEH melempar: exception yang lolos ke SolidWorks
+        // lewat IDispatch tidak meninggalkan jejak apa pun.
+        // ====================================================================
+
+        /// <summary>
+        /// Menampilkan atau menyembunyikan panel. Dipanggil dari tombol.
+        /// </summary>
+        public void MikosAiTogglePanel()
+        {
+            try
+            {
+                if (_taskPaneView is null)
+                {
+                    _diagnostics.AddError("tombol panel diklik, tapi TaskPane tidak ada.");
+                    return;
+                }
+
+                // Tidak ada API "apakah panel terlihat". IsActiveTab() adalah
+                // yang paling dekat dengan kebenaran: ia menjawab apakah TAB
+                // KITA yang sedang aktif.
+                //
+                // Jadi perilakunya: kalau tab kita aktif, sembunyikan; kalau
+                // tidak - entah tersembunyi, entah tab add-in lain yang tampil
+                // - tampilkan milik kita. Itu yang diharapkan orang dari satu
+                // tombol, dan ia tidak pernah berbohong tentang keadaan.
+                if (_taskPaneView.IsActiveTab())
+                {
+                    _taskPaneView.HideView();
+                }
+                else
+                {
+                    _taskPaneView.ShowView();
+                }
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("callback tombol panel", exception);
+            }
+        }
+
+        /// <summary>
+        /// Keadaan tombol, diminta SolidWorks setiap kali toolbar digambar.
+        ///
+        /// Nilai kembaliannya mengikuti konvensi SolidWorks:
+        /// 0 = mati, 1 = hidup, 2 = tertekan + mati, 3 = tertekan + hidup.
+        ///
+        /// Dipakai untuk menunjukkan apakah panel sedang tampil, sehingga
+        /// tombolnya memberi tahu keadaan alih-alih hanya bisa diklik.
+        /// </summary>
+        public int MikosAiStatusTombolPanel()
+        {
+            try
+            {
+                if (_taskPaneView is null)
+                {
+                    return 0;
+                }
+
+                return _taskPaneView.IsActiveTab() ? 3 : 1;
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("callback status tombol panel", exception);
+
+                // Tetap bisa diklik. Tombol yang mati gara-gara pembacaan
+                // keadaan gagal akan menutup satu-satunya jalan pengguna ke
+                // panel, padahal panelnya sendiri mungkin sehat.
+                return 1;
             }
         }
 

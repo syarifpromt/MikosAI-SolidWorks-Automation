@@ -65,7 +65,24 @@ namespace MikosAI.Addin
 
         internal bool CallbackRegistered { get; set; }
 
-        internal bool CommandGroup { get; set; }
+        /// <summary>
+        /// Hidup SEKARANG. Disetel false oleh teardown, sama seperti TaskPane -
+        /// jadi untuk menilai sesi yang sudah ditutup pakai
+        /// <see cref="CommandGroupPernahHidup"/>.
+        ///
+        /// Pembedaan ini bukan kerapian: Probe pernah membunyikan alarm palsu
+        /// karena menilai sesi tertutup dari flag yang memang sudah dimatikan
+        /// saat menutup.
+        /// </summary>
+        internal bool CommandGroup
+        {
+            get => _commandGroup;
+            set
+            {
+                _commandGroup = value;
+                if (value) _commandGroupPernah = true;
+            }
+        }
 
         /// <summary>
         /// Hidup SEKARANG. Disetel false oleh teardown.
@@ -132,6 +149,8 @@ namespace MikosAI.Addin
         // Umurnya satu sesi: objek ini dibuat ulang setiap kali add-in
         // diinstansiasi, jadi tidak ada risiko nilai basi dari sesi sebelumnya.
 
+        private bool _commandGroup;
+        private bool _commandGroupPernah;
         private bool _taskPane;
         private bool _mcpServer;
         private bool _dispatcherReady;
@@ -144,6 +163,9 @@ namespace MikosAI.Addin
 
         /// <summary>Server MCP pernah menerima koneksi di sesi ini. Hanya bisa naik.</summary>
         internal bool McpServerPernahHidup => _mcpServerPernah;
+
+        /// <summary>Tombol toolbar pernah aktif di sesi ini. Hanya bisa naik.</summary>
+        internal bool CommandGroupPernahHidup => _commandGroupPernah;
 
         /// <summary>Dispatcher thread utama pernah siap di sesi ini. Hanya bisa naik.</summary>
         internal bool DispatcherPernahSiap => _dispatcherPernah;
@@ -274,6 +296,7 @@ namespace MikosAI.Addin
                 Field(sb, "featureFlags", FeatureFlags);
                 FieldBool(sb, "taskPanePernahHidup", TaskPanePernahHidup);
                 FieldBool(sb, "mcpServerPernahHidup", McpServerPernahHidup);
+                FieldBool(sb, "commandGroupPernahHidup", CommandGroupPernahHidup);
                 FieldBool(sb, "dispatcherPernahSiap", DispatcherPernahSiap);
                 FieldBool(sb, "addinExposesIDispatch", AddinExposesIDispatch);
                 FieldInt(sb, "mainThreadId", MainThreadId);
