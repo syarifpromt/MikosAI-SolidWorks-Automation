@@ -43,10 +43,13 @@
       },
       "outputData": {
         "features": "array of {name, typeName, isSuppressed, hasError, parentSketch}",
+        "featureCount": "integer",
+        "suppressedCount": "integer",
         "rebuildRequired": "boolean",
-        "errorCount": "integer"
+        "errorCount": "integer",
+        "fieldsNotPopulated": "array of string"
       },
-      "notes": "errorCount > 0 harus membuat verification verdict minimal WARN. Tree yang punya error bukan tree yang sehat."
+      "notes": "errorCount > 0 harus membuat verification verdict minimal WARN. Tree yang punya error bukan tree yang sehat. parentSketch BELUM DIIMPLEMENTASIKAN dan selalu null - pembaca belum menelusuri hubungan fitur-ke-sketsa. null di situ berarti BELUM DIBACA, bukan 'tidak punya sketsa induk'; Boss-Extrude1 pada part acuan melaporkan null padahal Sketch1 jelas induknya. Ketiadaan itu disiarkan lewat fieldsNotPopulated di setiap jawaban, supaya pemanggil tahu bedanya tanpa membaca dokumen ini."
     },
 
     {
@@ -109,9 +112,12 @@
         }
       },
       "outputData": {
-        "sketches": "array of {name, constrainedStatus, entityCount, dimensionCount, consumedByFeature, hasOpenContour}"
+        "sketches": "array of {name, constrainedStatus, entityCount, dimensionCount|null, consumedByFeature|null, hasOpenContour|null}",
+        "sketchCount": "integer",
+        "fullyDefinedCount": "integer",
+        "fieldsNotPopulated": "array of string"
       },
-      "notes": "constrainedStatus dibaca lewat ISketch.GetConstrainedStatus. Status over-defined atau dangling harus menghasilkan FAIL, bukan WARN."
+      "notes": "constrainedStatus dibaca lewat ISketch.GetConstrainedStatus, yang mengembalikan swConstrainedStatus_e: 1 Unknown, 2 UnderConstrained, 3 FullyConstrained, 4 OverConstrained, 5 NoSolution, 6 InvalidSolution, 7 AutosolveOff. Nilainya DITULIS DI SINI karena pemetaan kami pernah bergeser satu - sketsa fully defined dilaporkan OverDefined, dan yang lebih berbahaya, under-defined dilaporkan FullyDefined. OverDefined, NoSolution, dan InvalidSolution menghasilkan FAIL - bukan WARN. AutosolveOff menjadi Unknown lalu BLOCKED: solver sedang mati, jadi status apa pun tidak berarti. TIGA FIELD BELUM DIIMPLEMENTASIKAN dan selalu null: dimensionCount, consumedByFeature, hasOpenContour. Ketiganya pernah dikirim sebagai 0/null/false yang terbaca sebagai hasil pemeriksaan. Yang paling berbahaya consumedByFeature: null di situ berarti BELUM DIBACA, bukan 'tidak dipakai fitur apa pun' - dan 'tidak dipakai' adalah alasan yang masuk akal untuk MENGHAPUS sketsa di Fase 3. Semuanya disiarkan lewat fieldsNotPopulated."
     },
 
     {
@@ -127,9 +133,9 @@
       },
       "outputData": {
         "count": "integer",
-        "items": "array of {typeName, entityRef, centroid, normal}"
+        "items": "array of {kind, typeName, name|null, centroid|null, normal|null, entityRef|null}"
       },
-      "notes": "entityRef dikembalikan dalam bentuk EntityRef semantik yang bisa langsung dipakai tool lain - BUKAN Face1/Edge1."
+      "notes": "entityRef dikembalikan dalam bentuk EntityRef semantik yang bisa langsung dipakai tool lain - BUKAN Face1/Edge1. entityRef null berarti entitas itu TIDAK bisa dirujuk secara stabil dan tidak boleh dipakai sebagai argumen tool; keadaan itu menghasilkan WARN yang tidak required, bukan kegagalan. kind adalah klasifikasi kami (face, edge, vertex, plane, feature, unknown); typeName adalah nilai swSelectType_e apa adanya, disertakan supaya 'unknown' tetap bisa didiagnosis alih-alih jadi jalan buntu."
     },
 
     {

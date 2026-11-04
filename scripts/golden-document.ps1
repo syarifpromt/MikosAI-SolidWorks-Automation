@@ -321,12 +321,31 @@ else {
         Write-Gagal "entityCount : $jumlahEntitas, diharapkan minimal $minimal"
     }
 
+    # DULU DI SINI ADA ASSERTION HAMPA.
+    #
+    # Versi pertama meng-assert `hasOpenContour -eq $false` dan LULUS - padahal
+    # nilainya hardcoded false dan tidak pernah dibaca dari SolidWorks.
+    # Assertion yang tidak pernah bisa merah tidak menguji apa pun; ia hanya
+    # menambah rasa aman tanpa menambah jaminan.
+    #
+    # Yang diuji sekarang adalah kejujurannya: field yang belum dibaca harus
+    # null, DAN harus diakui di fieldsNotPopulated. Keduanya bisa merah.
     $kontur = Get-Properti $s1 'hasOpenContour'
-    if ([bool]$kontur -eq [bool]$h.sketsa.hasOpenContour) {
-        Write-Lulus "hasOpenContour = $kontur"
+    if ($null -eq $kontur) {
+        Write-Lulus 'hasOpenContour = null (belum dibaca, dan tidak mengaku sudah)'
     }
     else {
-        Write-Gagal "hasOpenContour : diharapkan $($h.sketsa.hasOpenContour), diterima $kontur"
+        Write-Gagal "hasOpenContour : $kontur, diharapkan null selama belum diimplementasikan"
+    }
+
+    $belumDibaca = @(Get-Properti $dataSk 'fieldsNotPopulated')
+    foreach ($f in $h.sketsa.fieldsNotPopulated) {
+        if ($belumDibaca -contains $f) {
+            Write-Lulus "fieldsNotPopulated memuat '$f'"
+        }
+        else {
+            Write-Gagal "fieldsNotPopulated TIDAK memuat '$f' - janji yang tidak ditepati jadi senyap lagi"
+        }
     }
 }
 

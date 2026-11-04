@@ -77,13 +77,19 @@
       "4 segmen.",
       "",
       "Yang benar-benar penting di sini adalah statusnya FullyDefined - dan itu",
-      "yang membongkar pemetaan swConstrainedStatus_e yang bergeser satu."
+      "yang membongkar pemetaan swConstrainedStatus_e yang bergeser satu.",
+      "",
+      "hasOpenContour TIDAK lagi dipatok ke false. Versi pertama berkas ini",
+      "melakukannya, dan assertion itu LULUS tanpa menguji apa pun: nilainya",
+      "hardcoded dan tidak pernah dibaca dari SolidWorks. Yang dipatok sekarang",
+      "adalah kejujurannya - field yang belum dibaca harus null DAN diakui di",
+      "fieldsNotPopulated. Keduanya bisa merah."
     ],
     "sketchCount": 1,
     "fullyDefinedCount": 1,
     "constrainedStatus": "FullyDefined",
     "entityCountMinimal": 4,
-    "hasOpenContour": false
+    "fieldsNotPopulated": ["dimensionCount", "consumedByFeature", "hasOpenContour"]
   },
 
   "toleransi": {

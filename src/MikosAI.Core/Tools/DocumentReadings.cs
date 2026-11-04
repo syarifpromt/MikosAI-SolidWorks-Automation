@@ -39,6 +39,17 @@ namespace MikosAI.Core.Tools
         public string? TypeName { get; set; }
         public bool IsSuppressed { get; set; }
         public bool HasError { get; set; }
+        /// <summary>
+        /// Sketsa induk fitur ini. null berarti BELUM DIBACA, bukan "tidak punya".
+        ///
+        /// Pembaca belum menelusuri hubungan fitur-ke-sketsa, jadi field ini
+        /// selalu null hari ini - termasuk untuk Boss-Extrude1 yang jelas punya
+        /// sketsa induk. Dibiarkan null dan DIAKUI, bukan diisi tebakan.
+        ///
+        /// Lihat catatan `fieldsNotPopulated` di ReadOnlyToolShaper: ketiadaan
+        /// ini disiarkan ke pemanggil, bukan hanya ditulis di komentar yang
+        /// tidak dibaca siapa pun saat tool dipanggil.
+        /// </summary>
         public string? ParentSketch { get; set; }
     }
 
@@ -146,12 +157,35 @@ namespace MikosAI.Core.Tools
         public string Name { get; set; } = string.Empty;
         public SketchConstraintStatus ConstrainedStatus { get; set; } = SketchConstraintStatus.Unknown;
         public int EntityCount { get; set; }
-        public int DimensionCount { get; set; }
 
-        /// <summary>Nama fitur yang mengkonsumsi sketsa ini, atau null.</summary>
+        /// <summary>
+        /// Jumlah dimensi. null berarti BELUM DIBACA.
+        ///
+        /// Dulu bertipe `int` dan selalu bernilai 0, dengan komentar yang
+        /// menyebut nol itu "jujur". Itu salah, dan melanggar aturan kami
+        /// sendiri: hitungan nol adalah fakta, tapi hanya kalau benar-benar
+        /// dihitung. Nol yang tidak pernah dihitung adalah karangan yang
+        /// kebetulan terlihat seperti hitungan.
+        /// </summary>
+        public int? DimensionCount { get; set; }
+
+        /// <summary>
+        /// Fitur yang mengkonsumsi sketsa ini. null berarti BELUM DIBACA -
+        /// BUKAN "tidak dikonsumsi siapa pun".
+        ///
+        /// Perbedaan itu menentukan di Fase 3: "tidak dipakai fitur apa pun"
+        /// adalah alasan yang masuk akal untuk MENGHAPUS sebuah sketsa.
+        /// </summary>
         public string? ConsumedByFeature { get; set; }
 
-        public bool HasOpenContour { get; set; }
+        /// <summary>
+        /// Apakah ada kontur terbuka. null berarti BELUM DIPERIKSA.
+        ///
+        /// Dulu bertipe `bool` dan selalu `false` - yaitu klaim "sudah
+        /// diperiksa, sketsanya tertutup" yang tidak pernah diperiksa. Golden
+        /// test sempat meng-assert nilai itu dan lulus tanpa menguji apa pun.
+        /// </summary>
+        public bool? HasOpenContour { get; set; }
     }
 
     /// <summary>

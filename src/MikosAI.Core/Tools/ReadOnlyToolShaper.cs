@@ -95,6 +95,7 @@ namespace MikosAI.Core.Tools
                 ["suppressedCount"] = tersupresi,
                 ["errorCount"] = bererror.Count,
                 ["rebuildRequired"] = reading.RebuildRequired,
+                ["fieldsNotPopulated"] = FieldBelumDibaca.ListFitur,
             };
 
             var checks = new List<VerificationCheck>();
@@ -380,6 +381,7 @@ namespace MikosAI.Core.Tools
                 }).ToList(),
                 ["sketchCount"] = readings.Count,
                 ["fullyDefinedCount"] = readings.Count(s => s.ConstrainedStatus == SketchConstraintStatus.FullyDefined),
+                ["fieldsNotPopulated"] = FieldBelumDibaca.ListSketsa,
             };
 
             var checks = new List<VerificationCheck>();

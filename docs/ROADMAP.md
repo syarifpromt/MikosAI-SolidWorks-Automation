@@ -181,7 +181,14 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
 
 - [ ] Test: tanpa TLB, add-in tidak terinstansiasi walaupun `LoadAddIn=0`
 - [x] Test: setiap metode yang menyentuh API menolak thread selain utama — `AddinThreadGuardTests`
-- [ ] Tinjau `schemas/tools.json` bersama
+- [x] Tinjau `schemas/tools.json` bersama — tanggapan di
+      `docs/tinjauan-tools-json.md`. Tinjauan itu menemukan lubang nyata; meninjau
+      balik menemukan yang tidak disebutnya: **kontrak menjanjikan empat field yang
+      pembacanya tidak pernah isi**, dan salah satunya membuat assertion golden test
+      kami sendiri hampa. Tiga keputusan harus diambil SEBELUM tool tulis ditulis,
+      karena ketiganya membentuk tanda tangan tool: kebijakan recovery, sistem
+      koordinat `hole_wizard.positions`, dan nasib `fully_define_sketch` setelah
+      `add_relation` ada
 
 ### Gerbang penerimaan Fase 0
 
