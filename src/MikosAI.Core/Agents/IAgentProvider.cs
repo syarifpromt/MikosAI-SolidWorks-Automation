@@ -48,9 +48,31 @@ namespace MikosAI.Core.Agents
 
         /// <summary>
         /// Direktori kerja. Untuk Antigravity ini folder AgentWorkspace milik
-        /// add-in, yang memuat .agents/mcp_config.json.
+        /// add-in.
+        ///
+        /// Dulu komentar di sini menyebut ".agents/mcp_config.json" sebagai
+        /// alasannya. Berkas itu terbukti DIABAIKAN agy - pendaftaran MCP
+        /// bersifat global lewat `agy mcp add` - jadi alasan cwd tinggal satu:
+        /// menjaga proses anak tidak menulis apa pun ke folder repo pengguna.
         /// </summary>
         public string WorkingDirectory { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Path berkas setelan sesi yang diteruskan lewat <c>--settings</c>.
+        /// null berarti tidak diteruskan.
+        ///
+        /// Isinya aturan izin MCP, dan tanpanya SEMUA tool kita ditolak di mode
+        /// headless - lihat AntigravityCommand.BuatArgumen.
+        ///
+        /// PATH BERKAS, BUKAN JSON INLINE. PowerShell 5.1 melepas tanda kutip
+        /// ganda saat meneruskan argumen ke exe native, dan `agy` menolak hasil
+        /// pelepasan itu dengan "invalid character 'p' looking for beginning of
+        /// object key string". Melewatkan path menghapus seluruh persoalan
+        /// kutip-mengutip, dan `--settings` memang menerima keduanya.
+        ///
+        /// Berkasnya TIDAK memuat secret apa pun - hanya aturan izin.
+        /// </summary>
+        public string? BerkasIzin { get; set; }
 
         public string? Model { get; set; }
 

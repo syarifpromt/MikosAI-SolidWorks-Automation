@@ -279,7 +279,9 @@ Fase paling berisiko. **Baca `docs/integrasi-antigravity.md` seluruhnya sebelum 
 - [x] 3. Nama field sebenarnya untuk isi jawaban di envelope `json`
 - [x] 4. Apakah `stream-json` didukung, dan bentuk event-nya
 - [x] 5. Apakah entry `serverUrl` mendukung custom header untuk bearer token
-- [ ] 6. Apakah `.agents/mcp_config.json` dibaca relatif ke cwd, menggantikan atau menggabung
+- [x] 6. ~~Apakah `.agents/mcp_config.json` dibaca relatif ke cwd~~ — **TIDAK, diabaikan
+      sepenuhnya.** Pendaftaran global lewat `agy mcp add`. Penulisan berkas itu sudah
+      dihapus beserta salinan token di dalamnya
 - [x] 7. Rate limit — satu permintaan ~4 detik, ~6.8k token input; batas belum diuji
 - [ ] 8. ToS: orkestrasi eksternal dengan pemakaian berbasis akun — **risiko legal, bukan teknis**
 
@@ -304,9 +306,14 @@ Fase paling berisiko. **Baca `docs/integrasi-antigravity.md` seluruhnya sebelum 
 ### Gerbang penerimaan Fase 2
 
 - [ ] Chat di TaskPane → `agy` → MCP → tool read-only → jawaban muncul di UI
+      — **penghalangnya sudah dibuka:** pembangun perintah provider tidak pernah mengirim
+      aturan izin MCP, jadi setiap tool akan ditolak dan panel menampilkan jawaban kosong
+      dengan `status: SUCCESS`. Sekarang `--settings` dikirim dan penolakan dilaporkan
+      sebagai `provider_permission_denied`. Tinggal diuji dari panelnya
 - [ ] Bug silent non-TTY terbukti tertangani — ada test yang gagal kalau ConPTY dilepas
 - [ ] Keadaan belum terautentikasi memberi panduan jelas, bukan error mentah
-- [ ] Semua 8 item verifikasi terjawab dan terdokumentasi di repo
+- [x] **7 dari 8** item verifikasi terjawab dan terdokumentasi. Yang tersisa hanya item 8
+      (ToS), yang risiko legal — bukan teknis, dan bukan milik kode untuk menjawabnya
 - [x] Status tidak dikenal mendarat di `BLOCKED`, dibuktikan test
 - [x] `RecoveryAdvisor` tidak pernah mengusulkan `retry` untuk error tidak dikenal
 

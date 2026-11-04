@@ -47,6 +47,27 @@ namespace MikosAI.Core.Agents
             argumen.Add("-p");
             argumen.Add(request.Prompt ?? string.Empty);
 
+            // IZIN MCP. TANPA INI, SEMUA TOOL KITA DITOLAK.
+            //
+            // Mode -p tidak bisa menampilkan prompt izin, jadi agy menolak
+            // otomatis dan jawabannya kosong:
+            //
+            //   "status": "SUCCESS", "response": "",
+            //   "denied_actions": [{"action": "mcp", "display_name": "CallMcpTool"}]
+            //
+            // Perhatikan status SUCCESS dan exit code 0. Dari luar itu terlihat
+            // seperti provider yang diam - dan deteksi provider_silent kita akan
+            // menyalahkan hal yang salah.
+            //
+            // Dokumen integrasi kami sempat menyatakan perizinan headless
+            // "dampaknya kecil, karena operasi CAD diekspos lewat MCP bukan
+            // shell". Itu terbalik: justru MCP yang kena.
+            if (probe.Supports("--settings") && !string.IsNullOrEmpty(request.BerkasIzin))
+            {
+                argumen.Add("--settings");
+                argumen.Add(request.BerkasIzin!);
+            }
+
             if (probe.Supports("--output-format"))
             {
                 argumen.Add("--output-format");
@@ -67,6 +88,36 @@ namespace MikosAI.Core.Agents
 
             return argumen;
         }
+
+        /// <summary>
+        /// Isi berkas setelan sesi untuk <c>--settings</c>.
+        ///
+        /// Satu sumber kebenaran: dipakai add-in maupun
+        /// <c>scripts/mcp-roundtrip.ps1</c>. Aturan izin yang menyimpang antara
+        /// alat verifikasi dan produk berarti verifikasinya menguji keadaan yang
+        /// bukan keadaan sebenarnya.
+        ///
+        /// SINTAKSNYA <c>mcp(&lt;server&gt;/&lt;tool&gt;)</c>, DENGAN GARIS MIRING.
+        /// Bentuk tanpa garis miring - <c>mcp(mikosai-solidworks)</c> - diterima
+        /// sebagai JSON yang sah tapi TIDAK cocok dengan apa pun, jadi toolnya
+        /// tetap ditolak tanpa keluhan soal aturannya. Bentuk yang benar diambil
+        /// dari string di dalam agy.exe:
+        ///
+        ///     mcp(&lt;server_name&gt;/&lt;tool_name&gt;)
+        ///     mcp(chrome_devtools/*)
+        ///     mcp(*)
+        ///
+        /// Lingkupnya server KITA saja, bukan <c>mcp(*)</c>: memberi izin lebih
+        /// luas daripada yang dibutuhkan berarti menukar satu masalah dengan
+        /// masalah yang lebih besar.
+        ///
+        /// Dan BUKAN <c>--dangerously-skip-permissions</c>, yang menyetujui
+        /// semua tool termasuk perintah shell.
+        ///
+        /// Berkasnya tidak memuat secret apa pun.
+        /// </summary>
+        public static string IsiBerkasIzin()
+            => "{\"permissions\":{\"allow\":[\"mcp(" + NamaServerMcp + "/*)\"]}}";
 
         /// <summary>
         /// Format keluaran: stream-json kalau bisa, karena hanya itu yang

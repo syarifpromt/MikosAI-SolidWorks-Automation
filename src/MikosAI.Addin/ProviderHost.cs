@@ -243,7 +243,17 @@ namespace MikosAI.Addin
                 Prompt = prompt,
                 WorkingDirectory = workingDirectory,
                 PreferStreaming = onDelta is not null,
+                BerkasIzin = SiapkanBerkasIzin(workingDirectory),
             };
+
+            if (permintaan.BerkasIzin is null)
+            {
+                // Tanpa aturan izin, SETIAP tool kita akan ditolak dan jawabannya
+                // kosong dengan status SUCCESS. Lebih baik dikatakan sekarang
+                // daripada muncul sebagai jawaban kosong yang tidak dijelaskan.
+                _diagnostics.AddError(
+                    "berkas izin MCP tidak bisa ditulis - tool akan ditolak agy di mode headless");
+            }
 
             try
             {
@@ -381,6 +391,49 @@ namespace MikosAI.Addin
                                      ? "Adapter provider belum diaktifkan di versi ini."
                                      : null),
             };
+
+        /// <summary>
+        /// Menulis berkas setelan sesi untuk <c>--settings</c>, dan mengembalikan
+        /// path-nya. null kalau gagal.
+        ///
+        /// Ditulis ulang setiap permintaan alih-alih sekali saat connect: isinya
+        /// murah, dan berkas yang terhapus di antara permintaan tidak boleh
+        /// mematikan chat secara diam-diam.
+        ///
+        /// TANPA BOM. Parser JSON agy menolak BOM dengan
+        /// "invalid character '﻿' looking for beginning of value", dan itu
+        /// kesalahan yang mudah terulang karena hampir semua penulis berkas di
+        /// Windows memasangnya secara default.
+        ///
+        /// Isinya dari AntigravityCommand.IsiBerkasIzin supaya add-in dan
+        /// scripts/mcp-roundtrip.ps1 tidak pernah menyimpang.
+        /// </summary>
+        private string? SiapkanBerkasIzin(string workingDirectory)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(workingDirectory))
+                {
+                    return null;
+                }
+
+                System.IO.Directory.CreateDirectory(workingDirectory);
+
+                var path = System.IO.Path.Combine(workingDirectory, "agy-settings.json");
+
+                System.IO.File.WriteAllText(
+                    path,
+                    AntigravityCommand.IsiBerkasIzin(),
+                    new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+                return path;
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("menulis berkas izin agy", exception);
+                return null;
+            }
+        }
 
         public void Dispose()
         {

@@ -280,7 +280,22 @@ Dua jebakan teknis saat meneruskannya, keduanya ditemukan dengan cara yang mahal
   `invalid character '﻿' looking for beginning of value`. Pakai
   `UTF8Encoding($false)`.
 
-Lihat `scripts/mcp-roundtrip.ps1`.
+### Satu sumber kebenaran
+
+Aturannya ada di `AntigravityCommand.IsiBerkasIzin()`, dan DUA pemakai mengambilnya dari
+sana: add-in saat menjalankan `agy` dari panel, dan `scripts/mcp-roundtrip.ps1`.
+
+Itu bukan kerapian belaka. Aturan izin yang menyimpang antara alat verifikasi dan produk
+berarti verifikasinya menguji keadaan yang bukan keadaan sebenarnya — dan kita hampir
+terjebak di situ: round-trip dari CLI lulus 10/10 dengan aturan yang ditulis di script,
+sementara pembangun perintah provider tidak mengirim aturan itu **sama sekali**. Chat di
+panel akan menabrak dinding yang sama, dengan gejala yang jauh lebih sulit dibaca.
+
+`AgentRequest.BerkasIzin` meneruskan path berkasnya; `ProviderHost` menuliskannya ulang
+setiap permintaan. Kalau penulisannya gagal, itu dicatat ke diagnostik — bukan dibiarkan
+muncul sebagai jawaban kosong nanti.
+
+Lihat `scripts/mcp-roundtrip.ps1` dan `AntigravityCommand.BuatArgumen`.
 
 ### Yang masih benar dari dugaan awal
 

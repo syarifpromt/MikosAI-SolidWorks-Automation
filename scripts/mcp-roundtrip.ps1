@@ -130,6 +130,35 @@ Add-Type -AssemblyName System.Net.Http | Out-Null
 $script:Klien = [System.Net.Http.HttpClient]::new()
 $script:Klien.Timeout = [TimeSpan]::FromSeconds($TimeoutSec)
 
+function Get-IsiBerkasIzin {
+    <#
+        Mengambil isi berkas setelan izin dari MikosAI.Core.
+
+        SATU SUMBER KEBENARAN. Aturan izin yang dipakai script verifikasi harus
+        PERSIS yang dipakai add-in, kalau tidak verifikasinya menguji keadaan
+        yang bukan keadaan sebenarnya.
+
+        Core dimuat lewat LoadFrom, bukan Load(byte[]): assembly tanpa lokasi
+        tidak bisa menemukan dependensinya, dan menambalnya dengan handler
+        AssemblyResolve berupa scriptblock PowerShell pernah menghasilkan gejala
+        yang jauh lebih sulit dibaca - lihat tools/MikosAI.McpHarness.
+
+        Kalau Core belum dibangun, script tidak menebak isinya: ia berhenti.
+        Aturan izin yang salah gagal DIAM-DIAM, dan menebaknya hanya memindahkan
+        kegagalan ke tempat yang lebih sulit dilihat.
+    #>
+    $core = Join-Path (Split-Path -Parent $PSScriptRoot) 'src\MikosAI.Core\bin\Release\net48\MikosAI.Core.dll'
+
+    if (-not (Test-Path -LiteralPath $core)) {
+        throw "MikosAI.Core.dll tidak ada di $core`nBangun dulu: dotnet build src\MikosAI.Core\MikosAI.Core.csproj -c Release"
+    }
+
+    $asm = [System.Reflection.Assembly]::LoadFrom($core)
+    $tipe = $asm.GetType('MikosAI.Core.Agents.AntigravityCommand', $true)
+
+    return $tipe.GetMethod('IsiBerkasIzin').Invoke($null, @())
+}
+
 function Get-Properti {
     <#
         Membaca properti yang mungkin tidak ada.
@@ -407,24 +436,23 @@ if ($Agy) {
             #
             # UTF8Encoding($false) adalah satu-satunya cara ringkas untuk menulis
             # UTF-8 tanpa BOM di PowerShell 5.1.
-            # SINTAKSNYA mcp(<server>/<tool>), BUKAN mcp(<server>).
+            # ISINYA DIAMBIL DARI MikosAI.Core, BUKAN DITULIS ULANG DI SINI.
             #
-            # Percobaan dengan mcp(mikosai-solidworks) diterima sebagai JSON yang
-            # sah tapi TIDAK cocok dengan apa pun, jadi tool-nya tetap ditolak -
-            # gagal diam-diam, tanpa keluhan soal aturannya.
+            # AntigravityCommand.IsiBerkasIzin() adalah sumber yang sama yang
+            # dipakai add-in saat menjalankan agy dari panel. Kalau aturan izin
+            # di alat verifikasi menyimpang dari aturan di produk, verifikasinya
+            # menguji keadaan yang bukan keadaan sebenarnya - dan itu lebih buruk
+            # daripada tidak memverifikasi.
             #
-            # Bentuk yang benar diambil dari string di dalam agy.exe sendiri:
-            #
-            #   mcp(<server_name>/<tool_name>)
-            #   mcp(chrome_devtools/*)
-            #   mcp(*)
-            #
-            # Dipakai lingkup server kita saja, bukan mcp(*): yang diuji adalah
-            # tool kita, dan memberi izin lebih luas daripada yang diuji membuat
-            # hasilnya tidak mewakili pemakaian sehari-hari.
+            # Sintaksnya mcp(<server>/<tool>) dengan garis miring; alasannya ada
+            # di XML doc metode itu.
+            $isiIzin = Get-IsiBerkasIzin
+
+            # TANPA BOM: parser JSON agy menolaknya dengan
+            # "invalid character '﻿' looking for beginning of value".
             [System.IO.File]::WriteAllText(
                 $berkasIzin,
-                '{"permissions":{"allow":["mcp(mikosai-solidworks/*)"]}}',
+                $isiIzin,
                 (New-Object System.Text.UTF8Encoding $false))
 
             # TANPA 2>&1, dan itu disengaja.

@@ -136,6 +136,53 @@ namespace MikosAI.Core.Agents
 
             var objek = BukaEnvelope(mentahObjek);
 
+            // IZIN DITOLAK: DIPERIKSA SEBELUM status, KARENA status-nya SUCCESS.
+            //
+            // Kalau agy menolak tool di lapisan izin, jawabannya begini:
+            //
+            //   {"status":"SUCCESS","response":"",
+            //    "denied_actions":[{"action":"mcp","display_name":"CallMcpTool"}]}
+            //
+            // Exit code 0, status SUCCESS, stdout TIDAK kosong - jadi
+            // DetectSilent tidak menyala dan pemeriksaan status lolos. Tanpa
+            // pemeriksaan ini, panel menampilkan jawaban kosong tanpa penjelasan
+            // apa pun: persis mode kegagalan yang kelas ini dibuat untuk
+            // mencegah, masuk lewat pintu lain.
+            var ditolak = objek["denied_actions"] as JsonArray;
+
+            if (ditolak is not null && ditolak.Count > 0)
+            {
+                var nama = new List<string>();
+                foreach (var item in ditolak)
+                {
+                    var aksi = item is JsonObject o
+                        ? AmbilTeks(o, "display_name", "action")
+                        : item?.ToString();
+
+                    if (!string.IsNullOrWhiteSpace(aksi))
+                    {
+                        nama.Add(aksi!);
+                    }
+                }
+
+                var daftar = nama.Count > 0 ? string.Join(", ", nama) : $"{ditolak.Count} aksi";
+
+                return new AgentResult
+                {
+                    Summary = AmbilTeks(objek, "response", "summary", "message"),
+                    Failure = new AgentFailure
+                    {
+                        Code = "provider_permission_denied",
+                        Message = $"Provider menolak aksi di lapisan izinnya sendiri: {daftar}. "
+                                  + "Jawabannya kosong karena toolnya TIDAK PERNAH dijalankan - "
+                                  + "ini bukan jawaban AI yang kosong, dan bukan server MCP kita yang gagal.",
+                        NextAction = "Mode headless tidak bisa menampilkan prompt izin, jadi aturannya harus "
+                                     + "diberikan lewat --settings. Pastikan AgentRequest.BerkasIzin terisi; "
+                                     + "lihat AntigravityCommand.IsiBerkasIzin.",
+                    },
+                };
+            }
+
             // agy melaporkan keberhasilan lewat field status. Nilai selain
             // SUCCESS diperlakukan sebagai kegagalan, dan nilai yang TIDAK
             // DIKENAL juga - default aman, sama seperti di VerificationGate.
