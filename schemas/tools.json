@@ -85,9 +85,11 @@
         "massGrams": "number|null",
         "surfaceAreaMm2": "number|null",
         "centerOfMass": "Vector3D (mm)|null",
-        "densityAssigned": "boolean"
+        "densityAssigned": "boolean|null",
+        "materialName": "string|null",
+        "densityKgM3": "number|null"
       },
-      "notes": "massGrams null kalau material belum di-assign. JANGAN mengarang massa dari densitas default lalu menyajikannya sebagai fakta. Aturan yang sama berlaku untuk volumeMm3, surfaceAreaMm2, dan centerOfMass: ukuran yang tidak ada dilaporkan null, bukan nol. surfaceAreaMm2 dinilai sendiri karena surface body punya area tanpa volume. centerOfMass digantungkan pada volume, BUKAN pada isinya sendiri - {0,0,0} adalah pusat massa yang sah untuk part simetris di titik asal."
+      "notes": "massGrams null kalau material belum di-assign. JANGAN mengarang massa dari densitas default lalu menyajikannya sebagai fakta - SolidWorks selalu mengembalikan massa, memakai densitas default 1000 kg/m3 kalau material tidak ada, dan status perhitungannya tetap 0. Jadi status sukses BUKAN bukti material ada; yang menentukan adalah nama materialnya. densityAssigned punya tiga keadaan: true material ada, false material tidak ada dan massa ditahan, null tidak bisa ditanyakan untuk tipe dokumen ini (assembly punya material per komponen) - di keadaan null massa dilaporkan tapi ditandai butuh tinjauan manusia. materialName dan densityKgM3 adalah BUKTI, bukan hiasan: bandingkan densityKgM3 dengan material yang kamu harapkan, karena 1000 kg/m3 pada part baja langsung terlihat salah sementara angka massanya sendirian terdengar wajar. Ukuran yang tidak ada dilaporkan null, bukan nol: itu berlaku untuk volumeMm3, surfaceAreaMm2, dan centerOfMass. surfaceAreaMm2 dinilai sendiri karena surface body punya area tanpa volume. centerOfMass digantungkan pada volume, BUKAN pada isinya sendiri - {0,0,0} adalah pusat massa yang sah untuk part simetris di titik asal."
     },
 
     {

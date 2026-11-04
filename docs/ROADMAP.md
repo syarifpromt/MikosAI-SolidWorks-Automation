@@ -131,7 +131,6 @@ SolidWorks dan punya kanal thread yang benar.
 - [x] `Tools/ToolCatalog.cs` — katalog + validasi silang terhadap ledger
 - [x] Harness golden test tanpa SolidWorks — `PlanRunner` + `FakeToolExecutor`
 - [x] `examples/mounting-plate.plan.json` sebagai target
-- [ ] **Tinjau `schemas/tools.json` bersama** sebelum dianggap final
 
 ### Sudah selesai di `MikosAI.Core`
 
@@ -188,7 +187,6 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
       Dibuktikan `status: disconnected` di `host-status.json` dan `crash.log`
       kosong dari exception — bukan sekadar tidak adanya laporan crash.
 - [x] `capabilities.yaml` tervalidasi
-- [ ] 18 skema tool disetujui kedua orang
 
 ---
 

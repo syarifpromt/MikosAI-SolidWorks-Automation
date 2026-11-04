@@ -224,7 +224,21 @@ namespace MikosAI.Core.Tools
             var data = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["volumeMm3"] = adaVolume ? (double?)Bulatkan(reading.VolumeMm3) : null,
-                ["massGrams"] = reading.MassGrams,
+
+                // REDUNDANSI YANG DISENGAJA.
+                //
+                // Pembaca sudah seharusnya membiarkan massa null kalau material
+                // belum di-assign. Tapi justru di situ bug-nya bertahan lama
+                // tanpa terlihat, dan pembaca hidup di MikosAI.Addin yang tidak
+                // bisa diuji tanpa SolidWorks terpasang.
+                //
+                // Aturannya ditegakkan ulang di sini, di satu-satunya tempat
+                // yang bisa diuji otomatis. Kalau pembacanya keliru lagi,
+                // angkanya tidak lolos - dan check di bawah melaporkan
+                // ketidakkonsistenannya alih-alih menyembunyikannya.
+                ["massGrams"] = reading.DensityAssigned == false
+                    ? null
+                    : (reading.MassGrams is null ? null : (double?)Bulatkan(reading.MassGrams.Value)),
 
                 // Area diperiksa sendiri, bukan ikut volume: surface body punya
                 // area tanpa volume, dan itu pembacaan sungguhan.
@@ -236,7 +250,17 @@ namespace MikosAI.Core.Tools
                 // massa tidak punya arti.
                 ["centerOfMass"] = adaVolume ? Vektor(reading.CenterOfMass) : null,
 
+                // Tiga keadaan: true / false / null. null berarti tidak bisa
+                // ditanyakan untuk tipe dokumen ini, bukan "tidak ada".
                 ["densityAssigned"] = reading.DensityAssigned,
+
+                // Bukti untuk klaim di atas. Tanpa keduanya, klaim bahwa massa
+                // bisa dipercaya tidak bisa diperiksa siapa pun - dan itulah
+                // yang membuat bug densitas default bertahan tanpa terlihat.
+                ["materialName"] = reading.MaterialName,
+                ["densityKgM3"] = reading.DensityKgM3 is null
+                    ? null
+                    : (double?)Bulatkan(reading.DensityKgM3.Value),
             };
 
             var checks = new List<VerificationCheck>();
@@ -257,7 +281,31 @@ namespace MikosAI.Core.Tools
                 });
             }
 
-            if (!reading.DensityAssigned)
+            var manualReview = false;
+
+            if (reading.DensityAssigned is null)
+            {
+                // TIDAK BISA DITANYAKAN - mis. assembly, yang materialnya per
+                // komponen dan bukan satu nilai tunggal.
+                //
+                // Massanya tetap dilaporkan, karena ia mungkin benar. Tapi ia
+                // ditandai butuh tinjauan manusia, dan itu disengaja: angka
+                // massa dipakai untuk keputusan teknik, jadi kalau harus salah,
+                // lebih baik salah ke arah "jangan percaya buta".
+                checks.Add(new VerificationCheck
+                {
+                    Id = "material_assigned",
+                    Verdict = Verdict.Warn,
+                    Required = false,
+                    Message = "Material tidak bisa ditanyakan untuk tipe dokumen ini - "
+                              + "assembly punya material per komponen, bukan satu nilai. "
+                              + "Massa dilaporkan apa adanya tapi BELUM diverifikasi; "
+                              + "periksa densityKgM3 terhadap material yang kamu harapkan.",
+                });
+
+                manualReview = true;
+            }
+            else if (reading.DensityAssigned == false)
             {
                 checks.Add(new VerificationCheck
                 {
@@ -267,6 +315,24 @@ namespace MikosAI.Core.Tools
                     Message = "Material belum di-assign, jadi massa tidak bisa dihitung. "
                               + "Angka massa TIDAK dikarang dari densitas default.",
                 });
+
+                if (reading.MassGrams is not null)
+                {
+                    // Pembaca memberi massa padahal material tidak ada. Angkanya
+                    // sudah ditahan di atas, tapi ia TIDAK boleh hilang diam-diam:
+                    // itu bug di lapisan pembacaan, dan kalau tidak dilaporkan ia
+                    // akan bertahan lama persis seperti sebelumnya.
+                    checks.Add(new VerificationCheck
+                    {
+                        Id = "mass_consistent_with_material",
+                        Verdict = Verdict.Blocked,
+                        Required = true,
+                        Observed = reading.MassGrams,
+                        Message = "Massa diberikan padahal material belum di-assign - "
+                                  + "hampir pasti dihitung dari densitas default. "
+                                  + "Angkanya ditahan, dan ini bug di lapisan pembacaan.",
+                    });
+                }
             }
             else if (reading.MassGrams is null)
             {
@@ -281,10 +347,11 @@ namespace MikosAI.Core.Tools
             }
             else
             {
+                checks.Add(VerificationCheck.Pass("material_assigned", reading.MaterialName));
                 checks.Add(VerificationCheck.Pass("mass_readable", reading.MassGrams));
             }
 
-            return Sukses(data, checks);
+            return Sukses(data, checks, manualReview);
         }
 
         // --- inspect_sketches -------------------------------------------------
@@ -494,7 +561,8 @@ namespace MikosAI.Core.Tools
 
         private static ToolResult Sukses(
             IReadOnlyDictionary<string, object?> data,
-            IReadOnlyList<VerificationCheck> checks)
+            IReadOnlyList<VerificationCheck> checks,
+            bool manualReviewRequired = false)
             => new ToolResult
             {
                 Ok = true,
@@ -502,7 +570,10 @@ namespace MikosAI.Core.Tools
                 Data = data,
                 // Read-only: tidak ada yang ditulis, jadi tidak ada yang perlu
                 // dibuktikan lewat baca-ulang.
-                Verification = VerificationGate.Evaluate(checks, requiresEvidence: false),
+                Verification = VerificationGate.Evaluate(
+                    checks,
+                    manualReviewRequired: manualReviewRequired,
+                    requiresEvidence: false),
             };
     }
 }

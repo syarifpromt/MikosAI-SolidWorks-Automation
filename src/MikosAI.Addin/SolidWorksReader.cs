@@ -258,6 +258,41 @@ namespace MikosAI.Addin
                 return hasil;
             }
 
+            // MATERIAL DITANYAKAN, BUKAN DISIMPULKAN.
+            //
+            // Versi sebelumnya menyimpulkan "material ada" dari status == 0 dan
+            // massa > 0. Itu salah, dan salahnya tidak kelihatan: SolidWorks
+            // SELALU mengembalikan massa, memakai densitas default 1000 kg/m3
+            // kalau material belum di-assign, dan status tetap 0 karena
+            // perhitungannya sendiri berhasil.
+            //
+            // Akibatnya balok 100266 mm3 dilaporkan 100,27 gram dengan
+            // densityAssigned: true - angka air yang disajikan sebagai fakta,
+            // tepat yang dilarang catatan di MassPropertiesReading.
+            //
+            // Satu-satunya cara menjawabnya adalah menanyakan nama materialnya.
+            var jenis = 0;
+            Coba("GetType untuk material", () => jenis = model.GetType());
+
+            if (jenis == 1)   // part
+            {
+                Coba("GetMaterialPropertyName2", () =>
+                {
+                    var konfigurasi = model.ConfigurationManager?.ActiveConfiguration?.Name ?? string.Empty;
+
+                    var nama = ((IPartDoc)model).GetMaterialPropertyName2(konfigurasi, out _);
+
+                    hasil.MaterialName = string.IsNullOrWhiteSpace(nama) ? null : nama.Trim();
+                    hasil.DensityAssigned = hasil.MaterialName is not null;
+                });
+            }
+            else
+            {
+                // Assembly dan drawing tidak punya satu material tunggal.
+                // null berarti "tidak bisa ditanyakan" - bukan "tidak ada".
+                hasil.DensityAssigned = null;
+            }
+
             Coba("GetMassProperties2", () =>
             {
                 // Susunan: [cgX, cgY, cgZ, volume, area, massa, ...] dalam SI.
@@ -279,13 +314,29 @@ namespace MikosAI.Addin
                 hasil.VolumeMm3 = nilai[3] * 1e9;
                 hasil.SurfaceAreaMm2 = nilai[4] * 1e6;
 
-                // status != 0 berarti massa tidak bisa dipercaya - mis. material
-                // belum di-assign. JANGAN mengarang angkanya; itu angka yang
-                // dipakai orang untuk keputusan teknik.
-                if (status == 0 && nilai[5] > 0)
+                // status != 0 berarti perhitungannya sendiri gagal.
+                //
+                // Massa hanya dilaporkan kalau material TIDAK terbukti absen.
+                // Untuk part tanpa material, DensityAssigned == false dan
+                // massanya dibiarkan null - karena angka yang ada di nilai[5]
+                // di situ dihitung dari densitas default, dan menyajikannya
+                // sebagai fakta persis yang dilarang.
+                //
+                // DensityAssigned == null (assembly) TETAP melaporkan massanya:
+                // ia mungkin benar, dan shaper menandainya butuh tinjauan
+                // manusia alih-alih menyembunyikannya.
+                if (status == 0 && nilai[5] > 0 && hasil.DensityAssigned != false)
                 {
-                    hasil.DensityAssigned = true;
                     hasil.MassGrams = nilai[5] * 1000.0;   // kg -> gram
+
+                    // Densitas yang BENAR-BENAR dipakai, supaya angkanya bisa
+                    // diaudit. Inilah yang akan membongkar kekeliruan serupa
+                    // berikutnya dalam sekali pandang: nilai 1000 kg/m3 pada
+                    // part yang seharusnya baja langsung terlihat salah.
+                    if (nilai[3] > 1e-12)
+                    {
+                        hasil.DensityKgM3 = nilai[5] / nilai[3];   // kg / m^3
+                    }
                 }
             });
 

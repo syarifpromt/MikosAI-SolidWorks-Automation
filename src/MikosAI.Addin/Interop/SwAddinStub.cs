@@ -121,6 +121,10 @@ namespace SolidWorks.Interop.sldworks
         object GetBodies2(int BodyType, bool BVisibleOnly);
 
         object GetPartBox(bool NoConversion);
+
+        // Tanda tangan direfleksikan dari PIA sungguhan:
+        //   String GetMaterialPropertyName2(String ConfigName, out String& Database)
+        string GetMaterialPropertyName2(string ConfigName, out string Database);
     }
 
     public interface ISketch

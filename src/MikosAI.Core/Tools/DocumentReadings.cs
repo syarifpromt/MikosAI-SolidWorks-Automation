@@ -73,10 +73,47 @@ namespace MikosAI.Core.Tools
         /// <summary>
         /// null kalau material belum di-assign. JANGAN diisi dari densitas
         /// default lalu disajikan sebagai fakta.
+        ///
+        /// Catatan ini sudah ada sejak awal, tapi SELAMA INI DILANGGAR tanpa
+        /// disadari: SolidWorks selalu mengembalikan massa, memakai densitas
+        /// default 1000 kg/m3 kalau material belum di-assign, dan status
+        /// perhitungannya tetap 0 karena perhitungannya sendiri berhasil.
+        /// Jadi "status sukses" bukan bukti material ada.
         /// </summary>
         public double? MassGrams { get; set; }
 
-        public bool DensityAssigned { get; set; }
+        /// <summary>
+        /// Nama material yang di-assign, atau null kalau tidak ada.
+        ///
+        /// Ini BUKTI untuk klaim <see cref="DensityAssigned"/>, bukan hiasan.
+        /// Tanpa nama materialnya, klaim bahwa massa bisa dipercaya tidak bisa
+        /// diperiksa siapa pun.
+        /// </summary>
+        public string? MaterialName { get; set; }
+
+        /// <summary>
+        /// Densitas yang BENAR-BENAR dipakai, diturunkan dari massa dibagi
+        /// volume. Disertakan supaya angkanya bisa diaudit.
+        ///
+        /// Inilah yang membongkar bug-nya: volume 100266 mm3 dengan massa
+        /// 100,27 g berarti densitas 1000 kg/m3 - air, bukan baja. Kalau
+        /// densitasnya ikut dilaporkan sejak awal, kekeliruannya akan terlihat
+        /// dalam sekali pandang.
+        /// </summary>
+        public double? DensityKgM3 { get; set; }
+
+        /// <summary>
+        /// true  = material di-assign, massa bisa dipercaya
+        /// false = material belum di-assign, massa TIDAK dihitung
+        /// null  = tidak bisa ditanyakan untuk tipe dokumen ini
+        ///
+        /// Keadaan ketiga itu bukan kerewelan. Assembly tidak punya satu
+        /// material tunggal - materialnya per komponen - jadi menjawab true
+        /// berarti mengklaim sesuatu yang tidak diperiksa, dan menjawab false
+        /// berarti menolak massa yang mungkin sah. "Tidak tahu" adalah satu-
+        /// satunya jawaban yang benar.
+        /// </summary>
+        public bool? DensityAssigned { get; set; }
     }
 
     /// <summary>
