@@ -385,6 +385,48 @@ if ($Agy) {
         Write-Host "   agy      : $agyExe"
         Write-Host "   workspace: $kerja"
 
+        # ALAT VERIFIKASI HARUS MENGUJI KEADAAN PRODUK, BUKAN KEADAAN IDEALNYA.
+        #
+        # Skrip ini menuliskan --settings TANPA SYARAT. Add-in tidak: ia hanya
+        # mengirim flag yang ditemukan di `agy --help`. Akibatnya skrip ini
+        # pernah lulus 10/10 sementara panel selalu menjawab kosong - karena
+        # `agy --help` menulis ke stderr sementara probe add-in membaca stdout,
+        # jadi probe menyimpulkan --settings tidak ada dan tidak mengirimnya.
+        #
+        # Jadi di sini kita periksa hal yang DIANDALKAN add-in, bukan hanya
+        # hal yang kita lakukan sendiri.
+        $bantuanOut = ''
+        $bantuanErr = ''
+        try {
+            $pi = New-Object System.Diagnostics.ProcessStartInfo
+            $pi.FileName = $agyExe
+            $pi.Arguments = '--help'
+            $pi.UseShellExecute = $false
+            $pi.RedirectStandardOutput = $true
+            $pi.RedirectStandardError = $true
+            $pi.CreateNoWindow = $true
+            $pr = [System.Diagnostics.Process]::Start($pi)
+            $tO = $pr.StandardOutput.ReadToEndAsync()
+            $tE = $pr.StandardError.ReadToEndAsync()
+            $null = $pr.WaitForExit(20000)
+            $bantuanOut = $tO.GetAwaiter().GetResult()
+            $bantuanErr = $tE.GetAwaiter().GetResult()
+        }
+        catch {
+            Write-Gagal "tidak bisa menjalankan 'agy --help': $($_.Exception.Message)"
+        }
+
+        $bantuan = $bantuanOut + "`n" + $bantuanErr
+        Write-Host ("   --help   : stdout {0} bita, stderr {1} bita" -f $bantuanOut.Length, $bantuanErr.Length)
+
+        if ($bantuan -match '(?<!\w)--settings(?![\w-])') {
+            Write-Lulus 'agy --help mengiklankan --settings (probe add-in akan mengirimnya)'
+        }
+        else {
+            Write-Gagal ('agy --help TIDAK mengiklankan --settings. Add-in tidak akan mengirim ' +
+                         'aturan izin, dan setiap tool MCP akan ditolak otomatis di mode headless.')
+        }
+
         # Dijalankan DI DALAM workspace, karena di situlah
         # .agents\mcp_config.json yang ditulis add-in berada.
         Push-Location $kerja

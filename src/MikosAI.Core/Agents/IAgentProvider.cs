@@ -27,6 +27,22 @@ namespace MikosAI.Core.Agents
 
         public string? Message { get; set; }
 
+        /// <summary>
+        /// Deteksi flag tidak menghasilkan apa pun padahal CLI-nya menjawab
+        /// <c>--version</c>.
+        ///
+        /// Ini MUSTAHIL sebagai keadaan nyata: CLI tanpa satu pun flag tidak
+        /// ada. Jadi artinya yang gagal adalah deteksinya, bukan kemampuan
+        /// CLI-nya - dan itu wajib dibedakan dari "flag ini memang tidak
+        /// didukung".
+        ///
+        /// Tanpa pembedaan itu, kegagalan deteksi menyamar sebagai CLI minimal:
+        /// <c>--settings</c> tidak dikirim, agy menolak semua tool MCP di mode
+        /// headless, dan yang terlihat pengguna hanyalah jawaban kosong. Itu
+        /// persis gejala yang kami lacak lama sebelum stderr dibaca.
+        /// </summary>
+        public bool DeteksiFlagGagal => SupportedFlags.Count == 0;
+
         public bool Supports(string flag)
         {
             foreach (var item in SupportedFlags)

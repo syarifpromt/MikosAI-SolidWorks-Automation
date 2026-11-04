@@ -71,7 +71,27 @@ namespace MikosAI.Addin
                     timeout: TimeSpan.FromSeconds(20),
                     cancellationToken).ConfigureAwait(false);
 
-                probe.SupportedFlags = ProviderOutcome.ParseFlags(bantuan.Output);
+                // KEDUA stream. `agy --help` menulis seluruh bantuannya ke
+                // stderr dengan exit code 0 - diukur pada 1.5.0: stdout 0
+                // karakter, stderr 3323 karakter.
+                //
+                // Membaca stdout saja membuat probe melihat CLI tanpa flag
+                // apa pun, sehingga --settings tidak pernah dikirim dan agy
+                // menolak otomatis setiap tool MCP di mode headless. Yang
+                // terlihat pengguna cuma jawaban kosong.
+                probe.SupportedFlags = ProviderOutcome.ParseFlags(bantuan.Output, bantuan.Galat);
+
+                if (probe.DeteksiFlagGagal)
+                {
+                    // CLI yang menjawab --version tapi tidak punya satu flag
+                    // pun adalah hal yang mustahil. Jadi yang gagal deteksinya,
+                    // dan itu dicatat SEKARANG - bukan dibiarkan muncul nanti
+                    // sebagai jawaban kosong tanpa sebab.
+                    _diagnostics.AddError(
+                        "deteksi flag agy --help tidak menghasilkan apa pun "
+                        + $"(stdout {bantuan.Output?.Length ?? 0} bita, stderr {bantuan.Galat?.Length ?? 0} bita, "
+                        + $"exit {bantuan.ExitCode}). Permintaan akan ditolak dengan sebab yang jelas.");
+                }
 
                 // Autentikasi TIDAK diperiksa dengan permintaan nyata - itu akan
                 // membakar kuota setiap kali SolidWorks dibuka.

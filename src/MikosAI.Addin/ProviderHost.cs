@@ -246,13 +246,44 @@ namespace MikosAI.Addin
                 BerkasIzin = SiapkanBerkasIzin(workingDirectory),
             };
 
-            if (permintaan.BerkasIzin is null)
+            // ATURAN IZIN HARUS BENAR-BENAR SAMPAI KE agy.
+            //
+            // Ada DUA cara aturan izin gagal terkirim, dan keduanya berakhir
+            // sama: agy menolak otomatis setiap tool MCP di mode headless, dan
+            // yang terlihat pengguna hanyalah jawaban kosong.
+            //
+            //   1. berkasnya tidak bisa ditulis -> BerkasIzin null
+            //   2. probe tidak menemukan --settings -> flagnya tidak dikirim
+            //
+            // Nomor 2 adalah yang benar-benar terjadi, dan sebabnya `agy --help`
+            // menulis ke stderr sementara probe membaca stdout. Butuh berhari-
+            // hari untuk menemukannya karena tidak ada yang mengeluh; semuanya
+            // melapor "berhasil" lalu menampilkan kosong.
+            //
+            // Jadi keduanya dihentikan DI SINI, dengan sebab yang disebut. Lebih
+            // baik menolak bekerja daripada bekerja sambil selalu gagal: jalur
+            // yang terlihat jalan tapi tidak pernah memberi jawaban adalah yang
+            // paling lama menyesatkan.
+            var sebabIzinTidakTerkirim = SebabAturanIzinTidakTerkirim(permintaan);
+            if (sebabIzinTidakTerkirim is not null)
             {
-                // Tanpa aturan izin, SETIAP tool kita akan ditolak dan jawabannya
-                // kosong dengan status SUCCESS. Lebih baik dikatakan sekarang
-                // daripada muncul sebagai jawaban kosong yang tidak dijelaskan.
-                _diagnostics.AddError(
-                    "berkas izin MCP tidak bisa ditulis - tool akan ditolak agy di mode headless");
+                _diagnostics.AddError(sebabIzinTidakTerkirim);
+
+                return new AgentResult
+                {
+                    Failure = new AgentFailure
+                    {
+                        Code = "provider_permission_rule_undeliverable",
+                        Message =
+                            "Aturan izin MCP tidak bisa dikirim ke " + DisplayName + ", jadi "
+                            + "permintaan tidak dijalankan: setiap tool SolidWorks akan "
+                            + "ditolak otomatis dan jawabannya kosong.\n\n" + sebabIzinTidakTerkirim,
+                        NextAction =
+                            "Jalankan scripts\\addin.ps1 -Action Probe untuk melihat flag yang "
+                            + "terdeteksi dari agy --help, lalu bandingkan dengan `agy --help` "
+                            + "di terminal. Catatan: agy mencetak bantuannya ke stderr.",
+                    },
+                };
             }
 
             try
@@ -408,6 +439,39 @@ namespace MikosAI.Addin
         /// Isinya dari AntigravityCommand.IsiBerkasIzin supaya add-in dan
         /// scripts/mcp-roundtrip.ps1 tidak pernah menyimpang.
         /// </summary>
+        /// <summary>
+        /// Kenapa aturan izin MCP tidak akan sampai ke agy, kalau memang tidak.
+        /// null berarti aturannya akan terkirim.
+        ///
+        /// Dipisah supaya alasannya satu tempat, dan supaya pesan ke pengguna
+        /// menyebut sebab yang SPESIFIK alih-alih "izin gagal".
+        /// </summary>
+        private string? SebabAturanIzinTidakTerkirim(AgentRequest permintaan)
+        {
+            if (permintaan.BerkasIzin is null)
+            {
+                return "Berkas aturan izin tidak bisa ditulis ke folder kerja agent.";
+            }
+
+            if (_probe.DeteksiFlagGagal)
+            {
+                return
+                    "Deteksi flag dari `agy --help` tidak menghasilkan apa pun, jadi tidak "
+                    + "diketahui apakah --settings didukung. CLI tanpa flag apa pun tidak "
+                    + "ada, jadi yang gagal adalah deteksinya.";
+            }
+
+            if (!_probe.Supports("--settings"))
+            {
+                return
+                    "agy " + (_probe.Version ?? "(versi tak diketahui)") + " tidak "
+                    + "mengiklankan --settings di --help, jadi aturan izin tidak punya "
+                    + "jalan masuk ke sesi headless.";
+            }
+
+            return null;
+        }
+
         private string? SiapkanBerkasIzin(string workingDirectory)
         {
             try

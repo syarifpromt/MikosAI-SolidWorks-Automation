@@ -10,12 +10,12 @@ yang akan membuat kita menghabiskan berhari-hari kalau tidak diketahui lebih dul
 ## 0. Status: TERVERIFIKASI di mesin nyata
 
 Dokumen ini semula berisi asumsi dari riset web pihak ketiga. Pada **2026-11-01**
-seluruhnya diverifikasi langsung terhadap **agy 1.4.11/1.4.12** di mesin bermesin
+seluruhnya diverifikasi langsung terhadap **agy 1.4.11/1.4.12/1.5.0** di mesin bermesin
 SolidWorks 2025.
 
 | # | Pertanyaan | Jawaban |
 |---|---|---|
-| 1 | Versi dan flag | **1.4.12.** `-p`/`--print`/`--prompt`, `--output-format`, `--json-schema`, `--print-timeout`, `--model`, `--mode`, `--effort`, `--dangerously-skip-permissions` |
+| 1 | Versi dan flag | **1.5.0** (sebelumnya 1.4.12; agy memperbarui diri sendiri). `--help` ada di **stderr**, lihat bagian 4. `-p`/`--print`/`--prompt`, `--output-format`, `--json-schema`, `--print-timeout`, `--model`, `--mode`, `--effort`, `--dangerously-skip-permissions` |
 | 2 | Bug stdout non-TTY | **TIDAK ADA.** Output lewat pipe jalan sempurna |
 | 3 | Nama field jawaban | **`response`** |
 | 4 | `stream-json` | **Didukung.** `text_delta` untuk progres, `event: "result"` untuk hasil akhir |
@@ -184,13 +184,40 @@ Artinya set flag berbeda antarrilis. Jangan hardcode.
 **Yang kita lakukan: flag probing saat startup.**
 
 ```
-1. Jalankan `agy --version`     -> catat versi
-2. Jalankan `agy --help`        -> parse flag yang benar-benar ada
-3. Simpan ke ProviderDescriptor -> ToolExecutor pilih flag dari situ
-4. Pin versi yang sudah diuji di capabilities.yaml
+1. Jalankan `agy --version`     -> catat versi (stdout)
+2. Jalankan `agy --help`        -> parse flag dari stdout DAN stderr
+3. Simpan ke ProviderProbe      -> command builder pilih flag dari situ
+4. Deteksi kosong = kegagalan, bukan "CLI minimal"
 ```
 
-Probing ini sekali per sesi, murah, dan menghilangkan seluruh kelas bug "jalan di laptopku".
+Probing ini sekali per sesi, murah, dan menghilangkan seluruh kelas bug "jalan di
+laptopku".
+
+### `agy --help` menulis ke stderr, dengan exit code 0
+
+Diukur pada **1.5.0**: `--help` memberi **0 bita di stdout** dan **3323 bita di
+stderr**, exit code **0**. `--version` memakai stdout seperti biasa.
+
+Kombinasi itu yang membuatnya mahal: exit code 0 berarti tidak ada yang dianggap
+gagal, dan stdout kosong berarti probe menyimpulkan agy tidak punya satu flag pun.
+Akibatnya `--settings` tidak pernah dikirim, agy menolak otomatis setiap tool MCP
+di mode headless, dan panel menampilkan jawaban kosong. Tidak ada satu pun lapisan
+yang mengeluh.
+
+Dua perbaikan, dan yang kedua lebih penting:
+
+1. `ProviderOutcome.ParseFlags(stdout, stderr)` menggabungkan kedua stream, bukan
+   memilih salah satu - stream mana yang dipakai adalah detail yang berubah
+   antarrilis.
+2. `ProviderProbe.DeteksiFlagGagal` membedakan **gagal mendeteksi** dari **tidak
+   didukung**. CLI tanpa satu flag pun tidak ada, jadi hasil itu mustahil dan
+   diperlakukan sebagai kerusakan. Permintaan ditolak dengan
+   `provider_permission_rule_undeliverable` alih-alih dijalankan sambil pasti
+   gagal.
+
+Pelajarannya: **degradasi sunyi lebih buruk daripada penolakan.** Jalur yang
+terlihat jalan tapi tidak pernah memberi jawaban adalah yang paling lama
+menyesatkan - termasuk menyesatkan kami sendiri ke arah ConPTY dan parser.
 
 ---
 

@@ -500,6 +500,27 @@ namespace MikosAI.Core.Agents
         /// Dipakai supaya kita tidak mengirim flag yang tidak dikenali versi
         /// terpasang. Lihat docs/integrasi-antigravity.md bagian 4.
         /// </summary>
+        /// <summary>
+        /// Membaca flag dari KEDUA stream <c>--help</c>.
+        ///
+        /// `agy --help` menulis seluruh bantuannya ke STDERR dengan exit code
+        /// 0. Diukur pada 1.5.0: stdout 0 karakter, stderr 3323 karakter.
+        ///
+        /// Membaca stdout saja berarti melihat CLI tanpa flag apa pun, dan
+        /// akibatnya <c>--settings</c> tidak pernah dikirim sehingga seluruh
+        /// tool MCP ditolak otomatis oleh mode headless - muncul sebagai
+        /// jawaban kosong. Lihat tests/BantuanDiStderrTests.cs.
+        ///
+        /// Keduanya digabung, bukan dipilih, karena stream mana yang dipakai
+        /// adalah detail yang berubah antarrilis. Menebak satu berarti menebak
+        /// ulang setiap kali agy diperbarui.
+        /// </summary>
+        public static IReadOnlyList<string> ParseFlags(string? stdout, string? stderr)
+        {
+            var gabungan = (stdout ?? string.Empty) + "\n" + (stderr ?? string.Empty);
+            return ParseFlags(gabungan);
+        }
+
         public static IReadOnlyList<string> ParseFlags(string? keluaranHelp)
         {
             if (string.IsNullOrWhiteSpace(keluaranHelp))
