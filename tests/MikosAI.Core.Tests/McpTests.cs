@@ -46,15 +46,27 @@ namespace MikosAI.Core.Tests
         }
 
         [Fact]
-        public void tool_pilot_ditandai_butuh_review_di_deskripsinya()
+        public void tool_yang_sudah_verified_tidak_lagi_ditandai_pilot()
         {
-            // AI harus tahu sebelum memanggil, bukan sesudah.
+            // Dulu test ini menegaskan sebaliknya: get_bounding_box HARUS
+            // bertanda [PILOT], karena document_inspection memang pilot.
+            //
+            // Sejak 2026-11-05 kemampuan itu `verified` - golden test baca
+            // lulus 33 pemeriksaan empat kali berturut-turut di SW2025 SP01.1.
+            // Jadi tandanya harus HILANG, dan itu yang diuji sekarang.
+            //
+            // Mekanisme penandaannya sendiri tidak kehilangan penjaga: ia
+            // diuji di kemampuan_pilot_ditandai_di_deskripsi() dengan ledger
+            // sintetis, yang tidak ikut berubah saat status kemampuan nyata
+            // naik. Test yang menguji mekanisme TIDAK boleh bergantung pada
+            // keadaan ledger hari ini - kalau bergantung, ia lenyap diam-diam
+            // begitu keadaannya berubah.
             var ledger = CapabilityLedger.Load(RepoFiles.CapabilitiesYaml);
             var catalog = ToolCatalog.Load(RepoFiles.ToolsJson, ledger);
             var tool = McpToolListBuilder.Build(catalog, ledger)
                 .First(t => t.Name == "get_bounding_box");
 
-            Assert.Contains("[PILOT]", tool.Description);
+            Assert.DoesNotContain("[PILOT]", tool.Description);
         }
 
         [Fact]

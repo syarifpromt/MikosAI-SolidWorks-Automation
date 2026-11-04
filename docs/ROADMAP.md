@@ -241,11 +241,18 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
 - [x] Pemeriksaan silang `massa = volume × densitas`, ketiganya dibaca terpisah,
       sehingga satu nilai yang dikarang memecah hubungannya
 - [x] Pembacaan identik 3× berturut-turut diuji
-- [ ] **`tests/golden/plat-referensi.SLDPRT` dibuat dan di-commit** — plat
-      100×80×10 mm, Plain Carbon Steel, berpusat di origin. Resepnya di
-      `tests/golden/CARA-MEMBUAT-PART.md`. Ini satu-satunya langkah yang menuntut
-      SolidWorks di tangan manusia
-- [ ] Golden test lulus terhadap part itu → `document_inspection` naik ke `verified`
+- [x] **`tests/golden/plat-referensi.SLDPRT` dibuat dan di-commit** — plat
+      100×80×10 mm, Plain Carbon Steel, berpusat di origin
+- [x] **Golden test LULUS — 2026-11-05.** 33 pemeriksaan, 0 gagal, empat kali
+      berturut-turut, pada add-in build `62d5aa8` yang sama dengan HEAD saat diuji.
+      `document_inspection` naik dari `pilot` ke **`verified`**, dan `33.1.1`
+      tercatat di `verified_versions`
+
+      Golden test ini membayar dirinya pada percobaan pertama: ia **menolak**
+      pembacaan kami sendiri dan membongkar pemetaan `swConstrainedStatus_e`
+      yang bergeser satu — sketsa *under-defined* dilaporkan *FullyDefined*,
+      yaitu rusak yang terlihat sehat. Acuan yang jawabannya sudah diketahui
+      lebih dulu bisa membantah pembacaan; snapshot hanya bisa mengulanginya
 
 Ukurannya sengaja sama dengan basis plat golden Fase 3 (100×80×10), supaya jalur
 baca dan jalur tulis nanti diuji di atas geometri yang sama.

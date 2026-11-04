@@ -15,14 +15,31 @@ schema_version: "1.0"
 # Versi yang diuji. Jangan klaim versi yang belum pernah dijalankan.
 # Versi tempat KEMAMPUAN CAD sudah lulus golden test.
 #
-# SENGAJA masih kosong. Add-in host sudah terbukti hidup di SW2025 (lihat
-# verified_hosts di bawah), tapi itu membuktikan fondasinya - BUKAN bahwa ada
-# satu pun kemampuan CAD yang benar sesuai spesifikasi.
-#
-# Mengisi ini tanpa golden test yang lulus akan melonggarkan arti `verified`,
-# yaitu satu-satunya hal yang melindungi pengguna di proyek ini.
+# Terisi pada 2026-11-05, setelah golden test baca lulus terhadap part acuan
+# yang nilai harapannya diturunkan dari geometri - bukan disalin dari keluaran
+# tool. Ini TERPISAH dari verified_hosts di bawah: yang itu membuktikan add-in
+# bisa dimuat, yang ini membuktikan pembacaannya benar.
 verified_versions:
-  solidworks: []
+  # Daftar revisi SolidWorks tempat KEMAMPUAN CAD sudah lulus golden test.
+  # Bentuknya daftar string - skema ledger menuntut itu, dan struktur
+  # bersarang di sini membuat seluruh berkas gagal diurai.
+  #
+  # Terisi 2026-11-05 oleh golden test baca:
+  #
+  #   acuan   : tests/golden/plat-referensi.SLDPRT (plat 100x80x10, Plain
+  #             Carbon Steel) - volume 80000 mm3, massa 624 g, luas 19600 mm2,
+  #             pusat massa (0,0,5), keempatnya dihitung lebih dulu dengan
+  #             pensil, bukan disalin dari keluaran tool
+  #   skrip   : scripts/golden-document.ps1
+  #   hasil   : 33 lulus / 0 gagal, EMPAT kali berturut-turut
+  #   build   : add-in 62d5aa8, sama dengan HEAD saat diuji
+  #
+  # Golden test itu tidak sekadar membenarkan kami: pada percobaan pertama ia
+  # MENOLAK pembacaan kami sendiri dan membongkar pemetaan
+  # swConstrainedStatus_e yang bergeser satu. Baris ini ditulis setelah bug itu
+  # diperbaiki, bukan sebelumnya.
+  solidworks:
+    - "33.1.1"
 
 # Lingkungan tempat add-in host terbukti hidup: ConnectToSW selesai, callback
 # terdaftar, thread utama tertangkap, dan tidak ada error tercatat.
@@ -75,7 +92,7 @@ capabilities:
   # ---- Fase 1: read-only ------------------------------------------------
   - id: document_inspection
     label: Baca dokumen aktif, fitur, dan properti massa
-    status: pilot
+    status: verified
     phase: 1
     review_required: false
     tools:
@@ -90,9 +107,10 @@ capabilities:
       merusak pekerjaan pengguna - itu alasan kemampuan ini yang pertama
       diekspos.
 
-      Status `pilot`, BUKAN `verified`. Logika pembentukan hasil dan aturan
-      verifikasinya sudah diuji otomatis di MikosAI.Core, tapi penerjemahan API
-      SolidWorks-nya baru bisa dibuktikan di mesin bermesin CAD.
+      Status `verified` sejak 2026-11-05. Logika pembentukan hasil dan aturan
+      verifikasinya diuji otomatis di MikosAI.Core, dan penerjemahan API
+      SolidWorks-nya dibuktikan golden test di SW2025 SP01.1 - 33 pemeriksaan,
+      empat kali berturut-turut.
 
       Golden test ada di `scripts/golden-document.ps1` dengan acuan
       `tests/golden/plat-referensi.SLDPRT` - plat 100x80x10 yang seluruh nilai
@@ -111,8 +129,13 @@ capabilities:
       hasilnya bergantung pada apa yang sedang dipilih pengguna dan part acuan
       tidak bisa membawa seleksi. Yang diuji hanya bahwa jalurnya hidup.
 
-      Naikkan ke `verified` hanya setelah golden test lulus penuh pada add-in
-      yang memuat perbaikan pemetaan itu.
+      Terbukti pada add-in build 62d5aa8, yaitu commit yang sama dengan HEAD
+      saat pengujian - jadi yang diuji memang kode yang tercatat.
+
+      `verified` di sini berarti: pembacaannya benar untuk part prismatik
+      sederhana di SW2025 SP01.1. Ia TIDAK berarti benar untuk assembly,
+      permukaan, atau konfigurasi ganda - itu belum pernah diuji, dan arti
+      `verified` hanya berguna selama ia tidak dilebarkan diam-diam.
 
   # ---- Fase 3: sketsa ---------------------------------------------------
   - id: sketch_authoring

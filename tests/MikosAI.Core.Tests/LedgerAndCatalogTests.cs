@@ -51,23 +51,51 @@ namespace MikosAI.Core.Tests
         // --- Keadaan jujur saat ini -----------------------------------------
 
         [Fact]
-        public void belum_ada_kemampuan_yang_verified_karena_belum_ada_golden_test_yang_lulus()
+        public void verified_hanya_untuk_kemampuan_yang_golden_test_nya_benar_benar_lulus()
         {
-            // Ini test yang MEMANG harus merah nanti - saat kemampuan pertama
-            // benar-benar lulus golden test di SolidWorks nyata, ubah test ini.
-            // Sampai hari itu, mengaku verified adalah berbohong.
+            // Pendahulu test ini bernama
+            // `belum_ada_kemampuan_yang_verified_karena_belum_ada_golden_test_yang_lulus`
+            // dan berbunyi: "Ini test yang MEMANG harus merah nanti - saat
+            // kemampuan pertama benar-benar lulus golden test di SolidWorks
+            // nyata, ubah test ini."
+            //
+            // 2026-11-05 adalah hari itu. document_inspection lulus 33
+            // pemeriksaan empat kali berturut-turut di SW2025 SP01.1, terhadap
+            // part acuan yang nilai harapannya diturunkan dari geometri.
+            //
+            // Yang dijaga SEKARANG adalah invarian yang sebenarnya, dan ia
+            // lebih ketat daripada sekadar "belum ada yang verified":
+            //
+            //   1. hanya document_inspection yang boleh verified - tidak ada
+            //      kemampuan MENULIS yang boleh ikut naik tanpa golden test
+            //      Fase 3
+            //   2. kalau ada yang verified, versinya WAJIB tercatat. Verified
+            //      tanpa versi berarti "benar di suatu tempat yang tidak kami
+            //      sebutkan", dan itu bukan jaminan, melainkan kesan jaminan
             var ledger = Ledger();
 
-            Assert.Empty(ledger.VerifiedSolidWorksVersions);
-            Assert.DoesNotContain(ledger.Capabilities, c => c.Status == CapabilityStatus.Verified);
+            var verified = ledger.Capabilities
+                .Where(c => c.Status == CapabilityStatus.Verified)
+                .Select(c => c.Id)
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToList();
+
+            Assert.Equal(new[] { "document_inspection" }, verified);
+            Assert.NotEmpty(ledger.VerifiedSolidWorksVersions);
+            Assert.Contains("33.1.1", ledger.VerifiedSolidWorksVersions);
         }
 
         [Fact]
         public void hanya_kemampuan_read_only_yang_sudah_dipromosikan_ke_pilot()
         {
-            // document_inspection berstatus pilot: logikanya sudah diuji
-            // otomatis, penerjemahan API-nya terbukti di SW2025. Semua
-            // kemampuan yang MENULIS masih not_implemented.
+            // document_inspection kini `verified` (sebelumnya pilot): logikanya
+            // diuji otomatis, dan penerjemahan API-nya dibuktikan golden test
+            // di SW2025 SP01.1. Semua kemampuan yang MENULIS masih
+            // not_implemented.
+            //
+            // Yang dijaga di sini adalah DAFTARNYA, bukan statusnya - verified
+            // maupun pilot sama-sama terekspos, jadi test ini tetap berlaku
+            // apa pun status yang dipakai.
             var ledger = Ledger();
 
             var dipromosikan = ledger.Capabilities
