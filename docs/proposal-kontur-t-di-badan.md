@@ -1,6 +1,21 @@
 # Proposal kecil — T yang berakhir di tengah bentang
 
-Status: **MENUNGGU PERSETUJUAN.** Belum diterapkan.
+Status: **DISETUJUI dan DITERAPKAN** 2026-11-05.
+
+Ketiganya disetujui, dengan satu penyempurnaan yang memperbaiki usulku:
+
+**`connectivityLimits` isinya KONDISIONAL per sketsa**, bukan daftar tetap.
+Alasannya tepat dan tidak terpikir olehku: daftar yang selalu sama di setiap
+respons akan diabaikan dan berubah jadi kebisingan — dan mekanisme kejujuran
+yang diabaikan sama saja dengan tidak ada. Jadi `undeclared_point_on_segment`
+hanya muncul kalau `openEndpointCount > endpointOnSegmentCount`, yaitu saat
+masih ada ujung terbuka yang belum dijelaskan relasi mana pun. Isinya juga ID
+string stabil, bukan kalimat bebas, supaya aturan verifikasi bisa merujuknya.
+
+**`ATINTERSECT` ditunda tapi DIDETEKSI.** Pemisahan ini bagus: implementasi
+tanpa fixture akan punya test yang tidak pernah merah, tapi keberadaan relasinya
+murah dan pasti, jadi ia dilaporkan sebagai `at_intersect_not_analyzed` alih-alih
+didiamkan.
 
 Dugaanmu benar, dan ini kasus yang lebih umum daripada yang sudah kami tangani.
 

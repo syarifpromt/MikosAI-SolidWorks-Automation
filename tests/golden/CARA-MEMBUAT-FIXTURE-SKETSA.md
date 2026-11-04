@@ -72,6 +72,8 @@ bounding box `z` dari **3** sampai **10**.
 | `unknownDrivenStateCount` | 0 |
 | `openEndpointCount` | 0 |
 | `branchPointCount` | 0 |
+| `endpointOnSegmentCount` | 0 |
+| `connectivityLimits` | `[]` |
 
 Center Rectangle menghasilkan 4 garis + 2 garis konstruksi diagonal. Konstruksi
 **tidak** dihitung, jadi keempat garis membentuk loop tertutup: 0 ujung bebas,
@@ -88,6 +90,8 @@ Center Rectangle menghasilkan 4 garis + 2 garis konstruksi diagonal. Konstruksi
 | `unknownDrivenStateCount` | 0 |
 | `openEndpointCount` | 2 |
 | `branchPointCount` | 0 |
+| `endpointOnSegmentCount` | 0 |
+| `connectivityLimits` | `["undeclared_point_on_segment"]` |
 
 ## Hipotesis yang diuji part ini
 
@@ -162,12 +166,12 @@ dikonsumsi.
 
 ## Nilai yang diharapkan
 
-| sketsa | `openEndpointCount` | `branchPointCount` | `endpointOnSegmentCount` |
-|---|---|---|---|
-| `SketchKotak` | **0** | 0 | 0 |
-| `SketchT` | **3** | **1** | 0 |
-| `SketchTBadan` | **4** | **0** | **1** |
-| `SketchDuaLoop` | **0** | 0 | 0 |
+| sketsa | `openEndpointCount` | `branchPointCount` | `endpointOnSegmentCount` | `connectivityLimits` |
+|---|---|---|---|---|
+| `SketchKotak` | **0** | 0 | 0 | `[]` |
+| `SketchT` | **3** | **1** | 0 | `["undeclared_point_on_segment"]` |
+| `SketchTBadan` | **4** | **0** | **1** | `["undeclared_point_on_segment"]` |
+| `SketchDuaLoop` | **0** | 0 | 0 | `[]` |
 
 `consumedByFeatures` adalah `[]` untuk keempatnya — **kosong, bukan null**.
 Part ini tidak punya fitur sama sekali.
@@ -192,6 +196,30 @@ Part ini tidak punya fitur sama sekali.
 
 - `SketchDuaLoop`: dua loop tertutup terpisah tetap **0** ujung bebas. Ini yang
   membedakan "menghitung ujung" dari "menghitung loop".
+
+### `connectivityLimits` — kenapa isinya berbeda per sketsa
+
+`undeclared_point_on_segment` dicantumkan **hanya** kalau
+`openEndpointCount > endpointOnSegmentCount`, yaitu saat masih ada ujung terbuka
+yang belum dijelaskan oleh relasi mana pun — di situlah titik yang duduk di atas
+garis tanpa relasi mungkin bersembunyi.
+
+Pada `SketchKotak` dan `SketchDuaLoop` semua ujung berpasangan, jadi tidak ada
+yang bisa bersembunyi dan batasnya **tidak relevan**. Daftar yang selalu sama di
+setiap respons akan diabaikan, dan mekanisme kejujuran yang diabaikan sama saja
+dengan tidak ada.
+
+Keempat sketsa ini kebetulan sudah memenuhi syarat test yang kamu minta: dua
+sketsa tempat batasnya **muncul** (`SketchT`, `SketchTBadan`) dan dua tempat ia
+**tidak muncul** (`SketchKotak`, `SketchDuaLoop`). Tidak perlu sketsa tambahan.
+
+`at_intersect_not_analyzed` tidak muncul di sketsa mana pun di sini — tidak ada
+relasi `ATINTERSECT` yang dibuat. Kalau nanti ada kasus nyata, fixture-nya
+ditambah lebih dulu, baru implementasinya.
+
+`[]` berarti **"tidak ada batas yang KAMI KETAHUI berlaku"**, bukan "analisis
+lengkap". Batas yang belum kami sadari tidak akan muncul di sana menurut
+definisinya.
 
 `nearlyCoincidentEndpointCount` diharapkan **0** di ketiganya.
 
