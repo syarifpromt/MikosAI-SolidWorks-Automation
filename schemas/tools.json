@@ -2,9 +2,7 @@
   "schemaVersion": "1.0",
   "description": "Katalog tool v0.1. Ini KONTRAK antara Jalur Platform dan Jalur CAD. Daftar tool MCP di-generate dari file ini, difilter oleh status di capabilities.yaml. Perubahan di sini adalah percakapan, bukan commit sepihak.",
   "commonDefs": "common.schema.json",
-
   "tools": [
-
     {
       "name": "get_active_document",
       "capabilityId": "document_inspection",
@@ -27,7 +25,6 @@
       },
       "notes": "hasDocument=false bukan error. Kembalikan ok=true dengan hasDocument=false supaya AI bisa memutuskan membuat dokumen baru."
     },
-
     {
       "name": "list_features",
       "capabilityId": "document_inspection",
@@ -38,7 +35,10 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "includeSuppressed": { "type": "boolean", "default": true }
+          "includeSuppressed": {
+            "type": "boolean",
+            "default": true
+          }
         }
       },
       "outputData": {
@@ -51,7 +51,6 @@
       },
       "notes": "errorCount > 0 harus membuat verification verdict minimal WARN. Tree yang punya error bukan tree yang sehat. parentSketch BELUM DIIMPLEMENTASIKAN dan selalu null - pembaca belum menelusuri hubungan fitur-ke-sketsa. null di situ berarti BELUM DIBACA, bukan 'tidak punya sketsa induk'; Boss-Extrude1 pada part acuan melaporkan null padahal Sketch1 jelas induknya. Ketiadaan itu disiarkan lewat fieldsNotPopulated di setiap jawaban, supaya pemanggil tahu bedanya tanpa membaca dokumen ini."
     },
-
     {
       "name": "get_bounding_box",
       "capabilityId": "document_inspection",
@@ -71,7 +70,6 @@
       },
       "notes": "bodyCount=0 berarti belum ada solid. Itu fakta sah, bukan error. Saat tidak ada yang bisa diukur, min/max/size adalah null - BUKAN nol. Kotak pembatas yang tidak ada berbeda dari kotak pembatas berukuran 0x0x0, dan nol adalah angka yang tampak masuk akal. bodyCount tetap angka karena ia hitungan: nol di situ benar."
     },
-
     {
       "name": "get_mass_properties",
       "capabilityId": "document_inspection",
@@ -94,7 +92,6 @@
       },
       "notes": "massGrams null kalau material belum di-assign. JANGAN mengarang massa dari densitas default lalu menyajikannya sebagai fakta - SolidWorks selalu mengembalikan massa, memakai densitas default 1000 kg/m3 kalau material tidak ada, dan status perhitungannya tetap 0. Jadi status sukses BUKAN bukti material ada; yang menentukan adalah nama materialnya. densityAssigned punya tiga keadaan: true material ada, false material tidak ada dan massa ditahan, null tidak bisa ditanyakan untuk tipe dokumen ini (assembly punya material per komponen) - di keadaan null massa dilaporkan tapi ditandai butuh tinjauan manusia. materialName dan densityKgM3 adalah BUKTI, bukan hiasan: bandingkan densityKgM3 dengan material yang kamu harapkan, karena 1000 kg/m3 pada part baja langsung terlihat salah sementara angka massanya sendirian terdengar wajar. Ukuran yang tidak ada dilaporkan null, bukan nol: itu berlaku untuk volumeMm3, surfaceAreaMm2, dan centerOfMass. surfaceAreaMm2 dinilai sendiri karena surface body punya area tanpa volume. centerOfMass digantungkan pada volume, BUKAN pada isinya sendiri - {0,0,0} adalah pusat massa yang sah untuk part simetris di titik asal."
     },
-
     {
       "name": "inspect_sketches",
       "capabilityId": "document_inspection",
@@ -119,7 +116,6 @@
       },
       "notes": "constrainedStatus dibaca lewat ISketch.GetConstrainedStatus, yang mengembalikan swConstrainedStatus_e: 1 Unknown, 2 UnderConstrained, 3 FullyConstrained, 4 OverConstrained, 5 NoSolution, 6 InvalidSolution, 7 AutosolveOff. Nilainya DITULIS DI SINI karena pemetaan kami pernah bergeser satu - sketsa fully defined dilaporkan OverDefined, dan yang lebih berbahaya, under-defined dilaporkan FullyDefined. OverDefined, NoSolution, dan InvalidSolution menghasilkan FAIL - bukan WARN. AutosolveOff menjadi Unknown lalu BLOCKED: solver sedang mati, jadi status apa pun tidak berarti. TIGA FIELD BELUM DIIMPLEMENTASIKAN dan selalu null: dimensionCount, consumedByFeature, hasOpenContour. Ketiganya pernah dikirim sebagai 0/null/false yang terbaca sebagai hasil pemeriksaan. Yang paling berbahaya consumedByFeature: null di situ berarti BELUM DIBACA, bukan 'tidak dipakai fitur apa pun' - dan 'tidak dipakai' adalah alasan yang masuk akal untuk MENGHAPUS sketsa di Fase 3. Semuanya disiarkan lewat fieldsNotPopulated."
     },
-
     {
       "name": "get_selection",
       "capabilityId": "document_inspection",
@@ -137,7 +133,6 @@
       },
       "notes": "entityRef dikembalikan dalam bentuk EntityRef semantik yang bisa langsung dipakai tool lain - BUKAN Face1/Edge1. entityRef null berarti entitas itu TIDAK bisa dirujuk secara stabil dan tidak boleh dipakai sebagai argumen tool; keadaan itu menghasilkan WARN yang tidak required, bukan kegagalan. kind adalah klasifikasi kami (face, edge, vertex, plane, feature, unknown); typeName adalah nilai swSelectType_e apa adanya, disertakan supaya 'unknown' tetap bisa didiagnosis alih-alih jadi jalan buntu."
     },
-
     {
       "name": "create_sketch",
       "capabilityId": "sketch_authoring",
@@ -147,9 +142,13 @@
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["plane"],
+        "required": [
+          "plane"
+        ],
         "properties": {
-          "plane": { "$ref": "common.schema.json#/$defs/EntityRef" },
+          "plane": {
+            "$ref": "common.schema.json#/$defs/EntityRef"
+          },
           "name": {
             "type": "string",
             "description": "Nama yang diinginkan. Runner mengembalikan nama sebenarnya - SolidWorks bisa mengubahnya."
@@ -162,7 +161,6 @@
       },
       "notes": "Selalu pakai sketchName yang dikembalikan untuk step berikutnya. Jangan asumsikan nama yang diminta dipakai."
     },
-
     {
       "name": "add_rectangle",
       "capabilityId": "sketch_authoring",
@@ -172,13 +170,30 @@
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["mode", "width", "height"],
+        "required": [
+          "mode",
+          "width",
+          "height"
+        ],
         "properties": {
-          "mode": { "enum": ["center", "corner"] },
-          "center": { "$ref": "common.schema.json#/$defs/Point2D" },
-          "corner": { "$ref": "common.schema.json#/$defs/Point2D" },
-          "width": { "$ref": "common.schema.json#/$defs/Length" },
-          "height": { "$ref": "common.schema.json#/$defs/Length" },
+          "mode": {
+            "enum": [
+              "center",
+              "corner"
+            ]
+          },
+          "center": {
+            "$ref": "common.schema.json#/$defs/Point2D"
+          },
+          "corner": {
+            "$ref": "common.schema.json#/$defs/Point2D"
+          },
+          "width": {
+            "$ref": "common.schema.json#/$defs/Length"
+          },
+          "height": {
+            "$ref": "common.schema.json#/$defs/Length"
+          },
           "addDimensions": {
             "type": "boolean",
             "default": true,
@@ -191,7 +206,6 @@
         "dimensionNames": "array of string"
       }
     },
-
     {
       "name": "add_circle",
       "capabilityId": "sketch_authoring",
@@ -201,11 +215,21 @@
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["center", "diameter"],
+        "required": [
+          "center",
+          "diameter"
+        ],
         "properties": {
-          "center": { "$ref": "common.schema.json#/$defs/Point2D" },
-          "diameter": { "$ref": "common.schema.json#/$defs/Length" },
-          "addDimensions": { "type": "boolean", "default": true }
+          "center": {
+            "$ref": "common.schema.json#/$defs/Point2D"
+          },
+          "diameter": {
+            "$ref": "common.schema.json#/$defs/Length"
+          },
+          "addDimensions": {
+            "type": "boolean",
+            "default": true
+          }
         }
       },
       "outputData": {
@@ -214,7 +238,6 @@
       },
       "notes": "Input diameter, bukan radius. Gambar teknik memakai diameter, jadi plan juga."
     },
-
     {
       "name": "add_slot",
       "capabilityId": "sketch_authoring",
@@ -224,9 +247,15 @@
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["start", "end", "width"],
+        "required": [
+          "start",
+          "end",
+          "width"
+        ],
         "properties": {
-          "start": { "$ref": "common.schema.json#/$defs/Point2D" },
+          "start": {
+            "$ref": "common.schema.json#/$defs/Point2D"
+          },
           "end": {
             "$ref": "common.schema.json#/$defs/Point2D",
             "description": "Titik pusat ujung yang lain - BUKAN tepi luar slot."
@@ -235,7 +264,10 @@
             "$ref": "common.schema.json#/$defs/Length",
             "description": "Lebar penuh slot, sama dengan diameter ujung bulatnya."
           },
-          "addDimensions": { "type": "boolean", "default": true }
+          "addDimensions": {
+            "type": "boolean",
+            "default": true
+          }
         }
       },
       "outputData": {
@@ -244,29 +276,32 @@
       },
       "notes": "start dan end adalah pusat busur ujung. Panjang keseluruhan slot = jarak(start,end) + width. Ini sumber kesalahan yang sering - dokumentasikan di UI."
     },
-
     {
-      "name": "fully_define_sketch",
+      "name": "diagnose_sketch",
       "capabilityId": "sketch_authoring",
       "phase": 3,
-      "mutates": true,
-      "description": "Coba definisikan penuh sketsa. HANYA untuk geometri dasar - persegi dan lingkaran tunggal.",
+      "mutates": false,
+      "description": "Kenapa sebuah sketsa belum fully defined, dan apa yang kurang. TIDAK mengubah apa pun.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "sketchName": { "type": "string" }
+          "sketchName": {
+            "type": "string",
+            "description": "Kosongkan untuk sketsa yang sedang terbuka."
+          }
         }
       },
       "outputData": {
         "constrainedStatus": "string",
         "fullyDefined": "boolean",
-        "addedRelations": "integer",
-        "addedDimensions": "integer"
+        "underDefinedEntities": "array of {entityId, missing, remainingDof|null}",
+        "conflictingRelations": "array of {relationId, kind, entityIds}",
+        "danglingEntities": "array of string",
+        "degreesOfFreedom": "integer|null"
       },
-      "notes": "DILARANG dipakai sebagai pengganti dimensi desain pada sketsa kompleks, dan DILARANG memakai Fix massal. Kalau tidak bisa fully defined lewat dimensi yang bermakna, kembalikan verdict BLOCKED - jangan dipaksa."
+      "notes": "MENGGANTIKAN fully_define_sketch, yang MENULIS. ISketchManager.FullyDefineSketch menerima HorizontalDimScheme, VerticalDimScheme, dan datum display - artinya ia MEMILIH skema dimensi dan datum. Itu bukan formalitas: skema datum menentukan bagaimana part berubah ketika parameter diubah, jadi memilihnya otomatis berarti mengambil keputusan desain lalu menyajikannya sebagai sekadar 'sketsa sudah fully defined'. Bahayanya sunyi - sketsa yang fully defined lewat dimensi pilihan mesin lolos SELURUH verifikasi kami (constrainedStatus hijau, verdict PASS) sementara partnya salah dengan cara yang tidak satu pun check kami tangkap. TIDAK BOLEH ada mode 'perbaiki' di tool ini. Yang dibutuhkan AI bukan 'buat hijau', melainkan 'apa yang kurang' - lalu planner menambahkan add_dimension eksplisit, atau mengembalikan openQuestions kalau dimensinya memang tidak pernah disebut pengguna. remainingDof dan degreesOfFreedom null berarti BELUM DIBACA, bukan nol."
     },
-
     {
       "name": "close_sketch",
       "capabilityId": "sketch_authoring",
@@ -277,7 +312,9 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "sketchName": { "type": "string" }
+          "sketchName": {
+            "type": "string"
+          }
         }
       },
       "outputData": {
@@ -287,7 +324,6 @@
       },
       "notes": "sketchFullyDefined memenuhi expect.sketchFullyDefined di DesignPlan. Hanya executor yang bisa menghitungnya, karena hanya dia yang membaca status constraint sebenarnya."
     },
-
     {
       "name": "extrude_boss",
       "capabilityId": "part_features",
@@ -297,13 +333,32 @@
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["sketch", "endCondition"],
+        "required": [
+          "sketch",
+          "endCondition"
+        ],
         "properties": {
-          "sketch": { "$ref": "common.schema.json#/$defs/EntityRef" },
-          "endCondition": { "$ref": "common.schema.json#/$defs/EndCondition" },
-          "direction": { "enum": ["normal", "reversed", "both"], "default": "normal" },
-          "draftAngle": { "$ref": "common.schema.json#/$defs/Angle" },
-          "merge": { "type": "boolean", "default": true }
+          "sketch": {
+            "$ref": "common.schema.json#/$defs/EntityRef"
+          },
+          "endCondition": {
+            "$ref": "common.schema.json#/$defs/EndCondition"
+          },
+          "direction": {
+            "enum": [
+              "normal",
+              "reversed",
+              "both"
+            ],
+            "default": "normal"
+          },
+          "draftAngle": {
+            "$ref": "common.schema.json#/$defs/Angle"
+          },
+          "merge": {
+            "type": "boolean",
+            "default": true
+          }
         }
       },
       "outputData": {
@@ -313,7 +368,6 @@
       },
       "notes": "PERINGATAN URUTAN PARAMETER: FeatureExtrusion2/3 punya daftar parameter panjang yang mudah tertukar, dan urutan berbeda antarversi. Tulis test khusus urutan parameter - repo referensi punya test_extrude_cut_param_order.py untuk alasan ini."
     },
-
     {
       "name": "extrude_cut",
       "capabilityId": "part_features",
@@ -323,12 +377,29 @@
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["sketch", "endCondition"],
+        "required": [
+          "sketch",
+          "endCondition"
+        ],
         "properties": {
-          "sketch": { "$ref": "common.schema.json#/$defs/EntityRef" },
-          "endCondition": { "$ref": "common.schema.json#/$defs/EndCondition" },
-          "direction": { "enum": ["normal", "reversed", "both"], "default": "normal" },
-          "flipSideToCut": { "type": "boolean", "default": false }
+          "sketch": {
+            "$ref": "common.schema.json#/$defs/EntityRef"
+          },
+          "endCondition": {
+            "$ref": "common.schema.json#/$defs/EndCondition"
+          },
+          "direction": {
+            "enum": [
+              "normal",
+              "reversed",
+              "both"
+            ],
+            "default": "normal"
+          },
+          "flipSideToCut": {
+            "type": "boolean",
+            "default": false
+          }
         }
       },
       "outputData": {
@@ -338,7 +409,6 @@
       },
       "notes": "Verifikasi WAJIB memeriksa volume BERKURANG. Cut yang sukses secara API tapi tidak mengubah volume adalah cut yang tidak memotong apa pun."
     },
-
     {
       "name": "fillet",
       "capabilityId": "part_features",
@@ -348,11 +418,21 @@
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["entities", "radius"],
+        "required": [
+          "entities",
+          "radius"
+        ],
         "properties": {
-          "entities": { "$ref": "common.schema.json#/$defs/EntitySelector" },
-          "radius": { "$ref": "common.schema.json#/$defs/Length" },
-          "propagateToTangent": { "type": "boolean", "default": true }
+          "entities": {
+            "$ref": "common.schema.json#/$defs/EntitySelector"
+          },
+          "radius": {
+            "$ref": "common.schema.json#/$defs/Length"
+          },
+          "propagateToTangent": {
+            "type": "boolean",
+            "default": true
+          }
         }
       },
       "outputData": {
@@ -361,7 +441,6 @@
       },
       "notes": "Radius lebih besar dari geometri yang tersedia akan gagal rebuild. Periksa ketebalan dinding lebih dulu kalau bisa; kalau tidak, kembalikan FAIL dengan pesan yang menyebut radius maksimum yang mungkin."
     },
-
     {
       "name": "chamfer",
       "capabilityId": "part_features",
@@ -371,11 +450,21 @@
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["entities", "distance"],
+        "required": [
+          "entities",
+          "distance"
+        ],
         "properties": {
-          "entities": { "$ref": "common.schema.json#/$defs/EntitySelector" },
-          "distance": { "$ref": "common.schema.json#/$defs/Length" },
-          "angle": { "$ref": "common.schema.json#/$defs/Angle", "default": 45 }
+          "entities": {
+            "$ref": "common.schema.json#/$defs/EntitySelector"
+          },
+          "distance": {
+            "$ref": "common.schema.json#/$defs/Length"
+          },
+          "angle": {
+            "$ref": "common.schema.json#/$defs/Angle",
+            "default": 45
+          }
         }
       },
       "outputData": {
@@ -383,7 +472,6 @@
         "chamferedEdgeCount": "integer"
       }
     },
-
     {
       "name": "hole_wizard",
       "capabilityId": "hole_features",
@@ -393,19 +481,31 @@
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["face", "holeType", "positions", "endCondition"],
+        "required": [
+          "face",
+          "holeType",
+          "positions",
+          "endCondition"
+        ],
         "properties": {
-          "face": { "$ref": "common.schema.json#/$defs/EntityRef" },
+          "face": {
+            "$ref": "common.schema.json#/$defs/EntityRef"
+          },
           "holeType": {
-            "enum": ["simple", "counterbore", "countersink", "tapped"]
+            "enum": [
+              "simple",
+              "counterbore",
+              "countersink",
+              "tapped"
+            ]
           },
           "standard": {
             "type": "string",
-            "description": "Mis. ISO, ANSI Metric. WAJIB diisi untuk counterbore/countersink/tapped."
+            "description": "NAMA standar, mis. 'ISO', 'ANSI Metric', 'DIN'. Divalidasi terhadap whitelist yang DI-GENERATE dari swWzdHoleStandards_e, bukan ditulis tangan. WAJIB untuk counterbore/countersink/tapped."
           },
           "fastenerSize": {
             "type": "string",
-            "description": "Mis. M6, M8. WAJIB untuk tipe selain simple."
+            "description": "Mis. 'M6', 'M8'. SSize memang String di HoleWizard5, jadi ini tetap string. WAJIB untuk tipe selain simple."
           },
           "diameter": {
             "$ref": "common.schema.json#/$defs/Length",
@@ -414,20 +514,24 @@
           "positions": {
             "type": "array",
             "minItems": 1,
-            "items": { "$ref": "common.schema.json#/$defs/Point2D" },
-            "description": "Posisi pada permukaan, dalam mm."
+            "items": {
+              "$ref": "common.schema.json#/$defs/Vector3D"
+            },
+            "description": "Posisi lubang dalam KOORDINAT MODEL, mm. Setiap titik wajib berada pada permukaan yang dirujuk `face`, dalam toleransi. BUKAN koordinat 2D pada face: face planar tidak punya origin maupun arah sumbu bawaan."
           },
-          "endCondition": { "$ref": "common.schema.json#/$defs/EndCondition" }
+          "endCondition": {
+            "$ref": "common.schema.json#/$defs/EndCondition"
+          }
         }
       },
       "outputData": {
         "featureName": "string",
         "holeCount": "integer",
-        "actualPositions": "array of Point2D (dibaca ulang dari model)"
+        "actualPositions": "array of Vector3D (dibaca ulang dari model, ditransformasi balik ke koordinat model)",
+        "positionDeviationsMm": "array of number|null"
       },
-      "notes": "Verifikasi WAJIB membandingkan actualPositions dengan positions yang diminta. Kalau standard atau fastenerSize tidak diberikan untuk tipe yang membutuhkannya, kembalikan BLOCKED dan buat entri openQuestions - JANGAN pilih standar default."
+      "notes": "POSISI TIDAK PERNAH MASUK LEWAT API HOLE WIZARD. HoleWizard5 tidak punya satu pun parameter koordinat - direfleksikan dari PIA asli. Posisi hidup di SKETSA POSISI dan ditaruh lewat ISketchManager.CreatePoint(X, Y, Z). KOORDINAT CreatePoint ADALAH RUANG SKETSA AKTIF, BUKAN KOORDINAT MODEL; Z ada karena method yang sama dipakai 3D sketch. Jadi tool WAJIB mentransformasi koordinat model ke ruang sketsa lewat ISketch.ModelToSketchTransform, dan mentransformasi actualPositions BALIK ke koordinat model lewat IMathTransform.Inverse sebelum dilaporkan. TEST INTEGRASI WAJIB memakai face yang BUKAN di Front Plane - minimal face atas, face samping, dan face pada offset dari origin. Test di Front Plane saja TIDAK dihitung sebagai bukti, karena di sana koordinat sketsa kebetulan sama dengan koordinat model, sehingga transform yang hilang pun akan lulus. Test harus pernah terlihat MERAH: pasang versi tanpa transformasi dan tunjukkan face non-Front gagal. Verifikasi WAJIB membandingkan actualPositions dengan positions yang diminta, dan check positions_on_face (required, FAIL) memastikan setiap titik berada pada face yang dirujuk. Kalau standard atau fastenerSize tidak diberikan untuk tipe yang membutuhkannya, kembalikan BLOCKED dan buat entri openQuestions - JANGAN pilih standar default. VALIDASI PER KOMBINASI, bukan per field: holeType x standard x fastenerType x size. Kombinasi yang tidak ada di basis data Hole Wizard menghasilkan BLOCKED + openQuestions yang menyebut opsi valid terdekat. StandardIndex dan FastenerTypeIndex adalah Int32 dengan enum asli (swWzdHoleStandards_e 19 nilai, swWzdHoleStandardFastenerTypes_e 404 nilai); pemetaan nama ke enum DI-GENERATE dari refleksi PIA dan terikat versi SolidWorks - catat versinya di berkas hasil generate. HANYA HoleWizard5, TANPA FALLBACK. HoleWizard5 menyisipkan parameter Length setelah Depth yang tidak ada di HoleWizard4, jadi fallback diam-diam akan menghasilkan kedalaman yang salah dan lolos sebagai sukses. Kalau HoleWizard5 tidak tersedia: BLOCKED. Value1..Value12 adalah dua belas parameter Double yang artinya BERGANTUNG TIPE LUBANG, dan namanya tidak memberi petunjuk apa pun - perangkap urutan parameter yang lebih buruk daripada FeatureExtrusion. Karena itu test urutan parameter dibuat PER TIPE LUBANG. M0 HANYA MEMBUKA holeType 'simple' dan 'counterbore'. Tipe lain tetap ada di enum skema, tapi executor mengembalikan BLOCKED 'holeType belum terverifikasi' sampai test urutan parameternya SW_PASS."
     },
-
     {
       "name": "linear_pattern",
       "capabilityId": "patterns",
@@ -437,29 +541,60 @@
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["features", "direction1"],
+        "required": [
+          "features",
+          "direction1"
+        ],
         "properties": {
-          "features": { "$ref": "common.schema.json#/$defs/EntitySelector" },
+          "features": {
+            "$ref": "common.schema.json#/$defs/EntitySelector"
+          },
           "direction1": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["edge", "spacing", "instances"],
+            "required": [
+              "edge",
+              "spacing",
+              "instances"
+            ],
             "properties": {
-              "edge": { "$ref": "common.schema.json#/$defs/EntityRef" },
-              "spacing": { "$ref": "common.schema.json#/$defs/Length" },
-              "instances": { "$ref": "common.schema.json#/$defs/Count" },
-              "reverse": { "type": "boolean", "default": false }
+              "edge": {
+                "$ref": "common.schema.json#/$defs/EntityRef"
+              },
+              "spacing": {
+                "$ref": "common.schema.json#/$defs/Length"
+              },
+              "instances": {
+                "$ref": "common.schema.json#/$defs/Count"
+              },
+              "reverse": {
+                "type": "boolean",
+                "default": false
+              }
             }
           },
           "direction2": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["edge", "spacing", "instances"],
+            "required": [
+              "edge",
+              "spacing",
+              "instances"
+            ],
             "properties": {
-              "edge": { "$ref": "common.schema.json#/$defs/EntityRef" },
-              "spacing": { "$ref": "common.schema.json#/$defs/Length" },
-              "instances": { "$ref": "common.schema.json#/$defs/Count" },
-              "reverse": { "type": "boolean", "default": false }
+              "edge": {
+                "$ref": "common.schema.json#/$defs/EntityRef"
+              },
+              "spacing": {
+                "$ref": "common.schema.json#/$defs/Length"
+              },
+              "instances": {
+                "$ref": "common.schema.json#/$defs/Count"
+              },
+              "reverse": {
+                "type": "boolean",
+                "default": false
+              }
             }
           }
         }
@@ -471,7 +606,6 @@
       "notes": "instances TERMASUK fitur aslinya, mengikuti konvensi SolidWorks. 4 lubang berarti instances=4, bukan 3. Verifikasi membandingkan actualInstanceCount dengan yang diminta - instance yang gagal dibuat tidak selalu menggagalkan panggilan API."
     }
   ],
-
   "orchestrationTools": [
     {
       "name": "validate_design_plan",
@@ -481,9 +615,13 @@
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["plan"],
+        "required": [
+          "plan"
+        ],
         "properties": {
-          "plan": { "$ref": "design-plan.schema.json" }
+          "plan": {
+            "$ref": "design-plan.schema.json"
+          }
         }
       },
       "outputData": {
@@ -501,13 +639,23 @@
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["plan"],
+        "required": [
+          "plan"
+        ],
         "properties": {
-          "plan": { "$ref": "design-plan.schema.json" },
+          "plan": {
+            "$ref": "design-plan.schema.json"
+          },
           "parameterOverrides": {
             "type": "object",
             "description": "Jalur Lapis 2: ubah parameter dan jalankan ulang tanpa memanggil AI.",
-            "additionalProperties": { "type": ["number", "string", "boolean"] }
+            "additionalProperties": {
+              "type": [
+                "number",
+                "string",
+                "boolean"
+              ]
+            }
           },
           "stopAtStep": {
             "type": "string",
@@ -517,13 +665,17 @@
       },
       "outputData": {
         "runId": "string",
+        "snapshotPath": "string|null",
         "stepsCompleted": "integer",
+        "lastGoodStep": "string|null",
+        "firstChangedStep": "string|null",
+        "failedStep": "string|null",
         "stepResults": "array of ToolResult",
         "acceptanceResults": "array of VerificationCheck",
         "finalVerdict": "PASS|WARN|FAIL|BLOCKED",
         "documentPath": "string|null"
       },
-      "notes": "finalVerdict mengagregasi SEMUA step dan SEMUA kriteria acceptance. Satu FAIL yang required membuat seluruh run FAIL, walaupun step lain PASS."
+      "notes": "finalVerdict mengagregasi SEMUA step dan SEMUA kriteria acceptance. Satu FAIL yang required membuat seluruh run FAIL, walaupun step lain PASS. TIDAK ADA ROLLBACK OTOMATIS, di level tool maupun plan. Rollback itu sendiri operasi yang bisa gagal, dan gagal saat memulihkan dari kegagalan adalah keadaan terburuk yang mungkin. Sebelum step pertama, buat SNAPSHOT PASIF dokumen lewat IModelDocExtension.SaveAs3 dengan Options = swSaveAsOptions_Copy (2) | swSaveAsOptions_Silent (1) = 3. Dokumen aktif TIDAK BOLEH berpindah ke berkas snapshot - buktikan ini di test integrasi. Jangan memakai swSaveAsOptions_CopyAndOpen (512), yang justru membuka salinannya. Errors dan Warnings adalah `ref`, bukan `out`. Dokumen yang belum pernah disimpan TETAP di-snapshot; namanya diambil dari judul dokumen. Snapshot disimpan di %LOCALAPPDATA%\\MikosAI\\snapshots\\<runId>\\. KALAU SNAPSHOT GAGAL DIBUAT, PLAN TIDAK DIJALANKAN - verdict BLOCKED. Menjalankan plan tanpa jaring berarti kegagalan di tengah meninggalkan model setengah jadi tanpa jalan pulang. snapshotPath dikembalikan JUGA saat plan berhasil, supaya manusia tahu ada berkas yang bisa dibuang. Saat gagal: berhenti, jangan pulihkan apa pun, laporkan lastGoodStep, firstChangedStep, failedStep, dan snapshotPath. Fitur yang gagal TIDAK dihapus otomatis - laporkan featureName sebenarnya beserta statusnya. Kalau ada step dengan modelChanged null, firstChangedStep dilaporkan sebagai batas paling awal yang MUNGKIN, bukan yang pasti, dan check change_extent_known berverdict FAIL. Tool tulis yang tidak bisa membaca ulang cakupan perubahannya berarti TIDAK TERVERIFIKASI, walaupun panggilan API-nya sukses - dan WARN akan membuat run terlihat lulus dengan catatan, padahal ini persis kondisi di mana manusia harus menganggap model berubah dan memeriksa snapshot. Pemulihan dari snapshot adalah keputusan manusia. Tidak ada tool restore di M0."
     }
   ]
 }

@@ -3,77 +3,117 @@
   "$id": "https://mikosai.dev/schemas/common.schema.json",
   "title": "MikosAI Common Definitions",
   "description": "Tipe bersama untuk DesignPlan dan katalog tool. Semua panjang dalam mm, sudut dalam derajat. Konversi ke SI (meter/radian) terjadi di ToolExecutor, bukan di plan.",
-
   "$defs": {
-
     "Length": {
       "description": "Panjang dalam milimeter. Boleh angka, atau referensi parameter seperti \"$plateWidth\".",
       "oneOf": [
-        { "type": "number" },
-        { "$ref": "#/$defs/ParameterRef" }
+        {
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/ParameterRef"
+        }
       ]
     },
-
     "Angle": {
       "description": "Sudut dalam derajat. Boleh angka, atau referensi parameter.",
       "oneOf": [
-        { "type": "number" },
-        { "$ref": "#/$defs/ParameterRef" }
+        {
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/ParameterRef"
+        }
       ]
     },
-
     "Count": {
       "description": "Bilangan bulat positif, atau referensi parameter.",
       "oneOf": [
-        { "type": "integer", "minimum": 1 },
-        { "$ref": "#/$defs/ParameterRef" }
+        {
+          "type": "integer",
+          "minimum": 1
+        },
+        {
+          "$ref": "#/$defs/ParameterRef"
+        }
       ]
     },
-
     "ParameterRef": {
       "description": "Referensi ke entri parameters di DesignPlan. Hanya referensi langsung - TIDAK ada ekspresi aritmetika. Lihat docs/skema-tool-dan-plan.md.",
       "type": "string",
       "pattern": "^\\$[A-Za-z][A-Za-z0-9_]*$"
     },
-
     "Point2D": {
       "description": "Titik pada bidang sketsa aktif, dalam mm, relatif ke origin sketsa.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["x", "y"],
+      "required": [
+        "x",
+        "y"
+      ],
       "properties": {
-        "x": { "$ref": "#/$defs/Length" },
-        "y": { "$ref": "#/$defs/Length" }
+        "x": {
+          "$ref": "#/$defs/Length"
+        },
+        "y": {
+          "$ref": "#/$defs/Length"
+        }
       }
     },
-
     "Vector3D": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["x", "y", "z"],
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
       "properties": {
-        "x": { "type": "number" },
-        "y": { "type": "number" },
-        "z": { "type": "number" }
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        }
       }
     },
-
     "StandardPlane": {
       "type": "string",
-      "enum": ["Front Plane", "Top Plane", "Right Plane"]
+      "enum": [
+        "Front Plane",
+        "Top Plane",
+        "Right Plane"
+      ]
     },
-
     "EntityRef": {
       "description": "Referensi entitas berbasis kriteria STABIL. Face1/Edge1 dan koordinat layar dilarang - lihat CONTRIBUTING.md aturan 4.",
       "type": "object",
-      "required": ["kind", "by"],
+      "required": [
+        "kind",
+        "by"
+      ],
       "oneOf": [
         {
           "additionalProperties": false,
-          "required": ["kind", "by", "name"],
+          "required": [
+            "kind",
+            "by",
+            "name"
+          ],
           "properties": {
-            "kind": { "enum": ["plane", "feature", "sketch"] },
-            "by": { "const": "name" },
+            "kind": {
+              "enum": [
+                "plane",
+                "feature",
+                "sketch"
+              ]
+            },
+            "by": {
+              "const": "name"
+            },
             "name": {
               "type": "string",
               "minLength": 1,
@@ -83,10 +123,19 @@
         },
         {
           "additionalProperties": false,
-          "required": ["kind", "by", "normal", "nearPoint"],
+          "required": [
+            "kind",
+            "by",
+            "normal",
+            "nearPoint"
+          ],
           "properties": {
-            "kind": { "const": "face" },
-            "by": { "const": "normal_and_point" },
+            "kind": {
+              "const": "face"
+            },
+            "by": {
+              "const": "normal_and_point"
+            },
             "normal": {
               "$ref": "#/$defs/Vector3D",
               "description": "Normal permukaan yang diharapkan, dalam koordinat model."
@@ -104,11 +153,21 @@
         },
         {
           "additionalProperties": false,
-          "required": ["kind", "by", "nearPoint"],
+          "required": [
+            "kind",
+            "by",
+            "nearPoint"
+          ],
           "properties": {
-            "kind": { "const": "edge" },
-            "by": { "const": "midpoint" },
-            "nearPoint": { "$ref": "#/$defs/Vector3D" },
+            "kind": {
+              "const": "edge"
+            },
+            "by": {
+              "const": "midpoint"
+            },
+            "nearPoint": {
+              "$ref": "#/$defs/Vector3D"
+            },
             "direction": {
               "$ref": "#/$defs/Vector3D",
               "description": "Opsional. Arah tepi yang diharapkan, untuk memperketat pencocokan."
@@ -117,10 +176,22 @@
         },
         {
           "additionalProperties": false,
-          "required": ["kind", "by", "persistId"],
+          "required": [
+            "kind",
+            "by",
+            "persistId"
+          ],
           "properties": {
-            "kind": { "enum": ["face", "edge", "vertex"] },
-            "by": { "const": "persist_id" },
+            "kind": {
+              "enum": [
+                "face",
+                "edge",
+                "vertex"
+              ]
+            },
+            "by": {
+              "const": "persist_id"
+            },
             "persistId": {
               "type": "string",
               "description": "Hasil GetPersistReference3, base64. Paling stabil, tapi hanya valid dalam dokumen yang sama. Belum dipakai di v0.1."
@@ -129,61 +200,93 @@
         }
       ]
     },
-
     "EntitySelector": {
       "description": "Satu atau beberapa entitas.",
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/EntityRef" }
+      "items": {
+        "$ref": "#/$defs/EntityRef"
+      }
     },
-
     "EndCondition": {
       "description": "Kondisi akhir fitur extrude.",
       "type": "object",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "oneOf": [
         {
           "additionalProperties": false,
-          "required": ["type", "depth"],
+          "required": [
+            "type",
+            "depth"
+          ],
           "properties": {
-            "type": { "const": "blind" },
-            "depth": { "$ref": "#/$defs/Length" }
+            "type": {
+              "const": "blind"
+            },
+            "depth": {
+              "$ref": "#/$defs/Length"
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["type"],
+          "required": [
+            "type"
+          ],
           "properties": {
-            "type": { "enum": ["through_all", "up_to_next"] }
+            "type": {
+              "enum": [
+                "through_all",
+                "up_to_next"
+              ]
+            }
           }
         },
         {
           "additionalProperties": false,
-          "required": ["type", "face"],
+          "required": [
+            "type",
+            "face"
+          ],
           "properties": {
-            "type": { "const": "up_to_surface" },
-            "face": { "$ref": "#/$defs/EntityRef" }
+            "type": {
+              "const": "up_to_surface"
+            },
+            "face": {
+              "$ref": "#/$defs/EntityRef"
+            }
           }
         }
       ]
     },
-
     "Verdict": {
       "description": "Agregasi: BLOCKED > FAIL > WARN > PASS. Status tidak dikenal menjadi BLOCKED.",
       "type": "string",
-      "enum": ["PASS", "WARN", "FAIL", "BLOCKED"]
+      "enum": [
+        "PASS",
+        "WARN",
+        "FAIL",
+        "BLOCKED"
+      ]
     },
-
     "VerificationCheck": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "verdict", "required"],
+      "required": [
+        "id",
+        "verdict",
+        "required"
+      ],
       "properties": {
         "id": {
           "type": "string",
           "description": "Mis. feature_exists_in_tree, rebuild_succeeds, save_reopen_dimension_readback."
         },
-        "verdict": { "$ref": "#/$defs/Verdict" },
+        "verdict": {
+          "$ref": "#/$defs/Verdict"
+        },
         "required": {
           "type": "boolean",
           "description": "Kalau true, FAIL di sini tidak boleh ditutupi PASS tingkat atas."
@@ -191,20 +294,31 @@
         "observed": {
           "description": "Nilai yang benar-benar dibaca dari model. Bukti, bukan klaim."
         },
-        "expected": { "description": "Nilai yang diharapkan." },
-        "message": { "type": "string" }
+        "expected": {
+          "description": "Nilai yang diharapkan."
+        },
+        "message": {
+          "type": "string"
+        }
       }
     },
-
     "VerificationResult": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["verdict", "checks", "manualReviewRequired"],
+      "required": [
+        "verdict",
+        "checks",
+        "manualReviewRequired"
+      ],
       "properties": {
-        "verdict": { "$ref": "#/$defs/Verdict" },
+        "verdict": {
+          "$ref": "#/$defs/Verdict"
+        },
         "checks": {
           "type": "array",
-          "items": { "$ref": "#/$defs/VerificationCheck" }
+          "items": {
+            "$ref": "#/$defs/VerificationCheck"
+          }
         },
         "manualReviewRequired": {
           "type": "boolean",
@@ -212,7 +326,6 @@
         }
       }
     },
-
     "ErrorKind": {
       "type": "string",
       "enum": [
@@ -228,14 +341,20 @@
         "fatal"
       ]
     },
-
     "ToolError": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "message"],
+      "required": [
+        "kind",
+        "message"
+      ],
       "properties": {
-        "kind": { "$ref": "#/$defs/ErrorKind" },
-        "code": { "type": "string" },
+        "kind": {
+          "$ref": "#/$defs/ErrorKind"
+        },
+        "code": {
+          "type": "string"
+        },
         "message": {
           "type": "string",
           "description": "Untuk Lapis 1 UI: sebut tindakan konkret yang harus dilakukan manusia, bukan kode internal."
@@ -246,12 +365,14 @@
         }
       }
     },
-
     "ToolResult": {
       "description": "Envelope untuk SETIAP hasil tool. Perhatikan: `ok` berarti panggilan terlaksana. `verification.verdict` berarti tugasnya berhasil. Keduanya TIDAK sama - itu prinsip inti proyek ini, dan di sini dikodekan ke dalam skema.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["ok", "capabilityId"],
+      "required": [
+        "ok",
+        "capabilityId"
+      ],
       "properties": {
         "ok": {
           "type": "boolean",
@@ -261,23 +382,55 @@
           "type": "string",
           "description": "Id di capabilities.yaml. Dipakai untuk menegakkan gating."
         },
+        "modelChanged": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Apakah model BERUBAH akibat panggilan ini. Hanya untuk tool mutates=true; null untuk tool read-only. true/false WAJIB hasil pembacaan ulang dari model, BUKAN asumsi dari status sukses API. null berarti cakupan perubahan tidak bisa dipastikan, dan di laporan untuk manusia null diperlakukan SAMA DENGAN true: anggap model berubah, periksa snapshot. Dua keadaan akan memaksa kita berbohong di keadaan ketiga - 'model tidak berubah' adalah alasan paling masuk akal bagi manusia untuk TIDAK memulihkan dari snapshot, jadi mengirim false tanpa memeriksanya bisa membuat dia kehilangan pekerjaannya."
+        },
+        "readBackFailed": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "WAJIB terisi kalau modelChanged null: alasan pembacaan ulang gagal, apa adanya. null tanpa alasan adalah ketidaktahuan yang tidak bisa ditindaklanjuti."
+        },
         "data": {
           "type": "object",
           "description": "Payload khusus per tool."
         },
-        "verification": { "$ref": "#/$defs/VerificationResult" },
-        "error": { "$ref": "#/$defs/ToolError" },
+        "verification": {
+          "$ref": "#/$defs/VerificationResult"
+        },
+        "error": {
+          "$ref": "#/$defs/ToolError"
+        },
         "evidence": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "documentPath": { "type": "string" },
-            "solidworksRevision": { "type": "string" },
-            "featureNames": { "type": "array", "items": { "type": "string" } },
-            "sha256": { "type": "string" }
+            "documentPath": {
+              "type": "string"
+            },
+            "solidworksRevision": {
+              "type": "string"
+            },
+            "featureNames": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sha256": {
+              "type": "string"
+            }
           }
         },
-        "durationMs": { "type": "integer", "minimum": 0 }
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     }
   }

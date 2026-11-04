@@ -148,16 +148,30 @@ capabilities:
       - add_rectangle
       - add_circle
       - add_slot
-      - fully_define_sketch
+      - diagnose_sketch
       - close_sketch
     verification:
       - sketch_exists_in_tree
       - constrained_status_read        # GetConstrainedStatus, BUKAN Fix massal
       - consumed_by_target_feature
     notes: >
-      fully_define_sketch hanya untuk geometri dasar (persegi, lingkaran).
-      Sketsa kompleks harus memakai dimensi desain eksplisit, lalu diverifikasi
-      lewat inspect_sketches. Fix massal sebagai pengganti dimensi desain dilarang.
+      `fully_define_sketch` DIHAPUS pada 2026-11-05, diganti `diagnose_sketch`
+      yang read-only.
+
+      Alasannya ada di tanda tangan API-nya sendiri:
+      ISketchManager.FullyDefineSketch menerima HorizontalDimScheme,
+      VerticalDimScheme, dan datum display - artinya ia MEMILIH skema dimensi
+      dan datum. Itu keputusan desain, bukan formalitas: skema datum menentukan
+      bagaimana part berubah ketika parameter diubah.
+
+      Bahayanya sunyi. Sketsa yang fully defined lewat dimensi pilihan mesin
+      lolos SELURUH verifikasi kami - constrainedStatus hijau, verdict PASS -
+      sementara partnya salah dengan cara yang tidak satu pun check kami
+      tangkap. Begitu add_relation ada, tool itu juga jadi jalan belakang ke
+      larangan Fix massal.
+
+      Sketsa harus memakai dimensi desain eksplisit. Dimensi yang tidak pernah
+      disebut pengguna menjadi openQuestions, bukan tebakan mesin.
 
   # ---- Fase 3: fitur ----------------------------------------------------
   - id: part_features
@@ -191,6 +205,21 @@ capabilities:
     notes: >
       Tipe lubang, datum, dan toleransi TIDAK BOLEH ditebak dari geometri.
       Kalau plan tidak menyebutnya, hasilnya review_required.
+
+      M0 HANYA MEMBUKA holeType `simple` dan `counterbore`. Tipe lain tetap ada
+      di enum skema, tapi executor mengembalikan BLOCKED
+      "holeType belum terverifikasi" sampai test urutan parameternya SW_PASS.
+
+      Alasannya HoleWizard5 punya dua belas parameter Double bernama
+      Value1..Value12 yang artinya BERGANTUNG TIPE LUBANG, dan namanya tidak
+      memberi petunjuk apa pun. Satu test urutan parameter tidak bisa mewakili
+      tipe yang lain, jadi tiap tipe dibuka setelah test-nya sendiri lulus di
+      SolidWorks nyata.
+
+      Posisi lubang TIDAK pernah masuk lewat HoleWizard5 - API itu tidak punya
+      satu pun parameter koordinat. Posisi ditaruh sebagai titik sketsa lewat
+      ISketchManager.CreatePoint, yang koordinatnya ADALAH RUANG SKETSA, bukan
+      koordinat model. Lihat catatan hole_wizard di schemas/tools.json.
 
   - id: patterns
     label: Linear pattern

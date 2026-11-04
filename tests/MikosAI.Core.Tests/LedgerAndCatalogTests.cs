@@ -288,14 +288,23 @@ capabilities:
         }
 
         [Fact]
-        public void ada_7_tool_read_only_dan_13_tool_yang_menulis()
+        public void ada_8_tool_read_only_dan_12_tool_yang_menulis()
         {
-            // 6 tool CAD read-only + validate_design_plan.
-            // 12 tool CAD yang menulis + run_design_plan.
+            // 7 tool CAD read-only + validate_design_plan.
+            // 11 tool CAD yang menulis + run_design_plan.
+            //
+            // Dulu 7 dan 13. Bergeser pada 2026-11-05 saat `fully_define_sketch`
+            // (mutates) diganti `diagnose_sketch` (read-only).
+            //
+            // Arah pergeserannya yang penting, dan itulah kenapa test ini dijaga
+            // sebagai angka: permukaan TULIS kita BERKURANG satu. Tool yang
+            // menulis adalah tool yang bisa merusak pekerjaan orang, jadi
+            // pertambahannya harus selalu jadi keputusan sadar - bukan sesuatu
+            // yang menyelinap masuk lewat satu entri katalog.
             var all = Catalog().All;
 
-            Assert.Equal(7, all.Count(t => !t.Mutates));
-            Assert.Equal(13, all.Count(t => t.Mutates));
+            Assert.Equal(8, all.Count(t => !t.Mutates));
+            Assert.Equal(12, all.Count(t => t.Mutates));
         }
     }
 }

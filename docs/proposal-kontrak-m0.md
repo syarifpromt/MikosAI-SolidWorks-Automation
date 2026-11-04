@@ -1,7 +1,47 @@
 # Proposal perubahan kontrak — M0 langkah 1
 
-Status: **MENUNGGU PERSETUJUAN.** Belum ada perubahan yang diterapkan ke
-`schemas/tools.json`, `schemas/common.schema.json`, atau `capabilities.yaml`.
+Status: **DISETUJUI dan DITERAPKAN** pada 2026-11-05. Keenam keputusan disetujui
+dengan empat amandemen, dan semuanya sudah masuk ke `schemas/tools.json`,
+`schemas/common.schema.json`, dan `capabilities.yaml`.
+
+Amandemen yang diterima:
+
+1. **A.2** — `null` wajib disertai alasan (`readBackFailed`), dan di laporan untuk
+   manusia `null` diperlakukan **sama dengan `true`**: anggap model berubah,
+   periksa snapshot.
+2. **A.4** — `change_extent_known` berverdict **FAIL**, bukan WARN. Alasannya
+   benar dan lebih kuat daripada usulku: WARN membuat run terlihat lulus dengan
+   catatan, padahal ini persis kondisi di mana manusia harus memeriksa snapshot.
+3. **B** — lihat koreksi di bawah; premisku salah.
+4. **D.1** — validasi **per kombinasi** (`holeType × standard × fastenerType ×
+   size`), bukan per field, dan pemetaan nama→enum **di-generate dari refleksi
+   PIA**, bukan ditulis tangan.
+5. **D.3** — M0 hanya membuka `simple` dan `counterbore`; tipe lain `BLOCKED`
+   sampai test urutan parameternya SW_PASS.
+
+## KOREKSI atas B — premisku salah
+
+Aku menulis bahwa `CreatePoint` menerima koordinat model. **Itu tidak ditopang
+bukti apa pun.** Aku menyimpulkannya dari *adanya* tiga parameter, dan refleksi
+hanya memberi tanda tangan — bukan semantik. Menyimpulkan semantik dari jumlah
+parameter adalah bentuk lain dari menebak, yaitu hal yang dilarang briefing ini.
+
+Koreksinya: `ISketchManager.Create*` menerima koordinat dalam **ruang sketsa
+aktif**; `Z` ada karena method yang sama dipakai 3D sketch.
+
+Bukti pendukung yang bisa kuperiksa: `ISketch.ModelToSketchTransform` **ada** di
+PIA, begitu juga `IMathTransform.Inverse`. Keberadaan transform model→sketsa itu
+sendiri adalah argumen kuat — kalau entitas sketsa hidup di koordinat model,
+transform itu tidak akan ada gunanya.
+
+Tapi ini tetap **argumen, bukan bukti**. Yang menyelesaikannya adalah test yang
+disyaratkan: face atas, face samping, dan face pada offset dari origin — dan
+test itu harus pernah terlihat **merah** dengan versi tanpa transformasi. Test di
+Front Plane saja tidak dihitung, karena di sana koordinat sketsa kebetulan sama
+dengan koordinat model, sehingga transform yang hilang pun akan lulus.
+
+Kontrak `positions` tetap `Vector3D` **koordinat model** — yang berubah bukan
+kontraknya, melainkan siapa yang menanggung transformasinya: tool, bukan AI.
 
 Mencakup tiga keputusan: kebijakan recovery (A), sistem koordinat
 `hole_wizard.positions` (B), dan nasib `fully_define_sketch` (C). Ditambah
