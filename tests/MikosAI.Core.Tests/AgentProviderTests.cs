@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using MikosAI.Core.Agents;
 using Xunit;
@@ -91,7 +92,18 @@ namespace MikosAI.Core.Tests
             Assert.NotNull(gagal);
             Assert.Equal("provider_silent", gagal!.Code);
             Assert.Contains("BUKAN jawaban AI yang kosong", gagal.Message);
-            Assert.Contains("ConPTY", gagal.NextAction);
+
+            // Dulu baris ini menuntut nasihat "ConPTY" ADA di NextAction.
+            //
+            // Test itu MENGABADIKAN NASIHAT BASI. Item 2 di daftar verifikasi
+            // sudah dijawab: pipe biasa cukup di agy 1.4.11+, jadi menyuruh
+            // orang memasang pseudo-terminal mengirim mereka memperbaiki hal
+            // yang tidak rusak.
+            //
+            // Yang dituntut sekarang adalah sifat yang benar-benar berguna:
+            // langkah berikutnya harus KONKRET, bukan sekadar ada.
+            Assert.False(string.IsNullOrWhiteSpace(gagal.NextAction));
+            Assert.DoesNotContain("ConPTY", gagal.NextAction!, StringComparison.OrdinalIgnoreCase);
         }
 
         [Theory]

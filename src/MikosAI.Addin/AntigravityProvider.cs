@@ -132,6 +132,13 @@ namespace MikosAI.Addin
         public AgentResult ParseResult(string stdout, int exitCode, ProviderProbe probe)
             => ProviderOutcome.Shape(stdout, exitCode);
 
+        /// <summary>
+        /// Varian yang meneruskan stderr. Dipakai jalur permintaan sungguhan,
+        /// karena stderr sering satu-satunya penjelasan saat stdout kosong.
+        /// </summary>
+        internal AgentResult ParseResult(HasilProses hasil, ProviderProbe probe)
+            => ProviderOutcome.Shape(hasil.Output, hasil.ExitCode, hasil.Galat);
+
         // ====================================================================
         // Eksekusi
         // ====================================================================
@@ -140,6 +147,22 @@ namespace MikosAI.Addin
         {
             internal int ExitCode { get; set; }
             internal string Output { get; set; } = string.Empty;
+
+            /// <summary>
+            /// stderr MENTAH, selalu disimpan - termasuk saat exit code 0.
+            ///
+            /// Versi sebelumnya hanya menggabungkannya ke Output kalau proses
+            /// gagal, dengan alasan stderr pada proses sukses biasanya cuma
+            /// catatan progres yang merusak parsing JSON. Alasan itu benar untuk
+            /// Output, tapi SALAH sebagai alasan membuangnya: provider_silent
+            /// persis berarti exit code 0, jadi di satu-satunya keadaan di mana
+            /// stderr adalah bukti satu-satunya, bukti itu hilang.
+            ///
+            /// Dipisah dari Output, bukan digabung: parser tetap bersih, dan
+            /// diagnosisnya tetap punya bahan.
+            /// </summary>
+            internal string Galat { get; set; } = string.Empty;
+
             internal bool Timeout { get; set; }
         }
 
@@ -168,13 +191,17 @@ namespace MikosAI.Addin
                     Failure = new AgentFailure
                     {
                         Code = "provider_timeout",
-                        Message = $"Provider tidak selesai dalam {AntigravityCommand.BatasWaktuDetik} detik.",
+                        Message = $"Provider tidak selesai dalam {AntigravityCommand.BatasWaktuDetik} detik."
+                                  + (hasil.Galat.Length > 0
+                                      ? Environment.NewLine + Environment.NewLine
+                                        + "Pesan dari provider (stderr):" + Environment.NewLine + hasil.Galat
+                                      : string.Empty),
                         NextAction = "Coba permintaan yang lebih sederhana.",
                     },
                 };
             }
 
-            return ParseResult(hasil.Output, hasil.ExitCode, probe);
+            return ParseResult(hasil, probe);
         }
 
         /// <summary>
@@ -303,7 +330,12 @@ namespace MikosAI.Addin
             if (!selesai)
             {
                 MatikanProses(proses);
-                return new HasilProses { Timeout = true, Output = keluaran.ToString() };
+                return new HasilProses
+                {
+                    Timeout = true,
+                    Output = keluaran.ToString(),
+                    Galat = galat.ToString().Trim(),
+                };
             }
 
             // Pembacaan stream bisa tertinggal sedikit dari keluarnya proses.
@@ -325,6 +357,7 @@ namespace MikosAI.Addin
             {
                 ExitCode = proses.ExitCode,
                 Output = gabungan,
+                Galat = pesanGalat,
             };
         }
 

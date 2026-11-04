@@ -211,5 +211,66 @@ namespace MikosAI.Core.Tests
 
             Assert.Null(hasil.Failure);
         }
+
+        // -------------------------------------------------------------------
+        // stderr tidak boleh dibuang saat exit code 0
+        // -------------------------------------------------------------------
+
+        /// <summary>
+        /// provider_silent PERSIS berarti exit code 0, jadi membuang stderr
+        /// "karena prosesnya sukses" membuang bukti di satu-satunya keadaan yang
+        /// membutuhkannya.
+        ///
+        /// Dan agy memang memakai jalur itu: penolakan izin ditulis ke stderr
+        /// DENGAN exit code 0.
+        /// </summary>
+        [Fact]
+        public void stdout_kosong_melaporkan_stderr_sebagai_alasannya()
+        {
+            const string stderr =
+                "jetski: no output produced - a tool required the \"mcp\" permission that "
+                + "headless mode cannot prompt for, so it was auto-denied.";
+
+            var hasil = ProviderOutcome.Shape(string.Empty, 0, stderr);
+
+            Assert.NotNull(hasil.Failure);
+            Assert.Equal("provider_silent", hasil.Failure!.Code);
+
+            // Alasan sebenarnya harus ADA di pesannya, bukan dibuang.
+            Assert.Contains("auto-denied", hasil.Failure.Message);
+            Assert.Contains("stderr", hasil.Failure.Message);
+        }
+
+        /// <summary>
+        /// Nasihat "pakai ConPTY" DIHAPUS.
+        ///
+        /// Item 2 di daftar verifikasi sudah dijawab: pipe biasa cukup di agy
+        /// 1.4.11+. Mengirim orang memasang pseudo-terminal untuk masalah yang
+        /// bukan itu adalah biaya yang kita timbulkan sendiri - dan nasihat basi
+        /// lebih mahal daripada tidak ada nasihat.
+        /// </summary>
+        [Fact]
+        public void tidak_lagi_menyarankan_ConPTY_yang_sudah_terbukti_tidak_perlu()
+        {
+            foreach (var stderr in new[] { string.Empty, "sesuatu" })
+            {
+                var hasil = ProviderOutcome.Shape(string.Empty, 0, stderr);
+
+                var gabungan = hasil.Failure!.Message + " " + hasil.Failure.NextAction;
+
+                Assert.DoesNotContain("ConPTY", gabungan, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("pseudo-terminal", gabungan, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        [Fact]
+        public void stderr_kosong_memberi_langkah_diagnosis_yang_konkret()
+        {
+            var hasil = ProviderOutcome.Shape(string.Empty, 0, string.Empty);
+
+            // Tanpa stderr, satu-satunya hal berguna adalah membandingkan dengan
+            // jalur yang TERBUKTI bekerja.
+            Assert.Contains("mcp-roundtrip", hasil.Failure!.NextAction);
+        }
     }
 }

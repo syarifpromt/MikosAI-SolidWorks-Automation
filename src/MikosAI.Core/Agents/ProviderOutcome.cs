@@ -31,22 +31,55 @@ namespace MikosAI.Core.Agents
         /// kosong" padahal yang terjadi adalah "integrasi rusak" - dan
         /// mendiagnosisnya bisa makan berhari-hari.
         /// </summary>
-        public static AgentFailure? DetectSilent(int exitCode, string? stdout)
+        public static AgentFailure? DetectSilent(int exitCode, string? stdout, string? stderr = null)
         {
             if (exitCode != 0 || !string.IsNullOrWhiteSpace(stdout))
             {
                 return null;
             }
 
+            // stderr IKUT DILAPORKAN, DAN ITU PERBAIKAN YANG MAHAL DIDAPAT.
+            //
+            // Eksekutor dulu membuang stderr kalau exit code 0 - dengan alasan
+            // "stderr pada proses yang sukses biasanya cuma kebisingan". Tapi
+            // provider_silent PERSIS berarti exit code 0, jadi di satu-satunya
+            // keadaan di mana stderr adalah bukti SATU-SATUNYA, bukti itu
+            // dibuang.
+            //
+            // Dan agy memang memakai jalur itu: penolakan izin ditulis ke stderr
+            // dengan exit code 0 - "jetski: no output produced - a tool required
+            // the mcp permission...". Pesan yang menjelaskan segalanya, hilang.
+            var alasan = (stderr ?? string.Empty).Trim();
+
+            var pesan = "Provider keluar dengan kode 0 tanpa mengeluarkan apa pun. "
+                        + "Ini kegagalan integrasi, BUKAN jawaban AI yang kosong.";
+
+            if (alasan.Length > 0)
+            {
+                pesan += Environment.NewLine + Environment.NewLine + "Pesan dari provider (stderr):"
+                         + Environment.NewLine + Potong(alasan, 1200);
+            }
+
             return new AgentFailure
             {
                 Code = "provider_silent",
-                Message = "Provider keluar dengan kode 0 tanpa mengeluarkan apa pun. "
-                          + "Ini kegagalan integrasi, BUKAN jawaban AI yang kosong.",
-                NextAction = "Pastikan provider dijalankan lewat pseudo-terminal (ConPTY), "
-                             + "bukan pipe biasa, dan pastikan sudah login.",
+                Message = pesan,
+
+                // NASIHAT LAMA DIHAPUS: ia menyuruh memakai ConPTY, padahal item 2
+                // di daftar verifikasi sudah DIJAWAB - pipe biasa cukup di agy
+                // 1.4.11+. Mengirim orang memasang pseudo-terminal untuk masalah
+                // yang bukan itu adalah biaya yang kita timbulkan sendiri.
+                NextAction = alasan.Length > 0
+                    ? "Baca pesan stderr di atas - itu alasan sebenarnya."
+                    : "stderr juga kosong. Periksa `agy` sudah login (agy -p \"tes\" dari terminal), "
+                      + "lalu jalankan scripts\\mcp-roundtrip.ps1 -Agy untuk membandingkan "
+                      + "dengan jalur yang terbukti bekerja.",
             };
         }
+
+        /// <summary>Memotong teks panjang supaya pesan error tetap terbaca.</summary>
+        private static string Potong(string teks, int maksimum)
+            => teks.Length <= maksimum ? teks : teks.Substring(0, maksimum) + " […]";
 
         // Pembersih keluaran pseudo-terminal.
         private static readonly Regex KodeAnsi =
@@ -72,10 +105,32 @@ namespace MikosAI.Core.Agents
 
             var tanpaAnsi = KodeAnsi.Replace(mentah!, string.Empty);
 
-            // Repaint carriage-return: hanya segmen terakhir di setiap baris
-            // yang relevan, sisanya sudah ditimpa di terminal.
+            // CRLF ADALAH TERMINATOR BARIS, BUKAN REPAINT.
+            //
+            // Normalisasi ini WAJIB mendahului pemecahan repaint di bawah, dan
+            // ketiadaannya adalah bug yang menghancurkan hampir seluruh keluaran
+            // provider di Windows.
+            //
+            // Tanpa baris ini: "a\r\n" dipecah pada '\n' menjadi ["a\r", ""],
+            // lalu "a\r" dipecah pada '\r' menjadi ["a", ""] - dan yang diambil
+            // adalah segmen TERAKHIR, yaitu string kosong. Jadi setiap baris
+            // CRLF menyisakan kosong dan dibuang; hanya baris terakhir, yang
+            // tidak punya \r di ujung, yang selamat.
+            //
+            // agy di Windows mengeluarkan CRLF. Artinya jawaban JSON-nya menjadi
+            // satu baris penutup "}" - dan parser gagal, lalu seluruh keluaran
+            // dilaporkan sebagai teks biasa atau kosong.
+            //
+            // Bug ini tersembunyi lama karena data uji di repo ini memakai LF.
+            // Ia baru terlihat setelah satu berkas test ditulis ulang dengan
+            // CRLF - bukan karena bug-nya baru.
+            var dinormalkan = tanpaAnsi.Replace("\r\n", "\n");
+
+            // Repaint carriage-return: setelah normalisasi di atas, \r yang
+            // tersisa memang repaint sungguhan - terminal menimpa baris yang
+            // sama, dan hanya segmen terakhir yang relevan.
             var hasil = new StringBuilder();
-            foreach (var baris in tanpaAnsi.Split('\n'))
+            foreach (var baris in dinormalkan.Split('\n'))
             {
                 var segmen = baris.Split('\r');
                 var terakhir = segmen[segmen.Length - 1];
@@ -103,9 +158,9 @@ namespace MikosAI.Core.Agents
         /// Antigravity, jadi beberapa kandidat dicoba. Lihat
         /// docs/integrasi-antigravity.md bagian 2.
         /// </summary>
-        public static AgentResult Shape(string? stdout, int exitCode)
+        public static AgentResult Shape(string? stdout, int exitCode, string? stderr = null)
         {
-            var diam = DetectSilent(exitCode, stdout);
+            var diam = DetectSilent(exitCode, stdout, stderr);
             if (diam is not null)
             {
                 return new AgentResult { Failure = diam };
