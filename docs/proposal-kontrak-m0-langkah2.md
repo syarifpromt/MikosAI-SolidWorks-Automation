@@ -1,6 +1,27 @@
 # Proposal kontrak — M0 langkah 2: bentuk empat field `fieldsNotPopulated`
 
-Status: **MENUNGGU PERSETUJUAN.** Belum diterapkan ke skema mana pun.
+Status: **DISETUJUI dan DITERAPKAN** 2026-11-05, dengan tiga koreksi.
+
+Koreksi yang diterima, dan semuanya memperbaiki proposalku:
+
+1. **`children` bukan konsumen, `parents` bukan sketsa.** Aku menyamakan
+   "children" dengan "konsumen" tanpa dasar. Dipisah jadi dua field:
+   `consumedByFeatures` (hanya profil/path/posisi) dan `dependents` (seluruh
+   children tanpa filter). `delete_feature` nanti memakai `dependents` - melihat
+   satu konsumen padahal ada dependent lain berarti menghapus sesuatu yang masih
+   dipakai. `parentSketches` difilter per tipe; plane dan fitur tidak ikut.
+   Kalau test membuktikan `GetChildren()` ternyata konsumen saja, satu field
+   cukup dan kontraknya disederhanakan.
+2. **Invariant dimensi.** Ditambah `dimensionCountRead` supaya
+   `driving + driven + unknown = dimensionCountRead` bisa diperiksa dari luar.
+   `unknownDrivenStateCount > 0` menghasilkan minimal WARN.
+3. **`hasOpenContour` dihapus sepenuhnya**, tanpa boolean turunan - lebih tegas
+   daripada usulku yang masih menawarkan opsi mempertahankannya. Ditambah
+   `branchPointCount`, karena T-junction tidak punya ujung bebas tapi tetap
+   bukan profil yang sah. Dan hipotesis identitas `SketchPoint`: kalau ujung yang
+   tersambung berbagi objek yang sama, konektivitas dihitung EKSAK tanpa
+   toleransi, dan toleransi hanya untuk `nearlyCoincidentEndpointCount`.
+   `ISketchPoint.GetID()` ada, jadi hipotesis itu bisa diuji.
 
 Keempat usulanmu kuterima. Dua di antaranya punya alasan yang lebih kuat
 daripada yang kamu ajukan, satu kuusulkan berubah lebih jauh dari usulanmu, dan
