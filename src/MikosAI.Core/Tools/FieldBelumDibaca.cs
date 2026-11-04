@@ -1,39 +1,69 @@
-using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace MikosAI.Core.Tools
 {
     /// <summary>
-    /// Field yang ADA di kontrak tapi BELUM pernah diisi pembaca.
+    /// Field yang ADA di kontrak tapi BELUM diisi pembaca, DIHITUNG PER JAWABAN.
     ///
-    /// KENAPA INI DISIARKAN, BUKAN CUKUP DITULIS DI DOKUMEN.
+    /// KENAPA DIHITUNG, BUKAN DAFTAR TETAP.
     ///
-    /// Empat field diemisikan sejak lama tanpa pernah dibaca dari SolidWorks.
-    /// Masing-masing terbaca sebagai pernyataan yang berbeda, dan semuanya
-    /// salah:
+    /// Versi pertama kelas ini memuat dua daftar konstan. Itu cukup selama
+    /// tidak ada satu pun field yang terisi, tapi begitu implementasinya
+    /// datang, daftar konstan akan terus menyebut field yang sudah terisi -
+    /// dan mekanisme kejujuran yang berbohong ke arah sebaliknya sama tidak
+    /// bergunanya.
     ///
-    ///   hasOpenContour: false  -> "sudah diperiksa, sketsanya tertutup"
-    ///   dimensionCount: 0      -> "sketsa ini tanpa dimensi"
-    ///   consumedByFeature: null-> "sketsa ini tidak dipakai fitur apa pun"
-    ///   parentSketch: null     -> "fitur ini tidak punya sketsa induk"
+    /// Jadi daftarnya diturunkan dari bacaan yang sebenarnya: sebuah field
+    /// masuk HANYA kalau nilainya null, yaitu "tidak diketahui". Kosong dan nol
+    /// TIDAK masuk, karena keduanya berarti sudah dibaca dan memang tidak ada.
     ///
-    /// Yang ketiga paling berbahaya begitu tool tulis ada: "tidak dipakai
-    /// fitur apa pun" adalah alasan yang masuk akal untuk MENGHAPUS sketsa.
+    /// Kenapa ini dikirim sama sekali: null saja tetap terbaca sebagai "tidak
+    /// ada", bukan "tidak diketahui". Pemanggil perlu tahu bedanya pada saat ia
+    /// memanggil tool - bukan dengan membaca dokumen yang tidak ada di
+    /// depannya.
     ///
-    /// Semuanya kini null. Tapi null saja tidak cukup - null tetap terbaca
-    /// sebagai "tidak ada", bukan "tidak diketahui". Jadi daftarnya ikut
-    /// dikirim di setiap jawaban, supaya pemanggil tahu BEDANYA tanpa harus
-    /// membaca dokumen yang tidak ada di depannya saat ia memanggil tool.
-    ///
-    /// Daftar ini MENGECIL saat field benar-benar diimplementasikan. Kalau ada
-    /// yang mengisi field tanpa menghapusnya dari sini, test akan merah.
+    /// Yang paling berbahaya di antara field-field ini consumedByFeatures:
+    /// "tidak dipakai fitur apa pun" adalah alasan yang masuk akal untuk
+    /// MENGHAPUS sebuah sketsa.
     /// </summary>
     public static class FieldBelumDibaca
     {
-        public static readonly IReadOnlyList<string> ListFitur =
-            Array.AsReadOnly(new[] { "parentSketch" });
+        public static IReadOnlyList<string> UntukFitur(IReadOnlyList<FeatureReading> fitur)
+        {
+            var hasil = new List<string>();
 
-        public static readonly IReadOnlyList<string> ListSketsa =
-            Array.AsReadOnly(new[] { "dimensionCount", "consumedByFeature", "hasOpenContour" });
+            // Satu fitur saja yang tidak terbaca sudah cukup untuk membuat
+            // seluruh jawaban tidak bisa dipercaya untuk field itu. Melaporkan
+            // "sebagian terbaca" akan menggoda pemanggil memakai yang terbaca
+            // dan melupakan sisanya.
+            if (fitur.Any(f => f.ParentSketches is null))
+            {
+                hasil.Add("parentSketches");
+            }
+
+            return hasil;
+        }
+
+        public static IReadOnlyList<string> UntukSketsa(IReadOnlyList<SketchReading> sketsa)
+        {
+            var hasil = new List<string>();
+
+            if (sketsa.Any(s => s.ConsumedByFeatures is null)) hasil.Add("consumedByFeatures");
+            if (sketsa.Any(s => s.Dependents is null)) hasil.Add("dependents");
+            if (sketsa.Any(s => s.DrivingDimensionCount is null)) hasil.Add("drivingDimensionCount");
+            if (sketsa.Any(s => s.DrivenDimensionCount is null)) hasil.Add("drivenDimensionCount");
+            if (sketsa.Any(s => s.UnknownDrivenStateCount is null)) hasil.Add("unknownDrivenStateCount");
+            if (sketsa.Any(s => s.DimensionCountRead is null)) hasil.Add("dimensionCountRead");
+
+            // Konektivitas belum diimplementasikan sama sekali - definisinya
+            // masih menunggu keputusan atas docs/proposal-kontur-loop-menempel.md.
+            // Disebut di sini supaya ketiadaannya tidak terbaca sebagai "sudah
+            // diperiksa dan bersih".
+            hasil.Add("openEndpointCount");
+            hasil.Add("branchPointCount");
+
+            return hasil;
+        }
     }
 }

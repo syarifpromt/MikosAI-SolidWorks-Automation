@@ -89,13 +89,13 @@ namespace MikosAI.Core.Tools
                     ["typeName"] = f.TypeName,
                     ["isSuppressed"] = f.IsSuppressed,
                     ["hasError"] = f.HasError,
-                    ["parentSketch"] = f.ParentSketch,
+                    ["parentSketches"] = f.ParentSketches,
                 }).ToList(),
                 ["featureCount"] = fitur.Count,
                 ["suppressedCount"] = tersupresi,
                 ["errorCount"] = bererror.Count,
                 ["rebuildRequired"] = reading.RebuildRequired,
-                ["fieldsNotPopulated"] = FieldBelumDibaca.ListFitur,
+                ["fieldsNotPopulated"] = FieldBelumDibaca.UntukFitur(fitur),
             };
 
             var checks = new List<VerificationCheck>();
@@ -375,13 +375,16 @@ namespace MikosAI.Core.Tools
                     ["name"] = s.Name,
                     ["constrainedStatus"] = s.ConstrainedStatus.ToString(),
                     ["entityCount"] = s.EntityCount,
-                    ["dimensionCount"] = s.DimensionCount,
-                    ["consumedByFeature"] = s.ConsumedByFeature,
-                    ["hasOpenContour"] = s.HasOpenContour,
+                    ["consumedByFeatures"] = s.ConsumedByFeatures,
+                    ["dependents"] = s.Dependents,
+                    ["drivingDimensionCount"] = s.DrivingDimensionCount,
+                    ["drivenDimensionCount"] = s.DrivenDimensionCount,
+                    ["unknownDrivenStateCount"] = s.UnknownDrivenStateCount,
+                    ["dimensionCountRead"] = s.DimensionCountRead,
                 }).ToList(),
                 ["sketchCount"] = readings.Count,
                 ["fullyDefinedCount"] = readings.Count(s => s.ConstrainedStatus == SketchConstraintStatus.FullyDefined),
-                ["fieldsNotPopulated"] = FieldBelumDibaca.ListSketsa,
+                ["fieldsNotPopulated"] = FieldBelumDibaca.UntukSketsa(readings),
             };
 
             var checks = new List<VerificationCheck>();
@@ -404,6 +407,55 @@ namespace MikosAI.Core.Tools
             else
             {
                 checks.Add(VerificationCheck.Pass("sketches_healthy", 0));
+            }
+
+            // DIMENSI YANG TIDAK BISA DIKLASIFIKASI BUKAN BERARTI TIDAK ADA.
+            //
+            // swDimensionDrivenUnknown = 0 adalah nilai yang benar-benar
+            // dikembalikan SolidWorks. Dimensi yang mendarat di sana tidak bisa
+            // dipakai untuk menilai apakah sketsa terkunci, jadi diagnosisnya
+            // TIDAK LENGKAP - dan itu harus terlihat alih-alih dibulatkan ke
+            // salah satu ember supaya angkanya rapi.
+            var takKetahuanDriven = readings.Sum(x => x.UnknownDrivenStateCount ?? 0);
+            if (takKetahuanDriven > 0)
+            {
+                checks.Add(new VerificationCheck
+                {
+                    Id = "dimension_driven_state_known",
+                    Verdict = Verdict.Warn,
+                    Required = false,
+                    Observed = takKetahuanDriven,
+                    Expected = 0,
+                    Message =
+                        $"{takKetahuanDriven} dimensi tidak bisa ditentukan driving atau driven. "
+                        + "Diagnosis sketsa tidak lengkap.",
+                });
+            }
+
+            // INVARIANT: driving + driven + unknown = dimensionCountRead.
+            //
+            // Diperiksa DI SINI, bukan hanya di test, karena pelanggarannya
+            // berarti ada dimensi yang lenyap antara dibaca dan diklasifikasi -
+            // dan dimensi yang lenyap tidak akan muncul di angka mana pun.
+            // Tanpa pemeriksaan ini, kehilangan itu sunyi.
+            foreach (var sk in readings)
+            {
+                if (sk.DimensionCountRead is null) continue;
+
+                var jumlahEmber =
+                    (sk.DrivingDimensionCount ?? 0)
+                    + (sk.DrivenDimensionCount ?? 0)
+                    + (sk.UnknownDrivenStateCount ?? 0);
+
+                if (jumlahEmber != sk.DimensionCountRead.Value)
+                {
+                    checks.Add(VerificationCheck.Blocked(
+                        "dimension_counts_consistent",
+                        $"Sketsa {sk.Name}: driving+driven+unknown = {jumlahEmber}, "
+                        + $"tapi dimensionCountRead = {sk.DimensionCountRead.Value}. "
+                        + "Ada dimensi yang hilang antara dibaca dan diklasifikasi."));
+                    break;
+                }
             }
 
             // Status yang tidak bisa dibaca bukan berarti sehat.

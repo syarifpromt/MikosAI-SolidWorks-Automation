@@ -276,6 +276,36 @@ namespace SolidWorks.Interop.sldworks
     {
         string Name { get; }
 
+        // Direfleksikan: Object GetParents() / Object GetChildren()
+        //
+        // Keduanya mengembalikan Object yang berisi array of Feature. Bentuk
+        // JAMAK inilah alasan parentSketches dan dependents berbentuk array -
+        // bukan antisipasi loft/sweep. Bentuk tunggal akan MEMBUANG data yang
+        // sudah dikembalikan SolidWorks.
+        object GetParents();
+
+        object GetChildren();
+
+        // Direfleksikan:
+        //   Object GetFirstDisplayDimension()
+        //   Object GetNextDisplayDimension(Object DispIn)
+        //
+        // GetNextDisplayDimension MENERIMA dimensi sebelumnya - ia bukan
+        // iterator berstatus. Stub ini sempat mendeklarasikannya tanpa
+        // parameter, sehingga compile-check LULUS untuk kode yang ditolak build
+        // nyata dengan CS7036.
+        //
+        // Sebabnya skrip refleksi kami sendiri: ia mencetak "()" secara
+        // hardcoded, jadi parameternya tidak pernah terlihat. Itu kesalahan
+        // kedua yang lahir dari FORMAT keluaran refleksi, bukan dari
+        // refleksinya - yang pertama `out` versus `ref` di CreateCommandGroup2.
+        //
+        // Dimensi dicacah dari node FITUR, bukan dari ISketch - ISketch memang
+        // tidak mengeksposnya.
+        object GetFirstDisplayDimension();
+
+        object GetNextDisplayDimension(object DispIn);
+
         string GetTypeName2();
 
         bool IsSuppressed();
@@ -296,6 +326,33 @@ namespace SolidWorks.Interop.sldworks
         // Tanda tangan direfleksikan dari PIA sungguhan:
         //   String GetMaterialPropertyName2(String ConfigName, out String& Database)
         string GetMaterialPropertyName2(string ConfigName, out string Database);
+    }
+
+    public interface IDisplayDimension
+    {
+        // Direfleksikan: Object GetDimension()
+        object GetDimension();
+
+        // SENGAJA DISERTAKAN WALAU TIDAK DIPAKAI.
+        //
+        // IsReferenceDim() bertipe Boolean dan TIDAK bisa menyatakan "tidak
+        // tahu", sementara swDimensionDrivenState_e punya
+        // swDimensionDrivenUnknown = 0 yang nyata. Kami memakai
+        // IDimension.DrivenState justru karena itu.
+        //
+        // Dibiarkan di stub supaya pilihan itu terlihat: kalau nanti ada yang
+        // tergoda memakainya sebagai fallback, ia akan menemukan catatan ini
+        // lebih dulu.
+        bool IsReferenceDim();
+    }
+
+    public interface IDimension
+    {
+        // Direfleksikan: Int32 get_DrivenState()
+        //   swDimensionDrivenUnknown = 0
+        //   swDimensionDriven        = 1
+        //   swDimensionDriving       = 2
+        int DrivenState { get; }
     }
 
     public interface ISketch

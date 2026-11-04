@@ -40,17 +40,20 @@ namespace MikosAI.Core.Tools
         public bool IsSuppressed { get; set; }
         public bool HasError { get; set; }
         /// <summary>
-        /// Sketsa induk fitur ini. null berarti BELUM DIBACA, bukan "tidak punya".
+        /// Sketsa induk fitur ini. ARRAY, bukan nilai tunggal.
         ///
-        /// Pembaca belum menelusuri hubungan fitur-ke-sketsa, jadi field ini
-        /// selalu null hari ini - termasuk untuk Boss-Extrude1 yang jelas punya
-        /// sketsa induk. Dibiarkan null dan DIAKUI, bukan diisi tebakan.
+        /// Alasannya berlaku sekarang, bukan antisipasi loft/sweep:
+        /// <c>IFeature.GetParents()</c> mengembalikan array. Bentuk tunggal
+        /// berarti MEMBUANG data yang sudah dikembalikan SolidWorks agar muat ke
+        /// bentuk yang lebih sempit - dan saat kita menemukan bentuknya salah,
+        /// datanya sudah tidak ada untuk membuktikannya.
         ///
-        /// Lihat catatan `fieldsNotPopulated` di ReadOnlyToolShaper: ketiadaan
-        /// ini disiarkan ke pemanggil, bukan hanya ditulis di komentar yang
-        /// tidak dibaca siapa pun saat tool dipanggil.
+        /// GetParents() memuat SEMUA parent, termasuk plane dan fitur, jadi
+        /// isinya wajib difilter per tipe sebelum sampai ke sini.
+        ///
+        /// null = BELUM DIBACA. Kosong = sudah dibaca, memang tidak ada.
         /// </summary>
-        public string? ParentSketch { get; set; }
+        public IReadOnlyList<string>? ParentSketches { get; set; }
     }
 
     public sealed class FeatureTreeReading
@@ -159,33 +162,58 @@ namespace MikosAI.Core.Tools
         public int EntityCount { get; set; }
 
         /// <summary>
-        /// Jumlah dimensi. null berarti BELUM DIBACA.
+        /// Fitur yang memakai sketsa ini sebagai profil, path, atau posisi.
         ///
-        /// Dulu bertipe `int` dan selalu bernilai 0, dengan komentar yang
-        /// menyebut nol itu "jujur". Itu salah, dan melanggar aturan kami
-        /// sendiri: hitungan nol adalah fakta, tapi hanya kalau benar-benar
-        /// dihitung. Nol yang tidak pernah dihitung adalah karangan yang
-        /// kebetulan terlihat seperti hitungan.
+        /// BERBEDA dari <see cref="Dependents"/>. "Tidak dipakai fitur apa pun"
+        /// adalah alasan yang masuk akal untuk MENGHAPUS sebuah sketsa, jadi
+        /// yang dipakai <c>delete_feature</c> nanti adalah Dependents - bukan
+        /// ini.
+        ///
+        /// null = BELUM DIBACA. Kosong = sudah dibaca, memang tidak dikonsumsi.
         /// </summary>
-        public int? DimensionCount { get; set; }
+        public IReadOnlyList<string>? ConsumedByFeatures { get; set; }
 
         /// <summary>
-        /// Fitur yang mengkonsumsi sketsa ini. null berarti BELUM DIBACA -
-        /// BUKAN "tidak dikonsumsi siapa pun".
+        /// SELURUH children, tanpa filter - termasuk sketsa lain yang sekadar
+        /// punya relasi ke geometri sketsa ini.
         ///
-        /// Perbedaan itu menentukan di Fase 3: "tidak dipakai fitur apa pun"
-        /// adalah alasan yang masuk akal untuk MENGHAPUS sebuah sketsa.
+        /// <c>ISketch</c> tidak punya method konsumen sama sekali; keduanya
+        /// diturunkan dari <c>IFeature.GetChildren()</c> pada node fitur sketsa.
+        /// Itu sebabnya field ini tidak pernah terisi sejak awal - pembacanya
+        /// memang tidak pernah punya aksesnya.
         /// </summary>
-        public string? ConsumedByFeature { get; set; }
+        public IReadOnlyList<string>? Dependents { get; set; }
 
         /// <summary>
-        /// Apakah ada kontur terbuka. null berarti BELUM DIPERIKSA.
-        ///
-        /// Dulu bertipe `bool` dan selalu `false` - yaitu klaim "sudah
-        /// diperiksa, sketsanya tertutup" yang tidak pernah diperiksa. Golden
-        /// test sempat meng-assert nilai itu dan lulus tanpa menguji apa pun.
+        /// Dimensi yang MENGUNCI geometri. <c>swDimensionDriving = 2</c>.
         /// </summary>
-        public bool? HasOpenContour { get; set; }
+        public int? DrivingDimensionCount { get; set; }
+
+        /// <summary>
+        /// Dimensi reference - tidak mengunci apa pun. <c>swDimensionDriven = 1</c>.
+        /// </summary>
+        public int? DrivenDimensionCount { get; set; }
+
+        /// <summary>
+        /// <c>swDimensionDrivenUnknown = 0</c>. SolidWorks PUNYA keadaan ini dan
+        /// ia nyata, jadi ia punya embernya sendiri.
+        ///
+        /// Dibaca lewat <c>IDimension.DrivenState</c>, BUKAN
+        /// <c>IDisplayDimension.IsReferenceDim()</c> yang bertipe Boolean dan
+        /// tidak bisa menyatakan "tidak tahu". Memakai yang boolean akan memaksa
+        /// setiap dimensi Unknown masuk ke salah satu ember - masalah
+        /// dua-keadaan yang sama dengan modelChanged.
+        /// </summary>
+        public int? UnknownDrivenStateCount { get; set; }
+
+        /// <summary>
+        /// Jumlah dimensi yang BERHASIL dibaca.
+        ///
+        /// Ada supaya invariant driving + driven + unknown = dimensionCountRead
+        /// bisa diperiksa dari luar. Tanpa angka ini, dimensi yang gagal dibaca
+        /// akan lenyap tanpa jejak dari ketiga ember di atas.
+        /// </summary>
+        public int? DimensionCountRead { get; set; }
     }
 
     /// <summary>

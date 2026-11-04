@@ -171,6 +171,8 @@ namespace MikosAI.Addin
                         bacaan.HasError = fitur.GetErrorCode2(out _) != 0;
                     });
 
+                    bacaan.ParentSketches = BacaSketsaInduk(fitur);
+
                     daftar.Add(bacaan);
 
                     fitur = fitur.GetNextFeature() as IFeature;
@@ -390,9 +392,192 @@ namespace MikosAI.Addin
             return daftar;
         }
 
+        /// <summary>
+        /// Nama-nama sketsa yang menjadi induk sebuah fitur.
+        ///
+        /// <c>IFeature.GetParents()</c> mengembalikan SEMUA parent - plane,
+        /// fitur lain, dan sketsa. Yang kita mau hanya sketsa, jadi hasilnya
+        /// DIFILTER per tipe. Tanpa filter, `parentSketches` akan memuat Front
+        /// Plane dan terbaca sebagai sketsa yang tidak ada.
+        ///
+        /// null dikembalikan kalau pembacaannya GAGAL - bukan daftar kosong.
+        /// Kosong berarti "sudah ditelusuri, memang tidak punya sketsa induk";
+        /// null berarti "tidak tahu", dan itu yang dilaporkan lewat
+        /// fieldsNotPopulated.
+        /// </summary>
+        private IReadOnlyList<string>? BacaSketsaInduk(IFeature fitur)
+        {
+            var berhasil = false;
+            var hasil = new List<string>();
+
+            Coba("Feature.GetParents", () =>
+            {
+                var parents = fitur.GetParents() as object[];
+                berhasil = true;
+
+                if (parents is null)
+                {
+                    return;
+                }
+
+                foreach (var item in parents)
+                {
+                    if (item is not IFeature induk) continue;
+
+                    var tipe = induk.GetTypeName2() ?? string.Empty;
+                    if (tipe != "ProfileFeature" && tipe != "3DProfileFeature") continue;
+
+                    var namaInduk = induk.Name;
+                    if (!string.IsNullOrEmpty(namaInduk))
+                    {
+                        hasil.Add(namaInduk);
+                    }
+                }
+            });
+
+            return berhasil ? hasil : null;
+        }
+
+        /// <summary>
+        /// Menelusuri children sebuah node sketsa, memisahkan KONSUMEN dari
+        /// DEPENDENT.
+        ///
+        /// <c>ISketch</c> tidak punya method konsumen sama sekali, jadi keduanya
+        /// hanya bisa didapat dari node FITUR sketsa lewat
+        /// <c>IFeature.GetChildren()</c>. Itu sebabnya kedua field ini tidak
+        /// pernah terisi sejak awal - pembacanya memang tidak pernah punya
+        /// aksesnya.
+        ///
+        /// CARA 'KONSUMEN' DIDETEKSI, ditulis di sini supaya tidak jadi aturan
+        /// tak tertulis: sebuah child dianggap konsumen kalau ia BUKAN sketsa.
+        /// Sketsa lain yang muncul sebagai child hanya punya relasi ke geometri
+        /// sketsa ini - ia bergantung padanya, tapi tidak memakainya sebagai
+        /// profil, path, atau posisi.
+        ///
+        /// Itu aturan yang BELUM TERBUKTI, dan fixture-konsumen.SLDPRT dibuat
+        /// khusus untuk mengujinya: Sketch2 di sana punya relasi ke Sketch1 tapi
+        /// tidak dipakai fitur apa pun. Kalau ternyata GetChildren() memang
+        /// hanya mengembalikan konsumen, aturan ini tidak pernah terpakai dan
+        /// kontraknya disederhanakan.
+        /// </summary>
+        private void BacaKonsumenDanDependent(IFeature fitur, SketchReading bacaan)
+        {
+            var berhasil = false;
+            var konsumen = new List<string>();
+            var dependent = new List<string>();
+
+            Coba("Feature.GetChildren", () =>
+            {
+                var children = fitur.GetChildren() as object[];
+                berhasil = true;
+
+                if (children is null)
+                {
+                    return;
+                }
+
+                foreach (var item in children)
+                {
+                    if (item is not IFeature anak) continue;
+
+                    var namaAnak = anak.Name;
+                    if (string.IsNullOrEmpty(namaAnak)) continue;
+
+                    dependent.Add(namaAnak);
+
+                    var tipe = anak.GetTypeName2() ?? string.Empty;
+                    if (tipe != "ProfileFeature" && tipe != "3DProfileFeature")
+                    {
+                        konsumen.Add(namaAnak);
+                    }
+                }
+            });
+
+            if (berhasil)
+            {
+                bacaan.ConsumedByFeatures = konsumen;
+                bacaan.Dependents = dependent;
+            }
+        }
+
+        /// <summary>
+        /// Mencacah dimensi sebuah sketsa dan memisahkannya jadi TIGA ember.
+        ///
+        /// Dibaca lewat <c>IDimension.DrivenState</c>, BUKAN
+        /// <c>IDisplayDimension.IsReferenceDim()</c>. Alasannya
+        /// <c>swDimensionDrivenState_e</c> punya tiga nilai - Unknown 0,
+        /// Driven 1, Driving 2 - sementara IsReferenceDim() bertipe Boolean dan
+        /// tidak bisa menyatakan "tidak tahu". Memakai yang boolean akan memaksa
+        /// setiap dimensi Unknown masuk ke salah satu ember.
+        ///
+        /// DimensionCountRead dihitung terpisah, bukan dijumlahkan dari ketiga
+        /// ember, supaya dimensi yang gagal diklasifikasi TIDAK lenyap tanpa
+        /// jejak. Ketidakcocokan keduanya menghasilkan BLOCKED di shaper.
+        ///
+        /// CATATAN YANG BELUM TERBUKTI: belum diketahui apakah DrivenState
+        /// benar-benar terisi untuk dimensi SKETSA, atau hanya untuk dimensi
+        /// drawing. Kalau ternyata hanya drawing, seluruh dimensi akan mendarat
+        /// di ember Unknown - dan itu akan TERLIHAT lewat WARN, bukan tersamar.
+        /// Tidak ada fallback diam-diam ke IsReferenceDim().
+        /// </summary>
+        private void BacaDimensi(IFeature fitur, SketchReading bacaan)
+        {
+            var berhasil = false;
+            var driving = 0;
+            var driven = 0;
+            var takDiketahui = 0;
+            var terbaca = 0;
+
+            Coba("Feature.DisplayDimensions", () =>
+            {
+                var tampilan = fitur.GetFirstDisplayDimension() as IDisplayDimension;
+                var penjaga = 0;
+                berhasil = true;
+
+                while (tampilan is not null && penjaga++ < 5000)
+                {
+                    terbaca++;
+
+                    var dimensi = tampilan.GetDimension() as IDimension;
+
+                    if (dimensi is null)
+                    {
+                        // Terbaca sebagai dimensi, tapi tidak bisa ditanyai
+                        // keadaannya. Itu "tidak tahu", bukan "driving".
+                        takDiketahui++;
+                    }
+                    else
+                    {
+                        switch (dimensi.DrivenState)
+                        {
+                            case 2: driving++; break;         // swDimensionDriving
+                            case 1: driven++; break;          // swDimensionDriven
+                            default: takDiketahui++; break;   // swDimensionDrivenUnknown
+                        }
+                    }
+
+                    // GetNextDisplayDimension MENERIMA dimensi sebelumnya.
+                    // Ia bukan iterator berstatus - tanpa argumen ini,
+                    // penelusurannya tidak punya acuan posisi.
+                    tampilan = fitur.GetNextDisplayDimension(tampilan) as IDisplayDimension;
+                }
+            });
+
+            if (berhasil)
+            {
+                bacaan.DrivingDimensionCount = driving;
+                bacaan.DrivenDimensionCount = driven;
+                bacaan.UnknownDrivenStateCount = takDiketahui;
+                bacaan.DimensionCountRead = terbaca;
+            }
+        }
+
         private SketchReading BacaSatuSketsa(IFeature fitur, string nama)
         {
             var bacaan = new SketchReading { Name = nama };
+
+            BacaKonsumenDanDependent(fitur, bacaan);
+            BacaDimensi(fitur, bacaan);
 
             Coba("Sketch.GetConstrainedStatus", () =>
             {
@@ -405,11 +590,8 @@ namespace MikosAI.Addin
                         bacaan.EntityCount = segmen.Length;
                     }
 
-                    // Jumlah dimensi SENGAJA tidak dibaca di sini.
-                    // ISketch tidak mengeksposnya langsung, dan menelusuri
-                    // IDisplayDimension memperluas permukaan API tanpa memberi
-                    // nilai yang sepadan di tahap ini. Dibiarkan 0, dan itu
-                    // jujur - bukan angka karangan.
+                    // Dimensi dibaca di BacaDimensi, lewat node fitur -
+                    // bukan lewat ISketch, yang memang tidak mengeksposnya.
                 }
             });
 
