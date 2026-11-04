@@ -113,6 +113,43 @@ namespace SolidWorks.Interop.sldworks
 
         // Direfleksikan: Int32 RemoveCommandGroup2(Int32 UserID, Boolean RuntimeOnly)
         int RemoveCommandGroup2(int UserID, bool RuntimeOnly);
+
+        // Tab ribbon CommandManager. TANPA ketiga panggilan ini, tombol hanya
+        // muncul di menu Tools dan di toolbar klasik yang tersembunyi - yaitu
+        // tidak terlihat sama sekali di SolidWorks modern.
+        //
+        // Direfleksikan:
+        //   CommandTab GetCommandTab(Int32 DocumentType, String TabName)
+        //   CommandTab AddCommandTab(Int32 DocumentType, String TabName)
+        //   Boolean    RemoveCommandTab(CommandTab TabToRemove)
+        CommandTab GetCommandTab(int DocumentType, string TabName);
+
+        CommandTab AddCommandTab(int DocumentType, string TabName);
+
+        bool RemoveCommandTab(CommandTab TabToRemove);
+    }
+
+    public interface ICommandTab
+    {
+        // Direfleksikan: CommandTabBox AddCommandTabBox()
+        CommandTabBox AddCommandTabBox();
+    }
+
+    public interface CommandTab : ICommandTab
+    {
+    }
+
+    public interface ICommandTabBox
+    {
+        // Direfleksikan: Boolean AddCommands(Object CommandIDs, Object TextDisplayStyles)
+        //
+        // object, BUKAN int[]. Keduanya menyeberang COM sebagai VARIANT berisi
+        // SAFEARRAY, dan panjangnya harus sama.
+        bool AddCommands(object CommandIDs, object TextDisplayStyles);
+    }
+
+    public interface CommandTabBox : ICommandTabBox
+    {
     }
 
     public interface CommandManager : ICommandManager
@@ -147,6 +184,35 @@ namespace SolidWorks.Interop.sldworks
         object IconList { get; set; }
 
         object MainIconList { get; set; }
+
+        // ID perintah sebenarnya, dicari dengan indeks yang dikembalikan
+        // AddCommandItem2. Dua hal yang berbeda: indeks adalah posisi di dalam
+        // grup, ID adalah yang dipahami CommandManager.
+        //
+        // SATU-SATUNYA TEMPAT STUB INI SENGAJA BERBEDA BENTUK DARI PIA ASLI.
+        //
+        // Di PIA, CommandID adalah properti BERINDEKS BERNAMA:
+        //   Int32 get_CommandID(Int32 CommandIndex)
+        //
+        // C# bisa MEMAKAI bentuk itu dari COM, tapi tidak bisa
+        // MENDEKLARASIKANnya - bahasa ini hanya punya indexer tanpa nama.
+        // Jadi stub memakai tipe proksi supaya EKSPRESI pemakaiannya tetap
+        // identik: `grup.CommandID[indeks]` terkompilasi sama di kedua jalur.
+        //
+        // Yang dilindungi compile-check di sini adalah bentuk pemakaiannya,
+        // bukan bentuk deklarasinya. Perbedaan ini disebutkan alih-alih
+        // disembunyikan, karena stub yang berbeda diam-diam adalah cara stub
+        // berbohong.
+        PetaIdPerintah CommandID { get; }
+    }
+
+    /// <summary>
+    /// Proksi untuk properti berindeks bernama ICommandGroup.CommandID.
+    /// Lihat catatan panjang di sana. HANYA ada di stub.
+    /// </summary>
+    public interface PetaIdPerintah
+    {
+        int this[int CommandIndex] { get; }
     }
 
     public interface CommandGroup : ICommandGroup

@@ -108,11 +108,19 @@ SolidWorks dan punya kanal thread yang benar.
 - [x] `Threading/IMainThreadDispatcher.cs` — abstraksi
 - [x] **`MainThreadDispatcher` implementasi nyata** lewat `Control.BeginInvoke` — risiko R4 *(sudah lewat compile-check)*
 - [x] `MikosAI.Addin` mengimplementasikan `ISwAddin` + `SetAddinCallbackInfo2` *(sudah lewat compile-check)*
-- [x] CommandGroup (tombol toolbar + menu untuk tampil/sembunyikan panel)
-      — terkompilasi terhadap PIA ASLI, **belum pernah diklik di SolidWorks yang
-      berjalan.** Perilakunya baru terbukti setelah restart. Toggle-nya memakai
-      `IsActiveTab()`, karena SolidWorks tidak menyediakan "apakah panel terlihat";
-      itu pertanyaan terdekat yang bisa dijawab tanpa mengarang
+- [x] CommandGroup — tab ribbon + menu untuk tampil/sembunyikan panel.
+      Toggle-nya memakai `IsActiveTab()`, karena SolidWorks tidak menyediakan
+      "apakah panel terlihat"; itu pertanyaan terdekat yang bisa dijawab tanpa
+      mengarang. **Belum pernah diklik di SolidWorks yang berjalan**
+      — perilakunya baru terbukti setelah restart.
+
+      Versi pertama hanya memanggil `CreateCommandGroup2` + `HasToolbar`, dan itu
+      TIDAK cukup: tombolnya hanya lahir di menu Tools dan di toolbar klasik yang
+      tersembunyi selama CommandManager aktif — yaitu tidak terlihat sama sekali.
+      Tab ribbon menuntut `AddCommandTab` → `AddCommandTabBox` → `AddCommands`.
+      Add-in melapor `commandGroup: true` dengan jujur sementara penggunanya
+      mencari tombol yang tidak ada di tempat yang ia lihat: **diagnostik yang
+      benar tapi tidak menjawab pertanyaan orangnya tetap gagal.**
 - [x] TaskPane — panel WinForms biasa (WebView2 menjatuhkan SolidWorks, jadi opt-in)
 - [x] Penulis diagnostik `host-status.json`
 - [x] Script PowerShell build / register / unregister / probe / status (RegAsm 64-bit + TLB)

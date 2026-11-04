@@ -69,6 +69,26 @@ namespace MikosAI.Addin
         private const int PosisiAkhir = -1;
 
         /// <summary>
+        /// swCreateCommandGroup_Success. SATU, bukan nol - lihat catatan di
+        /// Bangun(). Nol justru berarti gagal.
+        /// </summary>
+        private const int SuksesBuatGrup = 1;
+
+        /// <summary>swCommandTabButton_TextBelow, dari swconst asli.</summary>
+        private const int TeksDiBawahIkon = 2;
+
+        /// <summary>
+        /// Jenis dokumen yang mendapat tab ribbon: part, assembly, drawing
+        /// (swDocPART=1, swDocASSEMBLY=2, swDocDRAWING=3 di swconst asli).
+        ///
+        /// Ketiganya, karena panel ini membaca dokumen apa pun yang aktif.
+        /// Memberi tab hanya untuk part akan membuat tombolnya lenyap begitu
+        /// pengguna membuka assembly - dan lenyap tanpa sebab yang terlihat
+        /// adalah cara tercepat membuat orang mengira add-in-nya mati.
+        /// </summary>
+        private static readonly int[] JenisDokumenBertab = { 1, 2, 3 };
+
+        /// <summary>
         /// Nama method callback, sebagai STRING - dan itu bahayanya.
         ///
         /// SolidWorks memanggilnya lewat IDispatch berdasarkan nama. Compiler
@@ -84,6 +104,8 @@ namespace MikosAI.Addin
 
         private ICommandManager? _manager;
         private bool _terpasang;
+        private int _idPerintah = -1;
+        private string _judul = string.Empty;
 
         internal CommandGroupHost(HostDiagnostics diagnostics)
         {
@@ -106,6 +128,7 @@ namespace MikosAI.Addin
             }
 
             _manager = manager;
+            _judul = judul;
 
             ICommandGroup? grup;
             var galat = 0;
@@ -139,24 +162,28 @@ namespace MikosAI.Addin
                 return false;
             }
 
-            if (grup is null)
+            // 1 BERARTI BERHASIL. 0 BERARTI GAGAL. Jangan dibalik.
+            //
+            // Ini bukan konvensi yang biasa, dan versi pertama kode ini
+            // memang membalikkannya - memperlakukan "bukan nol" sebagai
+            // anomali, padahal nol justru satu-satunya nilai yang berarti
+            // gagal. Diambil dari swconst asli:
+            //
+            //   swCreateCommandGroup_Failed             = 0
+            //   swCreateCommandGroup_Success            = 1
+            //   swCreateCommandGroup_Exceeds_ToolBarIDs = 2
+            //
+            // Komentar sebelumnya di sini menyatakan enum-nya tidak ada di
+            // swconst. Itu keliru: namanya `swCreateCommandGroupErrors`, TANPA
+            // akhiran `_e`, dan pencarian kamilah yang meleset. Menyimpulkan
+            // "tidak ada" dari satu pencarian yang gagal adalah cara yang sama
+            // dengan menebak.
+            if (grup is null || !GrupBerhasil(galat))
             {
-                // Kode galat disertakan apa adanya. Tidak dipetakan ke teks,
-                // karena enum-nya tidak ada di swconst versi ini - menebak
-                // artinya akan menghasilkan diagnostik yang terdengar pasti
-                // padahal karangan.
                 _diagnostics.AddError(
-                    $"CreateCommandGroup2 mengembalikan null (kode galat {galat}).");
+                    $"CreateCommandGroup2 gagal: kode {galat} ({JelaskanKodeGrup(galat)}), "
+                    + $"grup {(grup is null ? "null" : "tidak null")}.");
                 return false;
-            }
-
-            if (galat != 0)
-            {
-                // Bukan kegagalan: grupnya ada. Tapi dicatat, karena nilai
-                // bukan-nol di sini biasanya berarti data registry lama ikut
-                // bicara.
-                _diagnostics.AddError(
-                    $"info: CreateCommandGroup2 berhasil dengan kode galat {galat}.");
             }
 
             // Ikon. Kegagalan di sini dibiarkan: tombol tanpa ikon tetap
@@ -176,9 +203,11 @@ namespace MikosAI.Addin
                 _diagnostics.AddError("memasang ikon grup perintah", exception);
             }
 
+            int indeks;
+
             try
             {
-                var indeks = grup.AddCommandItem2(
+                indeks = grup.AddCommandItem2(
                     "Panel MikosAI",
                     PosisiAkhir,
                     "Tampilkan atau sembunyikan panel MikosAI",
@@ -230,8 +259,153 @@ namespace MikosAI.Addin
                 return false;
             }
 
+            // --- Tab di ribbon CommandManager -------------------------------
+            //
+            // INI YANG MEMBUAT TOMBOLNYA TERLIHAT.
+            //
+            // CreateCommandGroup2 + HasToolbar + HasMenu + Activate() sudah
+            // cukup untuk membuat tombolnya ADA - tapi hanya di dua tempat yang
+            // tidak dilihat siapa pun di SolidWorks modern:
+            //
+            //   - menu Tools > MikosAI
+            //   - toolbar KLASIK (View > Toolbars > MikosAI), yang tersembunyi
+            //     selama CommandManager aktif, dan CommandManager aktif secara
+            //     default
+            //
+            // Ribbon dengan tab Features / Sketch / Evaluate itu CommandManager,
+            // dan ia TIDAK mengambil grup perintah secara otomatis. Tab harus
+            // diminta sendiri: AddCommandTab -> AddCommandTabBox -> AddCommands.
+            //
+            // Versi pertama melewatkan ketiganya. Hasilnya add-in yang melapor
+            // "commandGroup: true" dengan jujur, sementara penggunanya mencari
+            // tombol yang tidak ada di tempat yang ia lihat. Diagnostik yang
+            // benar tapi tidak menjawab pertanyaan orangnya tetap gagal.
+            try
+            {
+                var idPerintah = grup.CommandID[indeks];
+                _idPerintah = idPerintah;
+
+                var jumlahTab = 0;
+
+                foreach (var jenisDokumen in JenisDokumenBertab)
+                {
+                    if (PasangTab(judul, jenisDokumen, idPerintah))
+                    {
+                        jumlahTab++;
+                    }
+                }
+
+                if (jumlahTab == 0)
+                {
+                    // Tombolnya masih ada di menu Tools, jadi ini bukan
+                    // kegagalan total - tapi juga tidak boleh lewat diam-diam,
+                    // karena inilah keadaan yang membuat orang mengira tombolnya
+                    // tidak dibuat sama sekali.
+                    _diagnostics.AddError(
+                        "tab ribbon MikosAI tidak bisa dipasang untuk satu jenis dokumen pun. "
+                        + "Tombol tetap ada di menu Tools > MikosAI.");
+                }
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError("memasang tab CommandManager", exception);
+            }
+
             _terpasang = true;
             return true;
+        }
+
+        /// <summary>
+        /// Memasang satu tab ribbon untuk satu jenis dokumen.
+        /// true kalau tabnya benar-benar berisi tombol kita.
+        /// </summary>
+        private bool PasangTab(string judul, int jenisDokumen, int idPerintah)
+        {
+            if (_manager is null)
+            {
+                return false;
+            }
+
+            try
+            {
+                // Tab dari sesi SEBELUMNYA harus dibuang, bukan dipakai ulang.
+                //
+                // Isinya menunjuk ID perintah sesi lama. ID itu tidak berlaku
+                // lagi, jadi tab yang dipakai ulang menghasilkan tombol yang
+                // terlihat normal dan tidak melakukan apa-apa - kegagalan yang
+                // jauh lebih membingungkan daripada tab yang hilang.
+                var lama = _manager.GetCommandTab(jenisDokumen, judul);
+
+                if (lama is not null)
+                {
+                    _manager.RemoveCommandTab(lama);
+                }
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError($"membersihkan tab lama (jenis {jenisDokumen})", exception);
+                // Diteruskan: AddCommandTab di bawah masih mungkin berhasil.
+            }
+
+            try
+            {
+                var tab = _manager.AddCommandTab(jenisDokumen, judul);
+
+                if (tab is null)
+                {
+                    _diagnostics.AddError($"AddCommandTab mengembalikan null (jenis {jenisDokumen}).");
+                    return false;
+                }
+
+                var kotak = tab.AddCommandTabBox();
+
+                if (kotak is null)
+                {
+                    _diagnostics.AddError($"AddCommandTabBox mengembalikan null (jenis {jenisDokumen}).");
+                    return false;
+                }
+
+                // Kedua argumen menyeberang COM sebagai VARIANT berisi
+                // SAFEARRAY, jadi panjangnya HARUS sama: satu gaya teks per
+                // perintah.
+                var idList = new[] { idPerintah };
+                var gaya = new[] { TeksDiBawahIkon };
+
+                if (!kotak.AddCommands(idList, gaya))
+                {
+                    _diagnostics.AddError($"AddCommands mengembalikan false (jenis {jenisDokumen}).");
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.AddError($"memasang tab ribbon (jenis {jenisDokumen})", exception);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Apakah kode dari CreateCommandGroup2 berarti berhasil.
+        ///
+        /// Dipisah jadi fungsi SEMATA-MATA supaya bisa diuji. Versi pertama
+        /// kode ini memperlakukan "bukan nol" sebagai anomali - kebalikan
+        /// persis dari yang benar - dan compiler tidak bisa menangkap
+        /// kesalahan seperti itu. Satu-satunya cara memakunya adalah test.
+        /// </summary>
+        internal static bool GrupBerhasil(int kode) => kode == SuksesBuatGrup;
+
+        internal static string JelaskanKodeGrup(int kode)
+        {
+            // Dari swconst asli, bukan tebakan.
+            switch (kode)
+            {
+                case 0: return "swCreateCommandGroup_Failed";
+                case 1: return "swCreateCommandGroup_Success";
+                case 2: return "swCreateCommandGroup_Exceeds_ToolBarIDs";
+                default: return "kode tidak dikenal";
+            }
         }
 
         /// <summary>
@@ -322,6 +496,26 @@ namespace MikosAI.Addin
             {
                 _manager = null;
                 return;
+            }
+
+            // Tab ribbon dibuang lebih dulu. Ia memegang ID perintah milik grup,
+            // jadi melepas grupnya duluan meninggalkan tab yang menunjuk ID
+            // yang sudah tidak ada.
+            foreach (var jenisDokumen in JenisDokumenBertab)
+            {
+                try
+                {
+                    var tab = _manager.GetCommandTab(jenisDokumen, _judul);
+
+                    if (tab is not null)
+                    {
+                        _manager.RemoveCommandTab(tab);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    _diagnostics.AddError($"RemoveCommandTab (jenis {jenisDokumen})", exception);
+                }
             }
 
             try
