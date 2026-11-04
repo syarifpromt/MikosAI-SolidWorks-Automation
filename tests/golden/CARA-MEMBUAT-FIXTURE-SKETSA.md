@@ -134,21 +134,43 @@ dikonsumsi.
    > bertemu, bukan tiga, jadi `branchPointCount` akan 0 dan test tidak menguji
    > apa yang dimaksud.
 
-4. **SketchDuaLoop** pada **Front Plane**: dua **Corner Rectangle** terpisah:
+4. **SketchTBadan** pada **Front Plane** — kasus T yang paling umum di dunia
+   nyata, dan BERBEDA dari SketchT:
+   - satu garis **utuh** dari `(0, -40)` ke `(40, -40)` — **jangan dipotong**
+   - satu garis batang dari `(20, -40)` ke `(20, -20)`
+   - ujung bawah batang diberi relasi **Coincident ke GARIS atasnya**, bukan ke
+     titik ujung mana pun. Caranya: pilih titik ujung batang **dan garis**
+     (bukan titik), lalu beri Coincident.
+
+   > Bedanya dengan SketchT sangat menentukan, dan mudah tertukar. Di SketchT
+   > tiga ujung berbagi satu titik. Di sini garis atas tetap SATU segmen utuh
+   > yang tidak punya ujung di `(20, -40)` — yang ada hanya relasi
+   > titik-ke-garis.
+   >
+   > Kalau kamu tidak sengaja memotong garis atas, atau relasinya jatuh ke
+   > titik tengah (midpoint) alih-alih ke garisnya, sketsa ini berubah jadi
+   > salinan SketchT dan tidak menguji apa pun. Periksa: garis atas harus
+   > terpilih sebagai SATU entitas saat diklik.
+
+5. **SketchDuaLoop** pada **Front Plane**: dua **Corner Rectangle** terpisah:
    - `(0, 0)` ke `(20, 10)`
    - `(30, 0)` ke `(50, 10)`
 
    Keduanya tidak bersentuhan.
 
-5. Simpan sebagai `tests/golden/fixture-kontur.SLDPRT`.
+6. Simpan sebagai `tests/golden/fixture-kontur.SLDPRT`.
 
 ## Nilai yang diharapkan
 
-| sketsa | `openEndpointCount` | `branchPointCount` | `consumedByFeatures` |
+| sketsa | `openEndpointCount` | `branchPointCount` | `endpointOnSegmentCount` |
 |---|---|---|---|
-| `SketchKotak` | **0** | 0 | `[]` |
-| `SketchT` | **3** | **1** | `[]` |
-| `SketchDuaLoop` | **0** | 0 | `[]` |
+| `SketchKotak` | **0** | 0 | 0 |
+| `SketchT` | **3** | **1** | 0 |
+| `SketchTBadan` | **4** | **0** | **1** |
+| `SketchDuaLoop` | **0** | 0 | 0 |
+
+`consumedByFeatures` adalah `[]` untuk keempatnya — **kosong, bukan null**.
+Part ini tidak punya fitur sama sekali.
 
 - `SketchKotak`: 4 garis tertutup. Centerline **tidak dihitung** karena
   konstruksi — kalau ikut dihitung, angkanya jadi 2 dan test merah. Itu memang
@@ -156,6 +178,18 @@ dikonsumsi.
 - `SketchT`: ujung bebas di `(0,0)`, `(40,0)`, `(20,20)`. Di `(20,0)` tiga ujung
   bertemu → satu titik cabang. Tidak punya ujung bebas di sana, tapi tetap bukan
   profil yang sah untuk extrude.
+- `SketchTBadan`: **inilah sketsa yang paling penting di berkas ini.**
+  `branchPointCount` **0** padahal bentuknya jelas bercabang — dan angka 0 itu
+  BENAR menurut definisinya, karena memang tidak ada titik tempat lebih dari dua
+  ujung bertemu. Yang salah adalah membacanya sebagai "tidak ada percabangan".
+  `endpointOnSegmentCount: 1` yang menangkapnya.
+
+  Keempat ujungnya — `(0,-40)`, `(40,-40)`, `(20,-40)`, `(20,-20)` — tidak
+  satu pun berpasangan dengan ujung lain, jadi `openEndpointCount` adalah **4**.
+  Ujung `(20,-40)` dihitung di KEDUA angka: `endpointOnSegmentCount` adalah
+  himpunan bagian dari `openEndpointCount`, bukan angka terpisah. **Jangan
+  dijumlahkan** — `4 + 1` tidak berarti apa-apa.
+
 - `SketchDuaLoop`: dua loop tertutup terpisah tetap **0** ujung bebas. Ini yang
   membedakan "menghitung ujung" dari "menghitung loop".
 
