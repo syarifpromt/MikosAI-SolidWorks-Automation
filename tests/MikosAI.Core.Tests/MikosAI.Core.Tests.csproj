@@ -18,6 +18,22 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\MikosAI.Core\MikosAI.Core.csproj" />
+
+    <!--
+      MikosAI.Addin dirujuk HANYA untuk urutan build, bukan untuk diikat tipenya.
+
+      AddinThreadGuardTests memuat DLL-nya lewat refleksi, dan itu disengaja:
+      nama assembly-nya berbeda antara build nyata (MikosAI.Addin) dan mode
+      compile-check (MikosAI.Addin.CompileCheck). Perbedaan nama itu adalah
+      pengaman - ia mencegah DLL stub didaftarkan ke SolidWorks - jadi yang
+      harus menyesuaikan adalah test-nya, bukan pengamannya.
+
+      ReferenceOutputAssembly=false memberi urutan build tanpa ikatan tipe,
+      sehingga test ini jalan di mesin dengan maupun tanpa SolidWorks.
+    -->
+    <ProjectReference Include="..\..\src\MikosAI.Addin\MikosAI.Addin.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
   </ItemGroup>
 
   <!-- Round-trip HTTP nyata di McpHttpServerTests butuh HttpClient. -->

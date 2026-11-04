@@ -1,4 +1,5 @@
 using System;
+using MikosAI.Core.Threading;
 using SolidWorks.Interop.sldworks;
 
 namespace MikosAI.Addin
@@ -43,9 +44,9 @@ namespace MikosAI.Addin
     {
         private readonly ISldWorks _app;
         private readonly HostDiagnostics _diagnostics;
-        private readonly MainThreadDispatcher _dispatcher;
+        private readonly IMainThreadDispatcher _dispatcher;
 
-        private SolidWorksApi(ISldWorks app, HostDiagnostics diagnostics, MainThreadDispatcher dispatcher)
+        private SolidWorksApi(ISldWorks app, HostDiagnostics diagnostics, IMainThreadDispatcher dispatcher)
         {
             _app = app;
             _diagnostics = diagnostics;
@@ -86,7 +87,7 @@ namespace MikosAI.Addin
         internal static SolidWorksApi? Buat(
             object application,
             HostDiagnostics diagnostics,
-            MainThreadDispatcher dispatcher)
+            IMainThreadDispatcher dispatcher)
         {
             if (application is null)
             {

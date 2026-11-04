@@ -168,7 +168,7 @@ Platform bisa bekerja penuh tanpa CAD.
 Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
 
 - [ ] Test: tanpa TLB, add-in tidak terinstansiasi walaupun `LoadAddIn=0`
-- [ ] Test: `MainThreadDispatcher` gagal kalau API SolidWorks dipanggil dari thread lain
+- [x] Test: setiap metode yang menyentuh API menolak thread selain utama — `AddinThreadGuardTests`
 - [ ] Tinjau `schemas/tools.json` bersama
 
 ### Gerbang penerimaan Fase 0
@@ -182,7 +182,7 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
 - [ ] Test membuktikan: handler PMP tanpa `IDispatch` melempar `InvalidCastException`
 - [x] `MainThreadDispatcher` menangkap thread utama — terbukti, `dispatcherReady: true`
 - [x] Pelanggaran thread menjadi exception tercatat, bukan crash — assert di `SolidWorksApi` dan `SolidWorksReader`
-- [ ] Test otomatis untuk assert itu
+- [x] Test otomatis untuk assert itu — ditemukan lewat refleksi, jadi metode baru yang lupa penjaga langsung merah
 - [x] **Sesi penuh selesai bersih** — TaskPane terpasang, MCP hidup, lalu
       SolidWorks ditutup normal dan `DisconnectFromSW` berjalan sampai habis.
       Dibuktikan `status: disconnected` di `host-status.json` dan `crash.log`
@@ -220,7 +220,7 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
 ### Gerbang penerimaan Fase 1
 
 - [ ] `agy` bisa melihat daftar tool kita dan memanggilnya, round-trip terbukti
-- [ ] Semua 6 tool dieksekusi lewat dispatcher — dibuktikan test, bukan inspeksi mata
+- [x] Semua 6 tool dieksekusi lewat dispatcher — dibuktikan test, bukan inspeksi mata
 - [x] Tool berstatus `reference_only` **tidak muncul** di daftar MCP
 - [x] Request tanpa bearer token ditolak
 - [ ] Server hanya bind loopback — diverifikasi dari mesin lain di jaringan

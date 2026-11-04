@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using MikosAI.Core.Tools;
+using MikosAI.Core.Threading;
 using SolidWorks.Interop.sldworks;
 
 namespace MikosAI.Addin
@@ -28,12 +29,12 @@ namespace MikosAI.Addin
 
         private readonly ISldWorks _app;
         private readonly HostDiagnostics _diagnostics;
-        private readonly MainThreadDispatcher _dispatcher;
+        private readonly IMainThreadDispatcher _dispatcher;
 
         internal SolidWorksReader(
             ISldWorks app,
             HostDiagnostics diagnostics,
-            MainThreadDispatcher dispatcher)
+            IMainThreadDispatcher dispatcher)
         {
             _app = app ?? throw new ArgumentNullException(nameof(app));
             _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
