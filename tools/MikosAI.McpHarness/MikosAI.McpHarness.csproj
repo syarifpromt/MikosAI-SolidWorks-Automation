@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Harness MCP tanpa SolidWorks.
+
+    KENAPA PROYEK KONSOL, BUKAN SCRIPT POWERSHELL.
+
+    Versi pertama harness ini adalah script PowerShell yang memuat
+    MikosAI.Core.dll lewat refleksi. Ia gagal dua kali dengan cara yang
+    mahal dipahami:
+
+      1. Assembly.Load(byte[]) membuat assembly tanpa lokasi, jadi dependensinya
+         tidak bisa ditemukan CLR. Menambalnya dengan handler AssemblyResolve
+         berupa scriptblock PowerShell justru merusak lebih dalam: CLR memicu
+         resolve dari thread pool saat request ditangani, di thread itu tidak ada
+         runspace, scriptblock-nya gagal, loop accept mati - dan yang terlihat
+         dari luar hanya "connection forcibly closed".
+
+      2. Assembly.LoadFrom lolos dari masalah itu, tapi langsung menabrak
+         FileNotFoundException pada System.Runtime.CompilerServices.Unsafe
+         4.0.4.1. Itu bukan berkas yang hilang, melainkan versi yang tidak
+         cocok - persoalan binding redirect net48 yang di add-in diselesaikan
+         AssemblyResolver buatan sendiri.
+
+    Proyek konsol membuat MSBuild menghasilkan app.config dengan binding
+    redirect yang benar, dan tidak ada thread yang bergantung pada runspace.
+    Keduanya hilang sekaligus.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>MikosAI.McpHarness</AssemblyName>
+    <RootNamespace>MikosAI.McpHarness</RootNamespace>
+    <IsPackable>false</IsPackable>
+
+    <!-- Inilah seluruh alasan proyek ini ada. -->
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MikosAI.Core\MikosAI.Core.csproj" />
+  </ItemGroup>
+
+</Project>

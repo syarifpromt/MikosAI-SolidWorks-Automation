@@ -396,3 +396,59 @@ Mau mencoba WebView2 lagi di mesin atau versi SolidWorks lain:
 ```
 
 Lalu buka ulang SolidWorks. Halaman HTML-nya masih ada dan tetap dirawat.
+
+---
+
+## Memverifikasi round-trip MCP
+
+`host-status.json` yang bilang `mcpServer: true` hanya membuktikan socket-nya
+terbuka. Ia tidak membuktikan protokolnya benar, dan tidak membuktikan token
+salah ditolak.
+
+Dengan SolidWorks berjalan dan add-in aktif:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\mcp-roundtrip.ps1
+```
+
+Yang dijalankan:
+
+| Langkah | Yang dibuktikan |
+|---|---|
+| `initialize` | Protokol disepakati |
+| `tools/list` | Daftar tool terbaca dari luar |
+| `tools/call` x6 | Keenam tool read-only benar-benar bisa dipanggil |
+| Token salah | **Ditolak 401** |
+
+Langkah terakhir sama pentingnya dengan yang lain. Server yang menerima token
+apa pun bukan "lulus dengan catatan" — ia lubang, dan ia hidup di dalam proses
+SolidWorks milik pengguna.
+
+`isError: true` pada sebuah tool **bukan** kegagalan script ini. Field itu
+dipasang dari keberhasilan tugas, bukan keberhasilan transport: pada dokumen
+kosong, `get_bounding_box` memang seharusnya melapor tidak berhasil. Jawaban
+terstruktur yang jujur soal kegagalannya justru bukti round-trip-nya bekerja.
+
+Tidak ada model AI yang dipanggil, jadi tidak ada kuota terpakai. Untuk
+round-trip lewat `agy` — yang **memakai kuota akun Google** yang login di sana:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\mcp-roundtrip.ps1 -Agy
+```
+
+### Tanpa SolidWorks
+
+Lapisan MCP dan `agy` bisa dikerjakan di mesin tanpa CAD:
+
+```powershell
+# Terminal 1
+tools\MikosAI.McpHarness\bin\Release\net48\MikosAI.McpHarness.exe
+
+# Terminal 2 - pakai path sesi yang dicetak terminal 1
+powershell -File scripts\mcp-roundtrip.ps1 -SessionFile "<path>"
+```
+
+Yang palsu di harness **hanya eksekutor tool-nya**. Server HTTP, pemeriksaan
+token, handler JSON-RPC, pembentuk daftar tool, dan gating `capabilities.yaml`
+semuanya kode produksi yang sama. Jadi kalau protokolnya salah, ia salah di
+sini juga.

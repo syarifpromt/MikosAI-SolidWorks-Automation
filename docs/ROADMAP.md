@@ -219,7 +219,13 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
 
 ### Gerbang penerimaan Fase 1
 
-- [ ] `agy` bisa melihat daftar tool kita dan memanggilnya, round-trip terbukti
+- [x] Round-trip MCP terbukti lewat klien sungguhan — `scripts\mcp-roundtrip.ps1`:
+      initialize, tools/list, 6x tools/call, dan token salah ditolak 401.
+      Diuji terhadap `tools\MikosAI.McpHarness` (server produksi, executor palsu):
+      9 lulus 0 gagal. Dua uji negatif membuktikan verifikatornya bisa merah.
+- [ ] Hal yang sama terhadap add-in SUNGGUHAN di dalam SolidWorks — sama perintahnya,
+      tanpa `-SessionFile`
+- [ ] `agy` memanggil tool kita sendiri — `mcp-roundtrip.ps1 -Agy` (memakai kuota)
 - [x] Semua 6 tool dieksekusi lewat dispatcher — dibuktikan test, bukan inspeksi mata
 - [x] Tool berstatus `reference_only` **tidak muncul** di daftar MCP
 - [x] Request tanpa bearer token ditolak
