@@ -231,15 +231,25 @@ namespace MikosAI.Core.Tests
         }
 
         /// <summary>
-        /// Config GLOBAL agy tidak boleh tersentuh.
+        /// Prepare tidak menyentuh config global agy.
         ///
-        /// Ini gerbang penerimaan Fase 1 nomor dua: add-in menulis ke
-        /// workspace-nya sendiri, bukan ke ~/.gemini. Kalau ia menyentuh yang
-        /// global, ia merusak setelan agy untuk seluruh pekerjaan pengguna -
-        /// termasuk proyek yang tidak ada hubungannya dengan SolidWorks.
+        /// LINGKUPNYA SEMPIT, DAN ITU HARUS DIKATAKAN TERANG.
+        ///
+        /// Test ini hanya menguji <c>AgentWorkspace.Prepare</c>. Ia TIDAK
+        /// membuktikan "add-in tidak mengubah config global", dan untuk
+        /// sementara gerbang di ROADMAP memang ditulis seluas itu lalu
+        /// tercentang keliru atas dasar test ini.
+        ///
+        /// Kenyataannya add-in MEMANG mengubah config global, dengan sengaja:
+        /// pendaftaran MCP dilakukan lewat `agy mcp add`, yang menulis ke
+        /// ~/.gemini/config/mcp_config.json. Itu keputusan rancangan, bukan
+        /// kecelakaan - lihat docs/integrasi-antigravity.md bagian 3.
+        ///
+        /// Jadi yang dijaga di sini cuma satu hal: Prepare sendiri tidak ikut
+        /// menyentuhnya. Test hijau hanya membuktikan apa yang diuji.
         /// </summary>
         [Fact]
-        public void menyiapkan_workspace_tidak_menyentuh_config_global_agy()
+        public void Prepare_tidak_menyentuh_config_global_agy()
         {
             var global = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),

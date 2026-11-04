@@ -334,15 +334,26 @@ else {
 if ($Agy) {
     Write-Langkah 'round-trip lewat agy (memakai kuota)'
 
-    $agy = Get-AgyPath
+    # JANGAN menamai ini $agy.
+    #
+    # Nama variabel PowerShell TIDAK peka huruf besar-kecil, jadi $agy dan $Agy
+    # adalah variabel yang SAMA - dan $Agy adalah parameter [switch] di atas.
+    # Menugaskan string ke sana membuat PowerShell menegakkan tipe parameternya
+    # dan melempar ArgumentTransformationMetadataException.
+    #
+    # Pesannya tidak menyebut nama variabel mana pun, hanya "Cannot convert
+    # value System.String to type SwitchParameter", dan ia dilaporkan atas nama
+    # SCRIPT-nya - bukan atas nama barisnya. Jadi gejalanya menunjuk ke mana
+    # saja kecuali ke penyebabnya.
+    $agyExe = Get-AgyPath
 
-    if (-not $agy) {
+    if (-not $agyExe) {
         Write-Gagal 'agy tidak ditemukan - lihat doctor.ps1'
     }
     else {
         $kerja = Join-Path $env:LOCALAPPDATA 'MikosAI\agent-workspace'
 
-        Write-Host "   agy      : $agy"
+        Write-Host "   agy      : $agyExe"
         Write-Host "   workspace: $kerja"
 
         # Dijalankan DI DALAM workspace, karena di situlah
@@ -352,30 +363,148 @@ if ($Agy) {
             $permintaan = 'Pakai tool get_active_document dan laporkan hasilnya apa adanya. ' +
                           'Jangan mengarang nilai apa pun.'
 
-            # $ErrorActionPreference dilonggarkan: agy menulis kemajuan ke stderr,
-            # dan di PowerShell 5.1 itu cukup untuk menggagalkan perintah yang
-            # sebenarnya sukses.
+            # IZIN HARUS DIBERIKAN EKSPLISIT DI MODE HEADLESS.
+            #
+            # Percobaan pertama gagal dengan:
+            #
+            #   "a tool required the mcp permission that headless mode cannot
+            #    prompt for, so it was auto-denied"
+            #   "denied_actions":[{"action":"mcp","display_name":"CallMcpTool"}]
+            #
+            # Itu BUKAN kegagalan server kita - agy sudah menemukan server kita
+            # dan mencoba memanggil tool-nya. Yang memblokir sistem izin agy
+            # sendiri, yang di mode -p tidak bisa menampilkan prompt.
+            #
+            # BUKAN --dangerously-skip-permissions. Opsi itu menyetujui SEMUA
+            # tool, termasuk perintah shell, dan memakainya di script verifikasi
+            # berarti verifikasinya dijalankan dengan izin yang jauh lebih luas
+            # daripada pemakaian sehari-hari - menguji keadaan yang bukan
+            # keadaan sebenarnya.
+            #
+            # --settings bersifat SESI SAJA dan tidak pernah disimpan, jadi
+            # ~/.gemini/settings.json milik pengguna tidak tersentuh. Itu
+            # mempertahankan gerbang isolasi config global.
+            #
+            # DITULIS KE BERKAS, BUKAN DITERUSKAN INLINE.
+            #
+            # Percobaan inline gagal dengan "invalid character 'p' looking for
+            # beginning of object key string": PowerShell 5.1 melepas tanda kutip
+            # ganda saat meneruskan argumen ke exe native, jadi {"permissions":...}
+            # tiba sebagai {permissions:...}. Itu bisa ditambal dengan escape
+            # berlapis, tapi escape berlapis adalah hal yang rusak diam-diam saat
+            # diedit nanti.
+            #
+            # --settings juga menerima path berkas, yang menghapus seluruh
+            # masalah kutip-mengutip.
+            $berkasIzin = Join-Path ([System.IO.Path]::GetTempPath()) "mikosai-izin-$PID.json"
+
+            # TANPA BOM, dan itu bukan detail.
+            #
+            # Set-Content -Encoding utf8 di PowerShell 5.1 menulis UTF-8 DENGAN
+            # BOM, dan parser JSON agy menolaknya:
+            #
+            #   invalid character '﻿' looking for beginning of value
+            #
+            # UTF8Encoding($false) adalah satu-satunya cara ringkas untuk menulis
+            # UTF-8 tanpa BOM di PowerShell 5.1.
+            # SINTAKSNYA mcp(<server>/<tool>), BUKAN mcp(<server>).
+            #
+            # Percobaan dengan mcp(mikosai-solidworks) diterima sebagai JSON yang
+            # sah tapi TIDAK cocok dengan apa pun, jadi tool-nya tetap ditolak -
+            # gagal diam-diam, tanpa keluhan soal aturannya.
+            #
+            # Bentuk yang benar diambil dari string di dalam agy.exe sendiri:
+            #
+            #   mcp(<server_name>/<tool_name>)
+            #   mcp(chrome_devtools/*)
+            #   mcp(*)
+            #
+            # Dipakai lingkup server kita saja, bukan mcp(*): yang diuji adalah
+            # tool kita, dan memberi izin lebih luas daripada yang diuji membuat
+            # hasilnya tidak mewakili pemakaian sehari-hari.
+            [System.IO.File]::WriteAllText(
+                $berkasIzin,
+                '{"permissions":{"allow":["mcp(mikosai-solidworks/*)"]}}',
+                (New-Object System.Text.UTF8Encoding $false))
+
+            # TANPA 2>&1, dan itu disengaja.
+            #
+            # Di PowerShell 5.1, mengarahkan stderr exe native ke dalam pipeline
+            # membungkus SETIAP baris jadi ErrorRecord NativeCommandError - yang
+            # lalu dicetak sebagai blok error berhalaman, lengkap dengan stack
+            # trace, walaupun perintahnya sukses. Keluarannya jadi lebih sulit
+            # dibaca daripada kalau tidak ditangkap sama sekali.
+            #
+            # `--output-format json` menulis hasilnya ke STDOUT, jadi itu saja
+            # yang ditangkap. stderr dibiarkan mengalir ke layar: di situ agy
+            # menulis kemajuannya, dan saat gagal itulah yang ingin dilihat.
+            #
+            # $ErrorActionPreference tetap dilonggarkan supaya stderr tidak
+            # menggagalkan perintah yang sebenarnya berhasil.
             $simpan = $ErrorActionPreference
             $ErrorActionPreference = 'Continue'
-            $keluaran = & $agy --output-format json -p $permintaan 2>&1 | Out-String
+            $keluaran = (& $agyExe --output-format json --settings $berkasIzin -p $permintaan) | Out-String
             $kode = $LASTEXITCODE
             $ErrorActionPreference = $simpan
 
-            if ($kode -ne 0) {
-                Write-Gagal "agy keluar dengan kode $kode"
-                Write-Host $keluaran -ForegroundColor DarkGray
+            # Out-String pada keluaran kosong mengembalikan string kosong, bukan
+            # null - tapi jangan bergantung pada itu di bawah Set-StrictMode.
+            if (-not $keluaran) { $keluaran = '' }
+
+            # status: SUCCESS BUKAN berarti berhasil untuk tujuan kita.
+            #
+            # Percobaan pertama mengembalikan status SUCCESS, exit code 0, DAN
+            # response kosong - karena tool-nya ditolak di lapisan izin. Menilai
+            # dari status atau exit code saja akan melaporkan itu sebagai lulus.
+            #
+            # denied_actions adalah bukti yang bisa dibaca mesin, jadi itu yang
+            # diperiksa.
+            $jawabanJson = $null
+            if ($keluaran.Trim()) {
+                try { $jawabanJson = $keluaran | ConvertFrom-Json } catch { $jawabanJson = $null }
             }
-            elseif ($keluaran -match 'get_active_document') {
+
+            $ditolak = @()
+            if ($jawabanJson -and ($jawabanJson.PSObject.Properties.Name -contains 'denied_actions')) {
+                $ditolak = @($jawabanJson.denied_actions)
+            }
+
+            $jawaban = ''
+            if ($jawabanJson -and ($jawabanJson.PSObject.Properties.Name -contains 'response')) {
+                $jawaban = [string] $jawabanJson.response
+            }
+
+            if ($kode -ne 0) {
+                Write-Gagal "agy keluar dengan kode $kode (pesannya di stderr, di atas)"
+                Write-Host $keluaran.Trim() -ForegroundColor DarkGray
+            }
+            elseif ($ditolak.Count -gt 0) {
+                # Dibedakan dengan sengaja: agy MENEMUKAN server kita dan
+                # MENCOBA memanggil tool-nya. Yang gagal lapisan izinnya, bukan
+                # integrasi kita - dan itu diagnosis yang sama sekali berbeda.
+                $nama = ($ditolak | ForEach-Object { $_.action }) -join ', '
+                Write-Gagal "agy mencoba memanggil tool kita tapi izinnya ditolak: $nama"
+                Write-Host '   Integrasinya BEKERJA - yang kurang aturan izin. Periksa $izin di script ini.' -ForegroundColor Yellow
+            }
+            elseif ($jawaban -match 'get_active_document' -or $keluaran -match 'get_active_document') {
                 Write-Lulus 'agy memanggil tool kita dan menyebutnya di jawabannya'
-                Write-Host ($keluaran.Trim() | Select-Object -First 1) -ForegroundColor DarkGray
+                Write-Host "   $($jawaban.Trim())" -ForegroundColor DarkGray
+            }
+            elseif (-not $jawaban) {
+                Write-Gagal 'agy jalan tanpa error tapi tidak menghasilkan jawaban apa pun'
+                Write-Host $keluaran.Trim() -ForegroundColor DarkGray
             }
             else {
-                Write-Gagal 'agy jalan tapi tidak terlihat memanggil tool kita'
-                Write-Host $keluaran -ForegroundColor DarkGray
+                # agy menjawab tapi tidak menyentuh tool kita. Penyebab paling
+                # mungkin: .agents\mcp_config.json tidak dibaca.
+                Write-Gagal 'agy menjawab tapi tidak terlihat memanggil tool kita'
+                Write-Host "   Periksa: $(Join-Path $kerja '.agents\mcp_config.json')" -ForegroundColor Yellow
+                Write-Host "   $($jawaban.Trim())" -ForegroundColor DarkGray
             }
         }
         finally {
             Pop-Location
+            Remove-Item -LiteralPath $berkasIzin -ErrorAction SilentlyContinue
         }
     }
 }

@@ -225,7 +225,11 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
       dua kali: dokumen kosong, lalu part dengan solid body. Memeriksa isi jawabannya
       menemukan dua cacat yang gerbang transport TIDAK BISA tangkap — ukuran nol yang
       dikarang, dan massa dari densitas default. Keduanya sudah ditutup test.
-- [ ] `agy` memanggil tool kita sendiri — `mcp-roundtrip.ps1 -Agy` (memakai kuota)
+- [x] **`agy` memanggil tool kita sendiri** — terbukti: `agy` memanggil
+      `get_active_document` di dalam SolidWorks yang berjalan dan melaporkan
+      `Part1.SLDPRT`, `part`, `Default`, `33.1.1` apa adanya. 10 lulus 0 gagal.
+      Butuh aturan izin `mcp(mikosai-solidworks/*)` — lihat bagian 6
+      `docs/integrasi-antigravity.md`, yang dugaannya sempat salah soal ini.
 - [x] Semua 6 tool dieksekusi lewat dispatcher — dibuktikan test, bukan inspeksi mata
 - [x] Tool berstatus `reference_only` **tidak muncul** di daftar MCP
 - [x] Request tanpa bearer token ditolak
@@ -236,8 +240,25 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
       membuktikan **detektornya tidak hampa**: sebuah listener sengaja dibind ke
       `0.0.0.0` dan detektor yang sama HARUS menemukannya. Yang tetap tidak
       terjangkau cuma firewall dan NAT — dan itu bukan properti kode kita.
-- [x] Config global `~/.gemini/config/mcp_config.json` **tidak berubah** setelah add-in
-      berjalan — dibuktikan dengan hash sebelum dan sesudah
+- [x] ~~Config global `~/.gemini/config/mcp_config.json` **tidak berubah** setelah add-in
+      berjalan~~ — **gerbang ini salah, dan sempat tercentang keliru.**
+
+      Add-in MEMANG mengubahnya, dengan sengaja: pendaftaran MCP lewat `agy mcp add`,
+      sesuai keputusan di `docs/integrasi-antigravity.md` bagian 3. Gerbangnya ditulis
+      waktu rancangannya masih menulis `.agents/mcp_config.json` sendiri.
+
+      Test yang membuatnya tercentang menguji `AgentWorkspace.Prepare`, dan untuk itu ia
+      benar — tapi `Prepare` bukan satu-satunya yang berjalan. Pelajarannya: test hijau
+      hanya membuktikan apa yang diuji, bukan apa yang tertulis di gerbangnya.
+
+      Gerbang yang benar ada di bawah.
+- [x] Satu-satunya perubahan add-in pada config global adalah entry `mikosai-solidworks`
+      lewat `agy mcp add`, dan entry itu dihapus saat disconnect lewat `agy mcp remove`
+- [x] `AgentWorkspace.Prepare` sendiri tidak menyentuh config global — hash sebelum
+      dan sesudah
+- [ ] **Token tidak lagi ditulis ke berkas tanpa pembaca** — `.agents/mcp_config.json`
+      terbukti DIABAIKAN `agy`, jadi yang tersisa cuma satu salinan bearer token di disk
+      tanpa manfaat. Lihat catatan item 6 di `docs/integrasi-antigravity.md`.
 - [x] URL non-loopback ditolak sebelum ditulis ke konfigurasi AI — jaring pengamannya
       sudah ada di kode sejak awal, sampai sekarang tidak ada yang membuktikannya jalan
 - [x] Token sesi tidak pernah berulang dan panjangnya cukup — 200 iterasi

@@ -215,14 +215,78 @@ otomasi batch, dengan peringatan penagihan yang jelas di UI.
 
 ---
 
-## 6. Perizinan shell di mode headless
+## 6. Perizinan di mode headless — TOOL MCP JUGA KENA
 
-Dilaporkan bahwa perintah shell **otomatis ditolak** di mode headless kecuali ada allow-rule
-di bawah `permissions.allow` pada `~/.gemini/antigravity-cli/settings.json`.
+**Dugaan awal di dokumen ini salah, dan salahnya ke arah yang melegakan diri sendiri.**
 
-Untuk kita dampaknya kecil — dan itu memang **disengaja**. Operasi CAD kita diekspos lewat
-tool MCP, bukan lewat shell. AI tidak pernah perlu izin shell untuk membangun geometri.
-Kalau suatu saat kita merasa butuh shell, itu tanda rancangan tool kita kurang lengkap.
+Yang tertulis sebelumnya: perizinan headless hanya soal perintah shell, dan "untuk kita
+dampaknya kecil — operasi CAD kita diekspos lewat tool MCP, bukan lewat shell".
+
+Pemanggilan `agy` pertama membantahnya:
+
+```
+jetski: no output produced — a tool required the "mcp" permission that headless mode
+cannot prompt for, so it was auto-denied.
+```
+
+```json
+"status": "SUCCESS", "response": "", "denied_actions": [{"action": "mcp", "display_name": "CallMcpTool"}]
+```
+
+Tool MCP punya kelas izinnya **sendiri**, dan di mode `-p` ia otomatis ditolak karena
+tidak ada yang bisa ditanyai. Jadi dampaknya bukan kecil — tanpa aturan izin, **tidak
+satu pun tool kita bisa dipanggil**.
+
+### Dua jebakan di dalamnya
+
+**`status: SUCCESS` dan exit code 0 bukan bukti berhasil.** Jawaban di atas berstatus
+SUCCESS dengan `response` kosong. Script verifikasi yang menilai dari status atau exit
+code akan melaporkannya lulus. `denied_actions` adalah satu-satunya bukti yang bisa
+dibaca mesin.
+
+**Sintaksnya `mcp(<server>/<tool>)`, dengan garis miring.** `mcp(mikosai-solidworks)`
+diterima sebagai JSON yang sah tapi tidak cocok dengan apa pun — tool-nya tetap ditolak,
+tanpa keluhan soal aturannya. Bentuk yang benar diambil dari string di dalam `agy.exe`:
+
+```
+mcp(<server_name>/<tool_name>)
+mcp(chrome_devtools/*)
+mcp(*)
+```
+
+### Cara kita memberikannya
+
+`--settings` menerima objek JSON setelan **untuk sesi itu saja, tidak pernah disimpan**:
+
+```powershell
+'{"permissions":{"allow":["mcp(mikosai-solidworks/*)"]}}'
+```
+
+Tiga keputusan di situ, masing-masing karena alasannya:
+
+| Keputusan | Alasan |
+|---|---|
+| `--settings`, bukan mengedit `~/.gemini/settings.json` | Setelan pengguna tidak tersentuh |
+| Lingkup server kita, bukan `mcp(*)` | Izin yang lebih luas daripada yang diuji membuat hasilnya tidak mewakili pemakaian nyata |
+| **BUKAN** `--dangerously-skip-permissions` | Itu menyetujui semua tool termasuk shell |
+
+Dua jebakan teknis saat meneruskannya, keduanya ditemukan dengan cara yang mahal:
+
+- **Inline gagal.** PowerShell 5.1 melepas tanda kutip ganda saat meneruskan argumen ke
+  exe native, jadi `{"permissions":...}` tiba sebagai `{permissions:...}`. `--settings`
+  juga menerima path berkas, yang menghapus seluruh masalah itu.
+- **BOM gagal.** `Set-Content -Encoding utf8` di PowerShell 5.1 menulis UTF-8 **dengan**
+  BOM, dan parser JSON `agy` menolaknya dengan
+  `invalid character '﻿' looking for beginning of value`. Pakai
+  `UTF8Encoding($false)`.
+
+Lihat `scripts/mcp-roundtrip.ps1`.
+
+### Yang masih benar dari dugaan awal
+
+AI tetap tidak perlu izin **shell** untuk membangun geometri. Kalau suatu saat kita merasa
+butuh shell, itu tanda rancangan tool kita kurang lengkap. Yang salah hanyalah anggapan
+bahwa tool MCP bebas dari perizinan.
 
 ---
 
@@ -237,10 +301,36 @@ implementasi `ProviderHost` final.
 | 2 | Apakah bug silent non-TTY masih ada di versi itu? | Kalau sudah ditambal, ConPTY tidak perlu — tapi tetap pertahankan deteksi `provider_silent` |
 | 3 | Apa nama field sebenarnya untuk isi jawaban di envelope `json`? | Perbaiki parser |
 | 4 | Apakah `stream-json` didukung, dan apa bentuk event-nya? | Turun ke `json` tunggal, UI kehilangan progres bertahap |
-| 5 | Apakah entry `serverUrl` mendukung custom header untuk bearer token? | Pakai token query string atau pembuktian via file sesi ber-ACL |
-| 6 | Apakah `.agents/mcp_config.json` dibaca relatif ke cwd, dan menggantikan atau menggabung dengan config global? | Fallback ke merge non-destruktif pada config global |
+| 5 | ~~Apakah entry `serverUrl` mendukung custom header?~~ **YA** — field `headers` ada di pendaftaran, dan panggilan tool BERHASIL padahal server kita menolak token salah dengan 401. Jadi header-nya memang terkirim. | — |
+| 6 | ~~Apakah `.agents/mcp_config.json` dibaca relatif ke cwd?~~ **TIDAK — DIABAIKAN SEPENUHNYA.** Server palsu ditaruh di `.agents/mcp_config.json` sebuah folder; `agy mcp list` dari folder itu tidak menampilkannya. Pendaftaran bersifat GLOBAL lewat `agy mcp add`, terlihat dari direktori mana pun. | Lihat catatan di bawah — ini punya dua konsekuensi |
 | 7 | Berapa rate limit nyata untuk pemakaian interaktif? | Tambah caching lokal, batch permintaan, atau sarankan provider lain |
 | 8 | Apakah ToS mengizinkan orkestrasi eksternal `agy` dengan pemakaian berbasis akun? | **Lihat di bawah — ini risiko legal, bukan teknis** |
+
+### Catatan soal item 6 — dua konsekuensi yang tidak enak
+
+Jawabannya bukan sekadar "oh, pakai yang global saja".
+
+**Pertama: pendaftaran kita terlihat oleh SEMUA sesi `agy` di mesin ini.**
+
+`~/.gemini/config/mcp_config.json` memuat `serverUrl` kita beserta bearer token-nya.
+Selama add-in berjalan, sesi `agy` apa pun — di proyek apa pun, tidak ada hubungannya
+dengan SolidWorks — bisa memanggil tool CAD kita.
+
+Ini **bukan** peningkatan hak akses: server hanya bind loopback, dan sesi itu berjalan
+sebagai pengguna yang sama. Tapi ia lebih luas daripada yang dirancang, dan itu harus
+dinyatakan, bukan dibiarkan jadi kejutan. Peredamnya: entry-nya dihapus saat
+`DisconnectFromSW` lewat `agy mcp remove`.
+
+**Kedua: `AgentWorkspace.Prepare` menulis token ke berkas yang TIDAK ADA PEMBACANYA.**
+
+`.agents/mcp_config.json` dibuat untuk dibaca `agy`. Terbukti `agy` mengabaikannya. Jadi
+yang tersisa hanyalah satu salinan bearer token di disk, tanpa manfaat apa pun — dan
+secret tanpa pembaca adalah risiko murni.
+
+Berbeda dari `session.json`, yang juga memuat token tapi **punya** pembaca
+(`scripts/mcp-roundtrip.ps1`) dan ditulis dengan ACL khusus pengguna.
+
+Lihat gerbang terkait di `docs/ROADMAP.md`.
 
 ### Catatan soal item 8
 
