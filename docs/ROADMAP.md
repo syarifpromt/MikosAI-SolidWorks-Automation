@@ -56,7 +56,7 @@ itu jalur yang lebih sulit dicari penggantinya.
 
 Tidak ada satu pun yang bisa dibagi antar anggota tim.
 
-- [ ] Windows 10 1809+ (ConPTY butuh versi ini)
+- [ ] Windows 10 1809+ — ~~ConPTY butuh versi ini~~ ConPTY tidak dipakai; pipe biasa cukup
 - [ ] SolidWorks + seat lisensi — per mesin, tidak bisa headless
 - [ ] .NET Framework 4.8 SDK
 - [ ] `agy` terpasang — per mesin, kita tidak mendistribusikannya
@@ -305,12 +305,20 @@ Fase paling berisiko. **Baca `docs/integrasi-antigravity.md` seluruhnya sebelum 
 
 ### Gerbang penerimaan Fase 2
 
-- [ ] Chat di TaskPane → `agy` → MCP → tool read-only → jawaban muncul di UI
-      — **penghalangnya sudah dibuka:** pembangun perintah provider tidak pernah mengirim
-      aturan izin MCP, jadi setiap tool akan ditolak dan panel menampilkan jawaban kosong
-      dengan `status: SUCCESS`. Sekarang `--settings` dikirim dan penolakan dilaporkan
-      sebagai `provider_permission_denied`. Tinggal diuji dari panelnya
-- [ ] Bug silent non-TTY terbukti tertangani — ada test yang gagal kalau ConPTY dilepas
+- [x] Chat di TaskPane → `agy` → MCP → tool read-only → jawaban muncul di UI
+      — **terbukti 2026-11-04.** Diketik di panel: "dokumen apa yang aktif sekarang?",
+      dijawab `Part1.SLDPRT` / `part` / `Default` / `33.1.1` / `isDirty: false`, cocok
+      dengan apa yang dibaca `mcp-roundtrip.ps1` langsung dari tool. Empat bug berurutan
+      harus dilewati lebih dulu, dan **keempatnya melapor berhasil sambil gagal**:
+      aturan izin MCP tidak pernah dikirim; stderr dibuang justru pada exit code 0;
+      pembersih keluaran menghancurkan teks CRLF. Yang terakhir dan termahal: probe
+      membaca `--help` dari stdout sementara `agy` menulisnya ke stderr
+- [ ] ~~Bug silent non-TTY terbukti tertangani — ada test yang gagal kalau ConPTY
+      dilepas~~ **DIBATALKAN: premisnya salah.** Item verifikasi 2 membuktikan pipe
+      biasa cukup; ConPTY tidak dibutuhkan. Kekosongan yang kami kira bug TTY sebenarnya
+      empat hal di atas. Nasihat "pakai ConPTY" sudah dihapus dari pesan galat, dan test
+      yang MENUNTUT nasihat itu ada sudah dibalik — ia mengabadikan dugaan yang sudah
+      terbantah. Lihat docs/integrasi-antigravity.md bagian 4
 - [ ] Keadaan belum terautentikasi memberi panduan jelas, bukan error mentah
 - [x] **7 dari 8** item verifikasi terjawab dan terdokumentasi. Yang tersisa hanya item 8
       (ToS), yang risiko legal — bukan teknis, dan bukan milik kode untuk menjawabnya
