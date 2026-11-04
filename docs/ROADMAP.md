@@ -111,8 +111,9 @@ SolidWorks dan punya kanal thread yang benar.
 - [x] CommandGroup — tab ribbon + menu untuk tampil/sembunyikan panel.
       Toggle-nya memakai `IsActiveTab()`, karena SolidWorks tidak menyediakan
       "apakah panel terlihat"; itu pertanyaan terdekat yang bisa dijawab tanpa
-      mengarang. **Belum pernah diklik di SolidWorks yang berjalan**
-      — perilakunya baru terbukti setelah restart.
+      mengarang. **Tab muncul di ribbon — terbukti 2026-11-05** pada build
+      `4442e69`, dengan `commandGroup` HIDUP dan nol galat di `host-status.json`.
+      Perilaku toggle-nya sendiri belum dilaporkan, jadi belum diklaim.
 
       Versi pertama hanya memanggil `CreateCommandGroup2` + `HasToolbar`, dan itu
       TIDAK cukup: tombolnya hanya lahir di menu Tools dan di toolbar klasik yang
@@ -226,6 +227,28 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
 - [x] `get_selection` — mengembalikan `EntityRef` semantik, bukan `Face1`
 - [x] Pembentuk `EntityRef` untuk `name`, `normal_and_point`, dan `midpoint`
 - [ ] `EntityRef` *resolver* (arah sebaliknya: ref → entitas), untuk tool yang menulis
+
+### Golden test baca — menaikkan `document_inspection` dari `pilot` ke `verified`
+
+- [x] Harness: `scripts/golden-document.ps1` + `tests/golden/plat-referensi.json`.
+      Nilai harapannya **diturunkan dari geometri**, bukan disalin dari keluaran
+      tool — itu bedanya golden test dengan snapshot. Snapshot hanya menjawab
+      "apakah hasilnya sama seperti kemarin", dan kalau pembacaannya sudah salah
+      sejak awal ia membekukan kesalahan itu lalu menyebutnya lulus. Kami sudah
+      pernah membayar persis itu: `massGrams` yang dikarang dari densitas air
+- [x] Harness dibuktikan bisa GAGAL, bukan cuma bisa lulus — 26 lulus/exit 0 saat
+      cocok, 1 gagal/exit 1 dengan selisih tepat saat satu nilai dirusak
+- [x] Pemeriksaan silang `massa = volume × densitas`, ketiganya dibaca terpisah,
+      sehingga satu nilai yang dikarang memecah hubungannya
+- [x] Pembacaan identik 3× berturut-turut diuji
+- [ ] **`tests/golden/plat-referensi.SLDPRT` dibuat dan di-commit** — plat
+      100×80×10 mm, Plain Carbon Steel, berpusat di origin. Resepnya di
+      `tests/golden/CARA-MEMBUAT-PART.md`. Ini satu-satunya langkah yang menuntut
+      SolidWorks di tangan manusia
+- [ ] Golden test lulus terhadap part itu → `document_inspection` naik ke `verified`
+
+Ukurannya sengaja sama dengan basis plat golden Fase 3 (100×80×10), supaya jalur
+baca dan jalur tulis nanti diuji di atas geometri yang sama.
 
 ### Gerbang penerimaan Fase 1
 

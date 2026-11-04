@@ -1,0 +1,91 @@
+{
+  "_catatan": [
+    "NILAI DI SINI DITURUNKAN DARI GEOMETRI, BUKAN DISALIN DARI KELUARAN TOOL.",
+    "",
+    "Itu bedanya golden test dengan snapshot. Snapshot hanya bisa menjawab",
+    "'apakah hasilnya sama seperti kemarin'. Kalau pembacaannya sudah salah",
+    "sejak awal, snapshot akan membekukan kesalahan itu dan menyebutnya lulus.",
+    "",
+    "Plat 100 x 80 x 10 mm, Plain Carbon Steel (7800 kg/m3), berpusat di",
+    "origin pada sumbu X dan Y, diekstrusi 0..10 pada Z:",
+    "",
+    "  volume      = 100 * 80 * 10                      = 80000 mm3",
+    "  massa       = 80000e-9 m3 * 7800 kg/m3 = 0.624 kg = 624 g",
+    "  luas        = 2*(100*80) + 2*(100*10) + 2*(80*10)",
+    "              = 16000 + 2000 + 1600               = 19600 mm2",
+    "  pusat massa = (0, 0, 5) karena simetri",
+    "",
+    "Setiap angka bisa diperiksa dengan pensil. Kalau tool melaporkan nilai",
+    "lain, yang salah adalah tool - bukan berkas ini."
+  ],
+
+  "part": {
+    "berkas": "plat-referensi.SLDPRT",
+    "judul": "plat-referensi.SLDPRT",
+    "tipe": "part",
+    "konfigurasi": "Default",
+    "material": "Plain Carbon Steel"
+  },
+
+  "boundingBox": {
+    "min": { "x": -50.0, "y": -40.0, "z": 0.0 },
+    "max": { "x": 50.0, "y": 40.0, "z": 10.0 },
+    "size": { "x": 100.0, "y": 80.0, "z": 10.0 },
+    "bodyCount": 1
+  },
+
+  "massProperties": {
+    "volumeMm3": 80000.0,
+    "massGrams": 624.0,
+    "surfaceAreaMm2": 19600.0,
+    "centerOfMass": { "x": 0.0, "y": 0.0, "z": 5.0 },
+    "densityKgM3": 7800.0,
+    "densityAssigned": true
+  },
+
+  "fitur": {
+    "_catatan": [
+      "featureCount SENGAJA TIDAK DIPATOK.",
+      "",
+      "Sebagian besar isi FeatureManager datang dari template dan versi",
+      "SolidWorks - folder Comments, Favorites, Sensors, Markups, dan",
+      "seterusnya. Jumlahnya berbeda antarmesin dan antarversi.",
+      "",
+      "Memaku angka itu akan membuat golden test gagal di laptop teman kita",
+      "untuk alasan yang tidak ada hubungannya dengan kebenaran pembacaan.",
+      "Test yang gagal karena hal yang bukan kesalahan akan diabaikan orang,",
+      "dan test yang diabaikan sama saja dengan tidak ada.",
+      "",
+      "Yang dipatok: fitur yang KITA buat harus ada, tanpa error, tanpa",
+      "suppress."
+    ],
+    "harusAda": [
+      { "name": "Boss-Extrude1", "typeName": "Extrusion" }
+    ],
+    "suppressedCount": 0,
+    "errorCount": 0,
+    "rebuildRequired": false
+  },
+
+  "toleransi": {
+    "_catatan": [
+      "Prisma persegi dihitung eksak oleh SolidWorks, jadi toleransinya ketat.",
+      "Yang dilonggarkan hanya pembulatan 6 desimal yang kita lakukan sendiri",
+      "di ReadOnlyToolShaper."
+    ],
+    "panjangMm": 1e-6,
+    "volumeMm3": 1e-3,
+    "massaGram": 1e-3,
+    "luasMm2": 1e-3,
+    "densitasKgM3": 1e-6
+  },
+
+  "pengulangan": {
+    "_catatan": [
+      "Pembacaan harus IDENTIK tiga kali berturut-turut. Sekali benar bisa",
+      "kebetulan; yang kita butuhkan adalah bahwa ia tidak bergantung pada",
+      "keadaan yang berubah antarpanggilan."
+    ],
+    "jumlah": 3
+  }
+}
