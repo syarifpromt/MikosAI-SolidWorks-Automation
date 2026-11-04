@@ -53,7 +53,18 @@ dimensi driven.
      *"Make Dimension Driven?"* → jawab **Yes**. Nilainya **10 mm**.
    - status akhir harus **Fully Defined**
 
-6. Simpan sebagai `tests/golden/fixture-konsumen.SLDPRT`.
+6. **Plane1** — reference plane lewat SATU GARIS `Sketch1`:
+   - **Features → Reference Geometry → Plane**
+   - referensi pertama: **sisi atas `Sketch1`** (garis dari `(-50, 30)` ke
+     `(50, 30)`)
+   - referensi kedua: **Top Plane**, dengan **sudut 30°**
+   - namanya `Plane1`, dan **jangan dipakai untuk apa pun**
+
+   Ini contoh tandingan untuk asumsi "child bukan sketsa berarti konsumen".
+   `Plane1` memakai geometri `Sketch1`, jadi ia child-nya — tapi ia jelas
+   bukan fitur yang mengkonsumsi sketsa sebagai profil.
+
+7. Simpan sebagai `tests/golden/fixture-konsumen.SLDPRT`.
 
 ## Nilai yang diharapkan
 
@@ -66,7 +77,7 @@ bounding box `z` dari **3** sampai **10**.
 |---|---|
 | `constrainedStatus` | `FullyDefined` |
 | `consumedByFeatures` | `["Boss-Extrude1", "Cut-Extrude1"]` — dua, urutan bebas |
-| `dependents` | memuat keduanya, **dan kemungkinan `Sketch2`** — lihat catatan hipotesis |
+| `dependents` | memuat keduanya, **dan kemungkinan `Sketch2` serta `Plane1`** — lihat catatan hipotesis |
 | `drivingDimensionCount` | 2 |
 | `drivenDimensionCount` | 0 |
 | `unknownDrivenStateCount` | 0 |
@@ -92,6 +103,22 @@ Center Rectangle menghasilkan 4 garis + 2 garis konstruksi diagonal. Konstruksi
 | `branchPointCount` | 0 |
 | `endpointOnSegmentCount` | 0 |
 | `connectivityLimits` | `["undeclared_point_on_segment"]` |
+
+### `Plane1` — contoh tandingan
+
+| | harapan |
+|---|---|
+| muncul di `Sketch1.dependents` | **ya** (hipotesis) |
+| muncul di `Sketch1.consumedByFeatures` | **TIDAK** |
+| volume body | tetap **42000 mm³** — plane tidak menambah material |
+
+Kalau `Plane1` muncul di `consumedByFeatures`, berarti aturan klasifikasi kami
+salah dan harus diperbaiki sebelum `delete_feature` ditulis.
+
+`typeName` sebenarnya dari `Plane1` dan `Cut-Extrude1` **belum pernah kami
+lihat**, dan itu disengaja: laporan run pertama akan menyebutkannya, dan daftar
+putih tipe konsumen diisi dari situ — bukan dari ingatan. Lihat
+`docs/proposal-deteksi-konsumen.md`.
 
 ## Hipotesis yang diuji part ini
 
