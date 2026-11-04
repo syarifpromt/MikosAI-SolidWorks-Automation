@@ -540,7 +540,10 @@ namespace MikosAI.Core.Plan
 
             try
             {
-                return JsonSerializer.SerializeToNode(value);
+                // Opsi diteruskan karena SerializeToNode MEMBAKAR teks
+                // angkanya ke node. Tanpa ini, Display di bawah menampilkan
+                // ekor G17 di pesan verifikasi yang dibaca manusia dan model.
+                return JsonSerializer.SerializeToNode(value, MikosAI.Core.Json.JsonAngka.Opsi);
             }
             catch (NotSupportedException)
             {
@@ -550,7 +553,7 @@ namespace MikosAI.Core.Plan
 
         /// <summary>Bentuk yang enak dibaca manusia untuk pesan verifikasi.</summary>
         private static string Display(JsonNode? node)
-            => node is null ? "(tidak ada)" : node.ToJsonString().Trim('"');
+            => node is null ? "(tidak ada)" : node.ToJsonString(MikosAI.Core.Json.JsonAngka.Opsi).Trim('"');
 
         private async Task<IReadOnlyList<VerificationCheck>> EvaluateAcceptanceAsync(
             JsonObject plan,

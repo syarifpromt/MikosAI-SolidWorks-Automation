@@ -197,9 +197,14 @@ namespace MikosAI.Core.Mcp
                 var data = new JsonObject();
                 foreach (var pair in result.Data)
                 {
+                    // Opsi WAJIB diteruskan di sini, bukan hanya saat
+                    // ToJsonString: SerializeToNode membakar teks angkanya ke
+                    // dalam node, jadi konverter yang dipasang belakangan tidak
+                    // lagi punya kesempatan memperbaikinya.
                     data[pair.Key] = pair.Value is null
                         ? null
-                        : System.Text.Json.JsonSerializer.SerializeToNode(pair.Value);
+                        : System.Text.Json.JsonSerializer.SerializeToNode(
+                            pair.Value, MikosAI.Core.Json.JsonAngka.Opsi);
                 }
                 summary["data"] = data;
             }
@@ -246,8 +251,7 @@ namespace MikosAI.Core.Mcp
                     new JsonObject
                     {
                         ["type"] = "text",
-                        ["text"] = summary.ToJsonString(
-                            new System.Text.Json.JsonSerializerOptions { WriteIndented = true }),
+                        ["text"] = summary.ToJsonString(MikosAI.Core.Json.JsonAngka.OpsiIndent),
                     },
                 },
                 ["isError"] = !result.IsTaskSuccessful,

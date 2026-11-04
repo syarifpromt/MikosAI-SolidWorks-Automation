@@ -94,7 +94,10 @@ namespace MikosAI.Core.Tracing
                     }
                 }
 
-                var line = JsonSerializer.Serialize(payload);
+                // Jejak ini adalah bukti audit. Angka di dalamnya harus
+                // terbaca seperti yang dimaksud, bukan dengan ekor G17 yang
+                // ditambahkan penulis JSON net48.
+                var line = JsonSerializer.Serialize(payload, MikosAI.Core.Json.JsonAngka.Opsi);
 
                 lock (_lock)
                 {
