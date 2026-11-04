@@ -231,22 +231,74 @@ if ([string]::IsNullOrWhiteSpace($apiDir)) {
 $punyaSolidWorks = -not [string]::IsNullOrWhiteSpace($apiDir)
 
 # ====================================================================
+# 1b. SolidWorks harus TERTUTUP
+# ====================================================================
+#
+# Diperiksa di sini, SEBELUM build apa pun, karena setup ini tidak mungkin
+# berhasil selama SolidWorks berjalan: ia memegang MikosAI.Addin.dll dan
+# MikosAI.Core.dll yang ada di folder output add-in.
+#
+# Dulu langkah 2 dirancang memakai proyek test alih-alih solution, dengan alasan
+# "proyek test hanya menarik Core, jadi tetap jalan walaupun SolidWorks terbuka".
+# Alasan itu TIDAK BERLAKU LAGI: proyek test sekarang merujuk MikosAI.Addin untuk
+# urutan build, supaya AddinThreadGuardTests selalu memeriksa DLL yang segar
+# alih-alih DLL basi.
+#
+# Itu pertukaran yang disengaja - menguji DLL basi adalah lubang kebenaran yang
+# sunyi, dan proyek ini sudah pernah terjebak di situ. Harganya: setup butuh
+# SolidWorks tertutup, yang memang sudah jadi syarat langkah 5.
+#
+# Yang digantikan di sini terutama pesannya. Tanpa pemeriksaan ini, kegagalan
+# muncul tiga langkah kemudian setelah sepuluh kali retry, dengan diagnosis yang
+# MENUNJUK ARAH SALAH: "ini tidak butuh SolidWorks sama sekali, jadi kegagalan di
+# sini berarti masalah toolchain". Pesan yang salah lebih mahal daripada tidak
+# ada pesan.
+# Lewat Test-SolidWorksRunning di lib, BUKAN Get-Process inline.
+#
+# addin.ps1 -Action Build sudah memakai helper itu untuk pemeriksaan yang sama.
+# Menyalin logikanya ke sini akan membuat dua tempat yang bisa menyimpang -
+# kesalahan yang sudah pernah terjadi di proyek ini dengan deteksi path PIA,
+# dan baru ketahuan saat SolidWorks dipasang di drive selain C:.
+#
+# Lulus = TIDAK berjalan, karena itu keadaan yang dibutuhkan.
+$cekSw = Test-SolidWorksRunning
+
+if (-not $cekSw.Lulus) {
+    Stop-Setup "SolidWorks sedang $($cekSw.Nilai)." `
+        ("Setup membangun ulang MikosAI.Addin.dll, dan SolidWorks memegang berkas itu`n" +
+         "selama ia terbuka - termasuk MikosAI.Core.dll di folder yang sama.`n`n" +
+         "Tutup SolidWorks, lalu jalankan ulang:`n" +
+         "  powershell -File scripts\setup.ps1`n`n" +
+         "Kalau kamu hanya ingin menjalankan test tanpa menyentuh add-in:`n" +
+         "  dotnet build src\MikosAI.Core\MikosAI.Core.csproj -c Release`n" +
+         "  dotnet build tests\MikosAI.Core.Tests\MikosAI.Core.Tests.csproj -c Release -p:BuildProjectReferences=false`n" +
+         "  dotnet test tests\MikosAI.Core.Tests\MikosAI.Core.Tests.csproj -c Release --no-build")
+}
+# ====================================================================
 # 2. Core + test
 # ====================================================================
 Write-Langkah 'Build MikosAI.Core dan jalankan test'
 
-# SENGAJA proyek test, bukan $Solution.
+# SENGAJA proyek test, bukan $Solution - tapi alasannya sudah berubah.
 #
-# MikosAI.Addin ikut di solution, dan SolidWorks mengunci DLL-nya saat berjalan.
-# Membangun seluruh solution di sini akan gagal dengan pesan menyesatkan
-# "Build MikosAI.Core gagal" padahal Core tidak ada hubungannya.
+# Alasan ASLINYA: proyek test hanya menarik Core, jadi langkah ini tetap jalan
+# walaupun SolidWorks terbuka. Itu TIDAK BERLAKU LAGI. Proyek test sekarang
+# merujuk MikosAI.Addin untuk urutan build, supaya AddinThreadGuardTests selalu
+# memeriksa DLL yang segar - dan konsekuensinya langkah ini pun butuh SolidWorks
+# tertutup. Itu dijaga pemeriksaan di langkah 1b.
 #
-# Proyek test hanya menarik Core, jadi langkah ini tetap jalan walaupun
-# SolidWorks sedang terbuka.
+# Alasan yang MASIH berlaku: membangun proyek test menghindari membangun harness
+# dan proyek lain yang tidak ada hubungannya dengan setup, dan kegagalannya
+# menunjuk ke test - bukan ke "solution gagal" yang tidak memberi tahu apa pun.
 & dotnet build $TestProj -c Release --nologo -v q
 if ($LASTEXITCODE -ne 0) {
-    Stop-Setup 'Build MikosAI.Core gagal.' `
-        "Ini tidak butuh SolidWorks sama sekali, jadi kegagalan di sini berarti masalah toolchain.`nPeriksa error compiler di atas."
+    # Pemeriksaan di langkah 1b sudah menyaring kasus SolidWorks-masih-terbuka,
+    # tapi ia bisa dibuka ULANG di antara langkah 1b dan sini. Kalau pesannya
+    # memuat MSB3027/MSB3021, penyebabnya berkas terkunci - bukan compiler.
+    Stop-Setup 'Build gagal.' `
+        ("Kalau error di atas memuat MSB3027 atau MSB3021 dengan `"locked by: SolidWorks`",`n" +
+         "penyebabnya berkas terkunci: tutup SolidWorks dan jalankan ulang.`n`n" +
+         "Selain itu, langkah ini tidak butuh SolidWorks, jadi periksa error compiler di atas.")
 }
 Write-Host '  Build OK.' -ForegroundColor Green
 

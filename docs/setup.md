@@ -6,11 +6,28 @@ Tidak ada langkah yang butuh Visual Studio atau Windows SDK.
 
 ## Satu perintah
 
+**Tutup SolidWorks dulu.** Script ini membangun ulang `MikosAI.Addin.dll`, dan SolidWorks
+memegang berkas itu selama ia terbuka — termasuk `MikosAI.Core.dll` di folder yang sama.
+Script akan berhenti dalam sedetik dengan pesan itu kalau lupa, jadi tidak ada yang rusak
+— cuma satu putaran terbuang.
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 ```
 
 Di VS Code: `Ctrl+Shift+P` → **Run Task** → `setup (satu perintah)`.
+
+Kalau yang kamu butuhkan hanya menjalankan test, SolidWorks boleh tetap terbuka:
+
+```powershell
+dotnet build src\MikosAI.Core\MikosAI.Core.csproj -c Release
+dotnet build tests\MikosAI.Core.Tests\MikosAI.Core.Tests.csproj -c Release -p:BuildProjectReferences=false
+dotnet test tests\MikosAI.Core.Tests\MikosAI.Core.Tests.csproj -c Release --no-build
+```
+
+`BuildProjectReferences=false` melewati proyek add-in, yang DLL-nya terkunci. Konsekuensinya
+`AddinThreadGuardTests` memeriksa DLL add-in yang **terakhir dibangun**, bukan yang segar —
+cukup untuk iterasi di Core, tapi bukan pengganti `setup.ps1` sebelum menguji add-in.
 
 Script itu mengerjakan semuanya dan berhenti dengan pesan jelas kalau ada yang kurang:
 
