@@ -47,6 +47,16 @@ verified_hosts:
       dan crash.log yang kosong dari exception - bukan sekadar tidak adanya
       laporan crash.
 
+      Rantai penuh terbukti 2026-11-04: agy memanggil get_active_document lewat MCP di
+      dalam SolidWorks yang berjalan dan melaporkannya apa adanya. Angka properti massa
+      diaudit terhadap materialnya - volume 100266,145 mm3 dengan densitas 7800 kg/m3
+      memberi 782,08 g, dan itu cocok dengan massGrams yang dilaporkan. Audit itulah yang
+      lebih dulu membongkar bug densitas default: angka 100,27 g sebelumnya berarti 1000
+      kg/m3, yaitu air.
+
+      Status TETAP `pilot`, bukan `verified`. Satu part yang benar bukan golden test, dan
+      aturannya tidak dilonggarkan karena hasilnya menyenangkan.
+
       TaskPane WAJIB panel WinForms biasa di host ini. WebView2 menjatuhkan
       SolidWorks lewat structured exception native yang tidak lewat CLR sama
       sekali, jadi tidak ada try/catch managed yang bisa menangkapnya. Ia tetap

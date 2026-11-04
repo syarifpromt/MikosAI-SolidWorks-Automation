@@ -453,17 +453,53 @@ if ($Action -eq 'Probe') {
     # Exception yang lolos ke atas dicatat terpisah, karena ia tidak pernah
     # lewat try/catch mana pun - itulah sebabnya errors di host-status.json
     # bisa kosong padahal SolidWorks mati.
+    #
+    # TAPI "pasang" BUKAN CRASH.
+    #
+    # PenangkapCrash mencatat satu entri "pasang" setiap kali ia dipasang, yaitu
+    # setiap sesi SolidWorks. Berkasnya append-only, jadi setelah sepuluh sesi
+    # sehat ia memuat sepuluh entri yang semuanya berarti "tidak ada apa-apa".
+    #
+    # Versi sebelumnya mencetak semuanya di bawah judul merah CRASH LOG. Di
+    # sistem yang justru SEHAT, itu alarm palsu - dan alarm palsu melatih orang
+    # mengabaikan alarm. Sama buruknya dengan pesan yang menunjuk arah salah.
+    #
+    # Entri "pasang" tetap ditulis, karena ia bukti bahwa penangkapnya memang
+    # terpasang saat sesi itu berjalan. Yang berubah hanya cara membacanya.
     if (Test-Path -LiteralPath $CrashFile) {
-        $info = Get-Item -LiteralPath $CrashFile
-        Write-Section 'CRASH LOG'
-        Write-Host "  $CrashFile" -ForegroundColor Red
-        Write-Host "  Terakhir diubah: $($info.LastWriteTime)" -ForegroundColor Red
-        Write-Host ''
+        $isiCrash = @(Get-Content -LiteralPath $CrashFile -ErrorAction SilentlyContinue)
 
-        # 60 baris terakhir: entri terbaru ada di bawah.
-        Get-Content -LiteralPath $CrashFile -Tail 60 | ForEach-Object {
-            Write-Host "  $_" -ForegroundColor DarkYellow
+        # Baris judul entri: "[timestamp] jenis". Jenis selain "pasang" berarti
+        # ada sesuatu yang benar-benar tertangkap.
+        $entri = @($isiCrash | Select-String -Pattern '^\[\d{4}-\d{2}-\d{2}T' | ForEach-Object { $_.Line })
+        $nyata = @($entri | Where-Object { $_ -notmatch '\]\s*pasang\s*$' })
+
+        if ($nyata.Count -gt 0) {
+            $info = Get-Item -LiteralPath $CrashFile
+            Write-Section 'CRASH TERCATAT'
+            Write-Host "  $CrashFile" -ForegroundColor Red
+            Write-Host "  Terakhir diubah: $($info.LastWriteTime)" -ForegroundColor Red
+            Write-Host "  $($nyata.Count) entri bukan-pasang:" -ForegroundColor Red
+            foreach ($baris in $nyata) {
+                Write-Host "    $baris" -ForegroundColor Red
+            }
+            Write-Host ''
+
+            # 60 baris terakhir: entri terbaru ada di bawah.
+            Get-Content -LiteralPath $CrashFile -Tail 60 | ForEach-Object {
+                Write-Host "  $_" -ForegroundColor DarkYellow
+            }
         }
+        else {
+            Write-Section 'Penangkap crash'
+            Write-Host "  Terpasang di $($entri.Count) sesi, tidak ada crash tercatat." -ForegroundColor Green
+            Write-Host "  $CrashFile" -ForegroundColor DarkGray
+        }
+    }
+    else {
+        Write-Section 'Penangkap crash'
+        Write-Host '  Berkas log belum ada - add-in belum pernah memasang penangkapnya.' -ForegroundColor Yellow
+        Write-Host "  $CrashFile" -ForegroundColor DarkGray
     }
 
     Write-Section 'Gerbang penerimaan'
