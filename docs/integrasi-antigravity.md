@@ -330,6 +330,11 @@ secret tanpa pembaca adalah risiko murni.
 Berbeda dari `session.json`, yang juga memuat token tapi **punya** pembaca
 (`scripts/mcp-roundtrip.ps1`) dan ditulis dengan ACL khusus pengguna.
 
+**Sudah diperbaiki.** Penulisan `.agents/mcp_config.json` dihapus, bersama
+`BuildMcpConfig`, `WriteMcpConfig`, dan `McpConfigPath`. Di dalam workspace kita, token
+sekarang hanya ada di `session.json`, dan ada test yang mencari token itu di **seluruh**
+berkas workspace — jadi salinan baru akan langsung merah, bukan diam-diam bertambah.
+
 Lihat gerbang terkait di `docs/ROADMAP.md`.
 
 ### Catatan soal item 8

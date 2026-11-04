@@ -256,9 +256,12 @@ Add-in sudah terbukti hidup. Yang tersisa hanya pekerjaan test dan kesepakatan:
       lewat `agy mcp add`, dan entry itu dihapus saat disconnect lewat `agy mcp remove`
 - [x] `AgentWorkspace.Prepare` sendiri tidak menyentuh config global — hash sebelum
       dan sesudah
-- [ ] **Token tidak lagi ditulis ke berkas tanpa pembaca** — `.agents/mcp_config.json`
-      terbukti DIABAIKAN `agy`, jadi yang tersisa cuma satu salinan bearer token di disk
-      tanpa manfaat. Lihat catatan item 6 di `docs/integrasi-antigravity.md`.
+- [x] **Token tidak lagi ditulis ke berkas tanpa pembaca** — `.agents/mcp_config.json`
+      terbukti DIABAIKAN `agy`, jadi penulisannya dihapus bersama `BuildMcpConfig`,
+      `WriteMcpConfig`, dan `McpConfigPath`. Di dalam workspace kita, token sekarang
+      hanya ada di `session.json` — yang punya pembaca dan ACL khusus pengguna.
+      Dijaga test yang mencari token di SELURUH berkas workspace, jadi salinan baru
+      langsung merah. Lihat catatan item 6 di `docs/integrasi-antigravity.md`.
 - [x] URL non-loopback ditolak sebelum ditulis ke konfigurasi AI — jaring pengamannya
       sudah ada di kode sejak awal, sampai sekarang tidak ada yang membuktikannya jalan
 - [x] Token sesi tidak pernah berulang dan panjangnya cukup — 200 iterasi

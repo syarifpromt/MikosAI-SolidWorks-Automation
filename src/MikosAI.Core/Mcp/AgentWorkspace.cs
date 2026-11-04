@@ -52,7 +52,23 @@ namespace MikosAI.Core.Mcp
         /// <summary>Direktori kerja yang dipakai sebagai cwd saat men-spawn `agy`.</summary>
         public string WorkingDirectory => _root;
 
-        public string McpConfigPath => Path.Combine(_root, ".agents", "mcp_config.json");
+        // McpConfigPath DIHAPUS, bukan dipertahankan untuk kompatibilitas.
+        //
+        // `.agents/mcp_config.json` dibuat untuk dibaca agy. Terbukti agy
+        // MENGABAIKANNYA SEPENUHNYA: sebuah server palsu ditaruh di berkas itu
+        // pada satu folder, dan `agy mcp list` dari folder itu tidak
+        // menampilkannya. Pendaftaran bersifat global lewat `agy mcp add`,
+        // terlihat dari direktori mana pun.
+        //
+        // Yang tersisa dari berkas itu hanyalah satu salinan bearer token di
+        // disk tanpa pembaca - dan secret tanpa pembaca adalah risiko murni,
+        // bukan cadangan.
+        //
+        // Bedakan dari session.json di bawah: ia juga memuat token, tapi PUNYA
+        // pembaca (scripts/mcp-roundtrip.ps1) dan ditulis dengan ACL khusus
+        // pengguna.
+        //
+        // Lihat catatan item 6 di docs/integrasi-antigravity.md.
 
         public string SessionFilePath => Path.Combine(_root, "session.json");
 
@@ -94,44 +110,11 @@ namespace MikosAI.Core.Mcp
                     nameof(serverUri));
             }
 
-            Directory.CreateDirectory(Path.Combine(_root, ".agents"));
+            Directory.CreateDirectory(_root);
 
-            WriteMcpConfig(serverUri, sessionToken);
             WriteSessionFile(serverUri, sessionToken);
         }
 
-        /// <summary>
-        /// Bentuk konfigurasi MCP Antigravity. Memakai `serverUrl` karena server
-        /// kita hidup di dalam SLDWORKS.exe dan tidak bisa dispawn oleh `agy`.
-        /// </summary>
-        internal JsonObject BuildMcpConfig(Uri serverUri, string sessionToken) => new JsonObject
-        {
-            ["mcpServers"] = new JsonObject
-            {
-                [ServerName] = new JsonObject
-                {
-                    ["serverUrl"] = serverUri.ToString(),
-
-                    // Apakah entry serverUrl Antigravity mendukung custom header
-                    // BELUM terkonfirmasi - item 5 di daftar verifikasi
-                    // docs/integrasi-antigravity.md. Kita tulis dalam bentuk yang
-                    // paling lazim; kalau diabaikan klien, server tetap menerima
-                    // token lewat query string sebagai fallback.
-                    ["headers"] = new JsonObject
-                    {
-                        ["Authorization"] = $"Bearer {sessionToken}",
-                    },
-                },
-            },
-        };
-
-        private void WriteMcpConfig(Uri serverUri, string sessionToken)
-        {
-            var json = BuildMcpConfig(serverUri, sessionToken)
-                .ToJsonString(new JsonSerializerOptions { WriteIndented = true });
-
-            File.WriteAllText(McpConfigPath, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        }
 
         /// <summary>
         /// Menulis session.json dengan ACL hanya untuk pengguna saat ini.

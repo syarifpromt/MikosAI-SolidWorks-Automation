@@ -44,8 +44,6 @@ namespace MikosAI.Addin
 
         internal string? WorkspaceDirectory { get; private set; }
 
-        internal string? McpConfigPath { get; private set; }
-
         /// <summary>
         /// Token bearer sesi ini. Dipakai mendaftarkan server MCP ke agy.
         /// Tidak pernah dilaporkan ke panel UI atau ke trace.
@@ -105,7 +103,6 @@ namespace MikosAI.Addin
                 _workspace.Prepare(_server.Endpoint, token);
 
                 WorkspaceDirectory = _workspace.WorkingDirectory;
-                McpConfigPath = _workspace.McpConfigPath;
 
                 return true;
             }
@@ -124,7 +121,6 @@ namespace MikosAI.Addin
             ["endpoint"] = Endpoint?.ToString(),
             ["toolCount"] = ToolCount,
             ["workspace"] = WorkspaceDirectory,
-            ["mcpConfig"] = McpConfigPath,
         };
 
         private void Hentikan()

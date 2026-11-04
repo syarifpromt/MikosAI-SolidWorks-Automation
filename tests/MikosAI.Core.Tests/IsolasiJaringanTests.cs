@@ -221,7 +221,6 @@ namespace MikosAI.Core.Tests
                     () => workspace.Prepare(new Uri(url), AgentWorkspace.NewSessionToken()));
 
                 // Dan tidak ada berkas yang tertinggal separuh jalan.
-                Assert.False(File.Exists(workspace.McpConfigPath));
                 Assert.False(File.Exists(workspace.SessionFilePath));
             }
             finally
@@ -266,11 +265,9 @@ namespace MikosAI.Core.Tests
 
                 // Yang ditulis ADA, supaya test ini tidak lulus karena Prepare
                 // tidak melakukan apa pun.
-                Assert.True(File.Exists(workspace.McpConfigPath));
                 Assert.True(File.Exists(workspace.SessionFilePath));
 
-                // Dan keduanya di dalam workspace-nya sendiri.
-                Assert.StartsWith(folder, workspace.McpConfigPath, StringComparison.OrdinalIgnoreCase);
+                // Dan ia di dalam workspace-nya sendiri.
                 Assert.StartsWith(folder, workspace.SessionFilePath, StringComparison.OrdinalIgnoreCase);
 
                 Assert.Equal(sebelum, Sidik(global));

@@ -325,33 +325,59 @@ capabilities:
             }
         }
 
+        /// <summary>
+        /// Prepare TIDAK menulis .agents/mcp_config.json.
+        ///
+        /// Dua test sebelumnya di sini menuntut berkas itu ADA, dan satu lagi
+        /// memeriksa bentuk isinya. Keduanya menguji hal yang ternyata tidak ada
+        /// gunanya: agy MENGABAIKAN berkas itu sepenuhnya - dibuktikan dengan
+        /// menaruh server palsu di sana dan melihat `agy mcp list` tidak
+        /// menampilkannya.
+        ///
+        /// Jadi yang dulu ditulis hanyalah satu salinan bearer token di disk
+        /// tanpa pembaca. Test ini membalik tuntutannya: berkas itu harus TIDAK
+        /// ADA, supaya tidak ada yang menambahkannya kembali tanpa sadar.
+        /// </summary>
         [Fact]
-        public void Prepare_menulis_mcp_config_di_folder_milik_sendiri()
+        public void Prepare_tidak_menulis_salinan_token_yang_tidak_ada_pembacanya()
         {
             var workspace = new AgentWorkspace(_root);
             var token = AgentWorkspace.NewSessionToken();
 
             workspace.Prepare(new Uri("http://127.0.0.1:45678/mcp"), token);
 
-            Assert.True(File.Exists(workspace.McpConfigPath));
+            Assert.False(
+                File.Exists(Path.Combine(_root, ".agents", "mcp_config.json")),
+                ".agents/mcp_config.json ditulis lagi. agy mengabaikannya, jadi itu " +
+                "cuma salinan bearer token di disk tanpa pembaca.");
 
-            // Harus di .agents/ relatif ke working directory yang kita kendalikan.
-            Assert.Equal(
-                Path.Combine(_root, ".agents", "mcp_config.json"),
-                workspace.McpConfigPath);
+            // Folder .agents juga tidak perlu ada lagi.
+            Assert.False(Directory.Exists(Path.Combine(_root, ".agents")));
         }
 
+        /// <summary>
+        /// Token HANYA ada di session.json, dan berkas itu punya pembaca
+        /// (scripts/mcp-roundtrip.ps1) serta ACL khusus pengguna.
+        ///
+        /// Test ini menjaga jumlah tempat secret itu tersimpan tetap satu di
+        /// dalam workspace kita.
+        /// </summary>
         [Fact]
-        public void config_memakai_serverUrl_karena_server_tidak_bisa_dispawn_agy()
+        public void token_hanya_muncul_di_session_json()
         {
             var workspace = new AgentWorkspace(_root);
-            var config = workspace.BuildMcpConfig(new Uri("http://127.0.0.1:45678/mcp"), "token-uji");
+            var token = AgentWorkspace.NewSessionToken();
 
-            var entry = config["mcpServers"]!["mikosai-solidworks"]!.AsObject();
+            workspace.Prepare(new Uri("http://127.0.0.1:45678/mcp"), token);
 
-            Assert.Equal("http://127.0.0.1:45678/mcp", entry["serverUrl"]!.GetValue<string>());
-            Assert.Null(entry["command"]);
-            Assert.Equal("Bearer token-uji", entry["headers"]!["Authorization"]!.GetValue<string>());
+            var memuatToken = Directory
+                .GetFiles(_root, "*", SearchOption.AllDirectories)
+                .Where(f => File.ReadAllText(f).Contains(token))
+                .Select(f => f.Substring(_root.Length).TrimStart(Path.DirectorySeparatorChar))
+                .OrderBy(f => f, StringComparer.Ordinal)
+                .ToList();
+
+            Assert.Equal(new[] { "session.json" }, memuatToken);
         }
 
         [Fact]
