@@ -162,7 +162,24 @@ dikonsumsi.
 
    Keduanya tidak bersentuhan.
 
-6. Simpan sebagai `tests/golden/fixture-kontur.SLDPRT`.
+6. **SketchLoopMenempel** pada **Front Plane** — dua loop TERTUTUP yang
+   bersentuhan di satu titik:
+   - **Corner Rectangle** `A` dari `(0, -80)` ke `(40, -60)`
+   - **segitiga** `B` dari tiga garis: `(20, -50)` → `(35, -50)` → `(27, -60)`
+     → kembali ke `(20, -50)`
+   - titik `(27, -60)` diberi relasi **Coincident ke SISI ATAS persegi A**
+     (garis dari `(0,-60)` ke `(40,-60)`), bukan ke titik ujung mana pun
+
+   > **Kenapa segitiga, bukan dua persegi.** Dua persegi sejajar sumbu tidak
+   > bisa dipakai untuk kasus ini: sudut persegi B yang menyentuh sisi A selalu
+   > membawa salah satu sisinya berimpit segaris dengan sisi A, sehingga yang
+   > terbentuk bukan sentuhan satu titik melainkan tepi yang berbagi. Segitiga
+   > menghindarinya karena tidak ada sisinya yang sejajar sisi atas A.
+   >
+   > Periksa seperti pada SketchTBadan: relasinya harus ke **garis**, bukan ke
+   > titik ujung atau Midpoint. Sisi atas A harus tetap SATU segmen utuh.
+
+7. Simpan sebagai `tests/golden/fixture-kontur.SLDPRT`.
 
 ## Nilai yang diharapkan
 
@@ -172,6 +189,7 @@ dikonsumsi.
 | `SketchT` | **3** | **1** | 0 | `["undeclared_point_on_segment"]` |
 | `SketchTBadan` | **4** | **0** | **1** | `["undeclared_point_on_segment"]` |
 | `SketchDuaLoop` | **0** | 0 | 0 | `[]` |
+| `SketchLoopMenempel` | **0** | **0** | lihat bawah | `[]` |
 
 `consumedByFeatures` adalah `[]` untuk keempatnya — **kosong, bukan null**.
 Part ini tidak punya fitur sama sekali.
@@ -196,6 +214,21 @@ Part ini tidak punya fitur sama sekali.
 
 - `SketchDuaLoop`: dua loop tertutup terpisah tetap **0** ujung bebas. Ini yang
   membedakan "menghitung ujung" dari "menghitung loop".
+
+- `SketchLoopMenempel`: **kasus yang membongkar definisi lama.** Kedua loop
+  tertutup, jadi `openEndpointCount` **0**. Di titik sentuh hanya dua ujung B
+  yang bertemu — sisi A tidak punya ujung di sana — jadi `branchPointCount`
+  juga **0**. Dengan definisi lama, `endpointOnSegmentCount` ikut **0** karena ia
+  himpunan bagian dari ujung terbuka. Semuanya bersih, padahal ada titik sentuh
+  yang membuat region profil ambigu.
+
+  Sentuhan itu **dideklarasikan** lewat relasi `(titik, segmen)`, jadi
+  mekanismenya sudah bisa melihatnya — definisi subset yang membuangnya.
+
+  Angka yang menangkapnya menunggu keputusan atas
+  `docs/proposal-kontur-loop-menempel.md`. Di bawah usulan di sana:
+  `openEndpointOnSegmentCount` **0**, `joinedEndpointOnSegmentCount` **1**.
+  Dua angka pertama di tabel sudah final apa pun keputusannya.
 
 ### `connectivityLimits` — kenapa isinya berbeda per sketsa
 
