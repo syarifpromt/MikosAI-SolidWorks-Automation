@@ -55,11 +55,11 @@ namespace MikosAI.Core.Tools
         }
 
         /// <summary>
-        /// SENGAJA HANYA SATU untuk saat ini.
+        /// Hanya tipe yang sudah teramati beserta bukti perannya.
         ///
-        /// Extrusion adalah satu-satunya typeName yang sudah teramati dari
-        /// model nyata - pada Boss-Extrude1 di plat-referensi.SLDPRT. Nama tipe
-        /// untuk cut, revolve, hole wizard, sweep, dan loft BELUM pernah kami
+        /// Extrusion teramati pada Boss-Extrude1 di plat-referensi.SLDPRT;
+        /// ICE pada Cut-Extrude1 di fixture-konsumen.SLDPRT. Nama tipe
+        /// untuk revolve, hole wizard, sweep, dan loft BELUM pernah kami
         /// lihat, dan menuliskannya dari ingatan adalah cara yang sama persis
         /// dengan menebak.
         ///
@@ -68,9 +68,8 @@ namespace MikosAI.Core.Tools
         ///
         /// CATATAN: Extrusion masuk dengan bukti peran dari plat-referensi,
         /// di mana Boss-Extrude1 memang menghasilkan volume 80000 mm3 dari
-        /// Sketch1. Bukti perannya ada; yang belum ada adalah fixture yang
-        /// memakai SATU sketsa untuk dua fitur sekaligus, dan itu yang sedang
-        /// dibuat.
+        /// Sketch1. fixture-konsumen membuktikan SATU sketsa dipakai dua fitur,
+        /// dengan volume akhir 42000 mm3; run awal masih punya kegagalan lain.
         /// </summary>
         private static readonly Entri[] Daftar =
         {
@@ -78,6 +77,12 @@ namespace MikosAI.Core.Tools
                 "Extrusion",
                 "tests/golden/plat-referensi.SLDPRT",
                 "SolidWorks 2025 SP01.1, build add-in 62d5aa8, 2026-11-05"),
+            new Entri(
+                "ICE",
+                "tests/golden/fixture-konsumen.SLDPRT",
+                "SolidWorks revisi 33.1.1, build add-in 52357c5, 2026-11-07; "
+                + "Cut-Extrude1 memakai Sketch1 yang sama; volume 42000 mm3, "
+                + "berkurang dari boss 60000 mm3. Run belum lulus seluruhnya."),
         };
 
         public static IReadOnlyList<Entri> Semua => Daftar;

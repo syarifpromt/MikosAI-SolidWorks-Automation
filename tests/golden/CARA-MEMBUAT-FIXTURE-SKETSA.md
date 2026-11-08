@@ -308,10 +308,114 @@ diam-diam ke `IsReferenceDim()`, sesuai keputusanmu.
 
 # Setelah kedua part jadi
 
+Aktifkan add-in MikosAI, buka `fixture-konsumen.SLDPRT` sebagai dokumen aktif,
+dan keluar dari Edit Sketch. Dari akar repo jalankan:
+
 ```powershell
+powershell -ExecutionPolicy Bypass -File scripts\addin.ps1 -Action Probe
 powershell -ExecutionPolicy Bypass -File scripts\golden-sketsa.ps1
 ```
 
-Skrip itu belum ada — ia ditulis bersama implementasinya. Yang kubutuhkan
-sekarang hanya kedua partnya, supaya angka harapan di atas bisa dibandingkan
-dengan pembacaan nyata alih-alih dengan dugaan.
+Skrip tersebut hanya menguji **fixture-konsumen**, termasuk batas body
+`z = 3..10`. Untuk **fixture-kontur**, pembaca konektivitas garis dan skrip
+terpisah tersedia; hasil run nyata dicatat di bawah.
+
+Setelah menyimpan pekerjaan, tutup SolidWorks, jalankan `scripts\setup.ps1`,
+lalu buka kembali SolidWorks dengan add-in aktif dan `fixture-kontur.SLDPRT`
+sebagai dokumen aktif. Keluar dari Edit Sketch, kemudian jalankan:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\golden-kontur.ps1
+```
+
+Default-nya tiga run berturut-turut; `-Runs 1` untuk diagnosis singkat.
+Angka harapan terkini ada di `fixture-kontur.json`:
+
+| sketsa | open | branch | open-on-segment | joined-on-segment |
+|---|---:|---:|---:|---:|
+| SketchKotak | 0 | 0 | 0 | 0 |
+| SketchT | 3 | 1 | 0 | 0 |
+| SketchTBadan | 4 | 0 | 1 | 0 |
+| SketchDuaLoop | 0 | 0 | 0 | 0 |
+| SketchLoopMenempel | 0 | 0 | 0 | 1 |
+
+Run nyata pada 2026-11-07, SolidWorks revisi `33.1.1`: seluruh hitungan di
+tabel cocok dalam tiga run. Skrip awal menghasilkan **156 lulus, 3 gagal**,
+karena mensyaratkan `limits = []` pada semua sketsa. Pembacaan MCP langsung
+menunjukkan `SketchT.limits = ["non_endpoint_point_on_segment"]`; empat
+sketsa lainnya mempunyai daftar kosong.
+
+**SW_PASS untuk hitungan saja: lima sketsa fixture, tiga kali berturut-turut.**
+Disetujui pengguna pada 2026-11-07. Tidak berlaku untuk semua jenis sketsa,
+deteksi limit, atau klasifikasi origin/proyeksi. DLL melaporkan commit dasar
+`52357c5` dengan perubahan lokal; ini bukan bukti untuk commit bersih itu.
+
+Keputusan baseline `observedLimits` **DITOLAK pengguna**. Hasil 159 lulus
+sebelumnya tidak boleh dipakai sebagai bukti kebenaran detektor limit.
+`hypothesizedLimits` kini kembali `[]` untuk semua sketsa berdasarkan resep
+geometri. Asersi limit dilaporkan sebagai **HIPOTESIS**, tidak menaikkan
+hitungan PASS, tidak menaikkan exit code, dan selisihnya tetap ditulis
+**BELUM DIJELASKAN**. Run ulang skrip yang dikoreksi pada DLL yang sama:
+**144 lulus, 0 gagal; 15 hipotesis limit, 3 belum dijelaskan**.
+
+`non_endpoint_point_on_segment` belum disetujui sebagai ID kontrak. Emisinya
+dicabut dari sumber build berikutnya; kandidatnya disimpan dalam dump privat
+untuk ditelusuri, bukan dinyatakan sudah selesai karena emisinya berhenti.
+Belum ada keputusan apakah origin/proyeksi termasuk titik analisis.
+
+Dump ketiga sketsa pembanding memerlukan build diagnostik terbaru. Setelah
+menyimpan pekerjaan dan memuat ulang add-in lewat `setup.ps1`, aktifkan
+`fixture-kontur.SLDPRT`, keluar dari Edit Sketch, lalu jalankan:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\dump-relasi-sketsa.ps1
+```
+
+Dump ditulis ke `tests/golden/evidence/relasi-kontur/`: semua relasi SketchT,
+SketchKotak, SketchDuaLoop, tipe entitas, ID/tipe/koordinat titik, geometri
+garis target, entitas definisi, dan pasangan pemicu detektor lama. Ini jalur
+diagnostik privat melalui dispatcher; tidak menambah tool atau field kontrak.
+Pertanyaan serta batas kesimpulan dicatat di `docs/temuan-relasi-fixture-kontur.md`.
+
+Dump lengkap pada 2026-11-07 menjelaskan pasangan pemicu lama: SketchT
+mempunyai Coincident titik External `(0,0)` ke garis `(20,0)..(40,0)`.
+Parameter proyeksi **-1**, sehingga titik berada pada perpanjangan garis,
+bukan badan segmen. SketchKotak dan SketchDuaLoop mempunyai Coincident
+titik–titik di `(0,0)` tetapi tidak mempunyai Coincident titik–garis.
+Asal titik eksternal sebagai origin dan pembuatan otomatis relasi belum
+terbukti. Usulan semantik dicatat terpisah di
+`docs/proposal-titik-referensi-konektivitas.md`, belum diterapkan. Harapan
+geometri dan status HIPOTESIS untuk asersi limit tidak diubah.
+
+Sketsa T dan loop menempel sengaja menghasilkan verdict profil tidak valid.
+Golden test memeriksa ukuran yang dilaporkan, bukan mensyaratkan verdict
+seluruh sketsa PASS. Geometri konstruksi dikecualikan. Kurva selain garis
+belum didukung: `segmentsNotAnalyzed` menyebutnya dan hitungan konektivitas
+tetap null agar angka parsial tidak terlihat seperti analisis lengkap.
+`analysisLimits` menyebut `undeclared_point_on_segment` pada tingkat respons;
+ID titik menentukan sambungan, toleransi 1e-6 mm hanya mendeteksi titik
+terbuka berbeda yang berimpit atau hampir berimpit.
+
+Run awal pada build `52357c5`, SolidWorks revisi `33.1.1`, membuktikan
+`Sketch1.dependents` memuat `Boss-Extrude1`, `Cut-Extrude1`, `Sketch2`, dan
+`Plane1`. Tipe cut yang teramati adalah `ICE`; plane adalah `RefPlane` dan
+tetap bukan konsumen. Volume terbaca **42000 mm³** dan dimensi driving/driven
+sesuai harapan. Run itu menghasilkan **24 lulus, 3 gagal**, jadi bukan bukti
+kelulusan fixture secara keseluruhan.
+
+Perbaikan setelah run tersebut: tipe `ICE` ditambahkan dengan bukti fixture,
+helper PowerShell mempertahankan array kosong sebagai `[]`, dan pembacaan
+bounding box menggunakan titik ekstrem solid body sebagai pengganti
+`GetPartBox` yang bersifat perkiraan.
+
+Run ulang pada 2026-11-07, SolidWorks revisi `33.1.1`, setelah perbaikan
+pemanggil helper array di skrip: **33 lulus, 0 gagal, 0 hipotesis patah**.
+Volume, ukuran, posisi body, dua konsumen Sketch1, dependents, dan dimensi
+kedua sketsa cocok. Ini satu run nyata yang lulus, belum tiga run berturut-turut.
+DLL melaporkan commit dasar `52357c5`, tetapi dibangun dari working tree dengan
+perubahan lokal; commit itu sendiri belum mewakili sumber perbaikannya.
+
+Bagian resep di atas masih memakai sebagian nama field lama. Kontrak terkini
+di `schemas/tools.json` memakai `openEndpointOnSegmentCount`,
+`joinedEndpointOnSegmentCount`, `limits` per sketsa, dan `analysisLimits`
+per respons. Keberadaan field dalam kontrak bukan bukti implementasinya.

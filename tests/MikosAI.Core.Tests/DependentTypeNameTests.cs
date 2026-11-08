@@ -126,8 +126,9 @@ namespace MikosAI.Core.Tests
         [Fact]
         public void daftar_putih_hanya_memuat_tipe_yang_teramati()
         {
-            Assert.Equal(new[] { "Extrusion" }, TipeKonsumenSketsa.Semua.Select(e => e.TypeName));
+            Assert.Equal(new[] { "Extrusion", "ICE" }, TipeKonsumenSketsa.Semua.Select(e => e.TypeName));
             Assert.True(TipeKonsumenSketsa.Dikenal("Extrusion"));
+            Assert.True(TipeKonsumenSketsa.Dikenal("ICE"));
         }
 
         /// <summary>

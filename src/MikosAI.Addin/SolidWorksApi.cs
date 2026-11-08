@@ -116,6 +116,12 @@ namespace MikosAI.Addin
         internal SolidWorksReader BuatPembaca(HostDiagnostics diagnostics)
             => new SolidWorksReader(_app, diagnostics, _dispatcher);
 
+        internal SolidWorksBlockWriter BuatPenulisBalok(HostDiagnostics diagnostics, SolidWorksReader reader)
+        {
+            PastikanThreadUtama(nameof(BuatPenulisBalok));
+            return new SolidWorksBlockWriter(_app,diagnostics,_dispatcher,reader);
+        }
+
         /// <summary>
         /// Mendaftarkan callback add-in. Tanpa ini, SolidWorks tidak bisa
         /// memanggil balik method add-in.

@@ -47,6 +47,13 @@ namespace SolidWorks.Interop.sldworks
 
     public interface ISldWorks
     {
+        string GetUserPreferenceStringValue(int UserPreference);
+        bool GetUserPreferenceToggle(int UserPreference);
+        void SetUserPreferenceToggle(int UserPreference, bool Value);
+        object NewDocument(string TemplateName, int PaperSize, double Width, double Height);
+        void CloseDoc(string Name);
+        object GetOpenDocumentByName(string Name);
+        ModelDoc2 OpenDoc6(string FileName, int Type, int Options, string Configuration, ref int Errors, ref int Warnings);
         object ActiveDoc { get; }
 
         bool SetAddinCallbackInfo2(int Reserved, object AddinObj, int Cookie);
@@ -238,6 +245,14 @@ namespace SolidWorks.Interop.sldworks
 
     public interface IModelDoc2
     {
+        SketchManager SketchManager { get; }
+        FeatureManager FeatureManager { get; }
+        object GetActiveSketch2();
+        void ClearSelection2(bool All);
+        object AddHorizontalDimension2(double X, double Y, double Z);
+        object AddVerticalDimension2(double X, double Y, double Z);
+        void SketchAddConstraints(string Constraint);
+        bool EditRebuild3();
         string GetTitle();
 
         string GetPathName();
@@ -257,6 +272,8 @@ namespace SolidWorks.Interop.sldworks
 
     public interface ModelDocExtension
     {
+        bool SelectByID2(string Name, string Type, double X, double Y, double Z, bool Append, int Mark, Callout? Callout, int SelectOption);
+        bool SaveAs(string Name, int Version, int Options, object? ExportData, ref int Errors, ref int Warnings);
         int NeedsRebuild2 { get; }
 
         object GetMassProperties2(int Accuracy, out int Status, bool UseSelected);
@@ -274,7 +291,10 @@ namespace SolidWorks.Interop.sldworks
 
     public interface IFeature
     {
-        string Name { get; }
+        string Name { get; set; }
+        bool Select2(bool Append, int Mark);
+        object GetFirstSubFeature();
+        object GetNextSubFeature();
 
         // Direfleksikan: Object GetParents() / Object GetChildren()
         //
@@ -317,6 +337,13 @@ namespace SolidWorks.Interop.sldworks
         object GetSpecificFeature2();
     }
 
+    // Direfleksikan dari PIA SolidWorks 2025 SP01.1 pada 2026-11-07.
+    public interface IBody2
+    {
+        bool GetExtremePoint(double X, double Y, double Z,
+            out double Outx, out double Outy, out double Outz);
+    }
+
     public interface IPartDoc
     {
         object GetBodies2(int BodyType, bool BVisibleOnly);
@@ -330,6 +357,7 @@ namespace SolidWorks.Interop.sldworks
 
     public interface IDisplayDimension
     {
+        Dimension GetDimension2(int Index);
         // Direfleksikan: Object GetDimension()
         object GetDimension();
 
@@ -348,6 +376,9 @@ namespace SolidWorks.Interop.sldworks
 
     public interface IDimension
     {
+        string FullName { get; }
+        double SystemValue { get; }
+        int SetSystemValue3(double NewValue, int WhichConfigurations, object? ConfigNames);
         // Direfleksikan: Int32 get_DrivenState()
         //   swDimensionDrivenUnknown = 0
         //   swDimensionDriven        = 1
@@ -360,7 +391,69 @@ namespace SolidWorks.Interop.sldworks
         int GetConstrainedStatus();
 
         object GetSketchSegments();
+        object GetSketchPoints2();
+
+        SketchRelationManager RelationManager { get; }
     }
+
+    // Tanda tangan direfleksikan dari PIA SolidWorks 2025 SP01.1.
+    public interface Sketch : ISketch { }
+    public interface ISketchSegment
+    {
+        bool Select4(bool Append, SelectData? Data);
+        int GetType();
+        object GetID();
+        bool ConstructionGeometry { get; }
+        Sketch GetSketch();
+    }
+    public interface ISketchLine
+    {
+        object GetStartPoint2();
+        object GetEndPoint2();
+    }
+    public interface ISketchPoint
+    {
+        bool Select4(bool Append, SelectData? Data);
+        int Type { get; }
+        object GetID();
+        double X { get; }
+        double Y { get; }
+        double Z { get; }
+        Sketch GetSketch();
+    }
+    public interface ISketchRelation
+    {
+        object GetDefinitionEntities2();
+        int GetRelationType();
+        object GetEntities();
+        object GetEntitiesType();
+    }
+    public interface ISketchRelationManager
+    {
+        object GetRelations(int Filter);
+        int GetRelationsCount(int Filter);
+    }
+    public interface SketchRelationManager : ISketchRelationManager { }
+
+    // Tanda tangan jalur tulis direfleksikan dari PIA asli SW2025 SP01.1.
+    public interface Callout { }
+    public interface SelectData { }
+    public interface Dimension : IDimension { }
+    public interface ModelDoc2 : IModelDoc2 { }
+    public interface SketchManager
+    {
+        void InsertSketch(bool UpdateEditRebuild);
+        object CreateCornerRectangle(double X1,double Y1,double Z1,double X2,double Y2,double Z2);
+    }
+    public interface FeatureManager : IFeatureManager { }
+    public interface IFeatureManager
+    {
+        Feature FeatureExtrusion2(bool Sd,bool Flip,bool Dir,int T1,int T2,double D1,double D2,
+            bool Dchk1,bool Dchk2,bool Ddir1,bool Ddir2,double Dang1,double Dang2,
+            bool OffsetReverse1,bool OffsetReverse2,bool TranslateSurface1,bool TranslateSurface2,
+            bool Merge,bool UseFeatScope,bool UseAutoSelect,int T0,double StartOffset,bool FlipStartOffset);
+    }
+    public interface Feature : IFeature { }
 
     public interface ISelectionMgr
     {

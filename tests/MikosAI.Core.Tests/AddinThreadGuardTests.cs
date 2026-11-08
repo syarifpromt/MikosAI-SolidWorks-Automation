@@ -64,6 +64,7 @@ namespace MikosAI.Core.Tests
         [Theory]
         [InlineData(NamaReader)]
         [InlineData(NamaApi)]
+        [InlineData("MikosAI.Addin.SolidWorksBlockWriter")]
         public void setiap_metode_yang_menyentuh_api_menolak_thread_selain_utama(string namaTipe)
         {
             var tipe = AddinAssembly.Tipe(namaTipe);

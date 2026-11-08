@@ -97,6 +97,7 @@ namespace MikosAI.Addin
         private MainThreadDispatcher? _dispatcher;
         private McpHost? _mcp;
         private SolidWorksReader? _pembaca;
+        private BlockPilotHost? _blockPilot;
         private TaskPaneHost? _panel;
         private CommandGroupHost? _tombol;
         private ProviderHost? _provider;
@@ -202,6 +203,8 @@ namespace MikosAI.Addin
             try
             {
                 _pembaca = _sw.BuatPembaca(_diagnostics);
+                _blockPilot = new BlockPilotHost(() => (_sw ?? throw new InvalidOperationException("SolidWorks tidak terhubung"))
+                    .BuatPenulisBalok(_diagnostics,_pembaca ?? throw new InvalidOperationException("Reader tidak tersedia")));
             }
             catch (Exception exception)
             {
@@ -664,6 +667,13 @@ namespace MikosAI.Addin
         /// </summary>
         private void SegarkanCache(object? pengirim, EventArgs e)
         {
+            // Request manual golden test diproses melalui dispatcher yang sama;
+            // tidak dipicu oleh tool read-only dan tidak diekspos kepada AI.
+            if (_dispatcher != null && _blockPilot != null)
+            {
+                var task=_dispatcher.InvokeAsync(() => _blockPilot.Poll());
+                if (task.IsFaulted) _diagnostics.AddError("pilot balok",task.Exception!);
+            }
             try
             {
                 _jumlahDokumenCache = _sw?.TryGetDocumentCount() ?? -1;

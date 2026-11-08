@@ -387,10 +387,21 @@ namespace MikosAI.Core.Tools
                     ["drivenDimensionCount"] = s.DrivenDimensionCount,
                     ["unknownDrivenStateCount"] = s.UnknownDrivenStateCount,
                     ["dimensionCountRead"] = s.DimensionCountRead,
+                    ["openEndpointCount"] = s.OpenEndpointCount,
+                    ["branchPointCount"] = s.BranchPointCount,
+                    ["openEndpointOnSegmentCount"] = s.OpenEndpointOnSegmentCount,
+                    ["joinedEndpointOnSegmentCount"] = s.JoinedEndpointOnSegmentCount,
+                    ["nearlyCoincidentEndpointCount"] = s.NearlyCoincidentEndpointCount,
+                    ["endpointToleranceMm"] = s.EndpointToleranceMm,
+                    ["segmentsNotAnalyzed"] = s.SegmentsNotAnalyzed,
+                    ["limits"] = s.Limits is null ? null : s.Limits.Concat(
+                        s.Dependents?.Any(d => !TipeKonsumenSketsa.Dikenal(d.TypeName)) == true
+                            ? new[] { "unclassified_child" } : Array.Empty<string>()).Distinct().ToList(),
                 }).ToList(),
                 ["sketchCount"] = readings.Count,
                 ["fullyDefinedCount"] = readings.Count(s => s.ConstrainedStatus == SketchConstraintStatus.FullyDefined),
                 ["fieldsNotPopulated"] = FieldBelumDibaca.UntukSketsa(readings),
+                ["analysisLimits"] = new[] { "undeclared_point_on_segment" },
             };
 
             var checks = new List<VerificationCheck>();
@@ -462,6 +473,23 @@ namespace MikosAI.Core.Tools
                         + "Ada dimensi yang hilang antara dibaca dan diklasifikasi."));
                     break;
                 }
+            }
+
+            foreach (var sk in readings)
+            {
+                if (sk.DeclaredEndpointOnSegmentCount.HasValue &&
+                    (!sk.OpenEndpointOnSegmentCount.HasValue || !sk.JoinedEndpointOnSegmentCount.HasValue ||
+                     sk.OpenEndpointOnSegmentCount + sk.JoinedEndpointOnSegmentCount != sk.DeclaredEndpointOnSegmentCount ||
+                     sk.OpenEndpointOnSegmentCount > sk.OpenEndpointCount))
+                    checks.Add(VerificationCheck.Blocked("endpoint_contact_counts_consistent",
+                        $"Sketsa {sk.Name}: partisi kontak titik-ke-badan tidak konsisten."));
+
+                if (sk.BranchPointCount > 0 || sk.OpenEndpointOnSegmentCount > 0 || sk.JoinedEndpointOnSegmentCount > 0)
+                    checks.Add(VerificationCheck.Fail("sketch_profile_connectivity",
+                        $"Sketsa {sk.Name}: cabang atau kontak titik-ke-badan membuat profil ambigu."));
+                if (sk.SegmentsNotAnalyzed?.Count > 0)
+                    checks.Add(VerificationCheck.Blocked("sketch_segments_analyzed",
+                        $"Sketsa {sk.Name}: ada segmen yang belum dianalisis."));
             }
 
             // Status yang tidak bisa dibaca bukan berarti sehat.

@@ -1,0 +1,18 @@
+{
+  "title": "fixture-kontur.SLDPRT",
+  "_catatanLimits": "Harapan limits diturunkan dari resep geometri, bukan disalin dari keluaran API. Selama temuan SketchT belum dijelaskan, asersi limits dilaporkan sebagai HIPOTESIS saja: tidak dihitung PASS dan tidak memengaruhi exit code.",
+  "hypothesizedLimits": {
+    "SketchKotak": [],
+    "SketchT": [],
+    "SketchTBadan": [],
+    "SketchDuaLoop": [],
+    "SketchLoopMenempel": []
+  },
+  "sketches": {
+    "SketchKotak": { "openEndpointCount": 0, "branchPointCount": 0, "openEndpointOnSegmentCount": 0, "joinedEndpointOnSegmentCount": 0 },
+    "SketchT": { "openEndpointCount": 3, "branchPointCount": 1, "openEndpointOnSegmentCount": 0, "joinedEndpointOnSegmentCount": 0 },
+    "SketchTBadan": { "openEndpointCount": 4, "branchPointCount": 0, "openEndpointOnSegmentCount": 1, "joinedEndpointOnSegmentCount": 0 },
+    "SketchDuaLoop": { "openEndpointCount": 0, "branchPointCount": 0, "openEndpointOnSegmentCount": 0, "joinedEndpointOnSegmentCount": 0 },
+    "SketchLoopMenempel": { "openEndpointCount": 0, "branchPointCount": 0, "openEndpointOnSegmentCount": 0, "joinedEndpointOnSegmentCount": 1 }
+  }
+}

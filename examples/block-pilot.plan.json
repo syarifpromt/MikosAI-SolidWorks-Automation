@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0",
+  "title": "Balok parametrik 100 x 80 x 10 mm",
+  "intent": "Golden test native: profil berdimensi, extrude, simpan, tutup dan baca ulang.",
+  "units": { "length": "mm", "angle": "deg" },
+  "parameters": {
+    "width": { "value": 100, "unit": "mm", "source": "user_stated" },
+    "height": { "value": 80, "unit": "mm", "source": "user_stated" },
+    "depth": { "value": 10, "unit": "mm", "source": "user_stated" }
+  },
+  "document": { "type": "part", "template": null, "savePath": null },
+  "steps": [
+    { "id": "s1", "tool": "create_sketch", "arguments": { "plane": { "kind": "plane", "by": "name", "name": "Front Plane" }, "name": "BlockProfile" } },
+    { "id": "s2", "tool": "add_rectangle", "dependsOn": ["s1"], "arguments": { "mode": "corner", "corner": { "x": 0, "y": 0 }, "width": "$width", "height": "$height", "addDimensions": true } },
+    { "id": "s3", "tool": "close_sketch", "dependsOn": ["s2"], "arguments": { "sketchName": "BlockProfile" }, "expect": { "sketchFullyDefined": true } },
+    { "id": "s4", "tool": "extrude_boss", "dependsOn": ["s3"], "arguments": { "sketch": { "kind": "sketch", "by": "name", "name": "BlockProfile" }, "endCondition": { "type": "blind", "depth": "$depth" }, "direction": "normal", "merge": true }, "expect": { "volumeIncreases": true } }
+  ],
+  "acceptance": [
+    { "id": "rebuild", "check": "rebuild_clean", "required": true },
+    { "id": "constraints", "check": "all_sketches_fully_defined", "required": true },
+    { "id": "volume", "check": "nonzero_volume", "required": true }
+  ],
+  "openQuestions": [],
+  "risks": ["Pilot manual; hanya Front Plane, corner rectangle berjangkar origin dan blind normal. Bukan dukungan semua argumen tool."],
+  "provenance": { "generatedBy": "native golden pilot", "editedByHuman": true }
+}

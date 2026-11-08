@@ -1,7 +1,7 @@
 # Roadmap MikosAI SolidWorks Automation
 
 Target v0.1: **12 minggu** untuk tim 2 orang paruh waktu
-Terakhir diperbarui 2026-10-31
+Ringkasan diperbarui 2026-11-07; checklist lama di bawah tetap memuat sisa gerbang.
 
 ---
 
@@ -10,17 +10,19 @@ Terakhir diperbarui 2026-10-31
 | Fase | Isi | Progres |
 |---|---|---|
 | **0** | Fondasi | **add-in TERBUKTI HIDUP** di SW2025 SP01.1, 7/7 gerbang lulus; sisa 4 item test |
-| 1 | MCP server + tool read-only | **kode lengkap**, menunggu verifikasi di SolidWorks |
-| 2 | Provider host (`agy`) | **kode lengkap**, menunggu uji di SolidWorks |
-| 3 | Jalur tulis | belum mulai |
+| 1 | MCP server + tool read-only | document_inspection terverifikasi pada part acuan; hitungan lima sketsa fixture SW_PASS 3× dengan lingkup terbatas |
+| 2 | Provider host (`agy`) | jalur chat → agy → MCP → jawaban pernah dibuktikan; sisa gerbang tercatat di bawah |
+| 3 | Jalur tulis | pilot balok 100×80×10 SW_PASS 3× termasuk simpan–buka ulang; variasi 120×50×12 lulus 1×. Belum diekspos ke AI atau terintegrasi PlanRunner produksi |
 | 4 | Pengalaman dua lapis | belum mulai |
 | 5 | Pengemasan | belum mulai |
 
-Sudah jalan: **264 test hijau**, seluruh alur DesignPlan end-to-end dengan executor palsu,
-tanpa SolidWorks.
+Alur DesignPlan dengan executor palsu sudah diuji. Pilot native pertama
+memakai `examples/block-pilot.plan.json` dan `scripts/golden-balok.ps1`;
+lihat [pilot-balok.md](pilot-balok.md) untuk bukti yang dituntut dan batasnya.
 
-Belum ada kemampuan berstatus `verified`, jadi daftar tool MCP masih kosong. Itu benar —
-dan akan tetap begitu sampai golden test pertama lulus di SolidWorks nyata.
+Tool read-only sudah tersedia lewat MCP. Status tool tulis di ledger belum
+dinaikkan; SW_PASS pilot manual terbatas pada alur/ukuran yang diuji, bukan
+promosi AI atau bukti seluruh opsi tool. Test otomatis saat run pilot: 382 lulus.
 
 ---
 

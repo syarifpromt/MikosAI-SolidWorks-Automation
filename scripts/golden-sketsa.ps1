@@ -53,7 +53,8 @@ function Write-Patah([string] $t) {
 
 function Get-Properti($o, [string] $n) {
     if ($null -eq $o) { return $null }
-    if ($o.PSObject.Properties.Name -contains $n) { return $o.$n }
+    # Jangan enumerate array: [] harus tetap array kosong, bukan menjadi null.
+    if ($o.PSObject.Properties.Name -contains $n) { return ,($o.$n) }
     return $null
 }
 
@@ -154,17 +155,30 @@ foreach ($sumbu in 'x', 'y', 'z') {
     Bandingkan-Angka "size.$sumbu" (Get-Properti $size $sumbu) ([double]$h.body.size.$sumbu) $h.toleransi.panjangMm
 }
 Bandingkan-Angka 'bodyCount' (Get-Properti (Get-Properti $bb 'data') 'bodyCount') ([double]$h.body.bodyCount) 0
+foreach ($batas in 'min', 'max') {
+    $harapanBatas = Get-Properti $h.body $batas
+    if ($null -eq $harapanBatas) { continue }
+    $diterimaBatas = Get-Properti (Get-Properti $bb 'data') $batas
+    foreach ($sumbu in 'x', 'y', 'z') {
+        Bandingkan-Angka "$batas.$sumbu" (Get-Properti $diterimaBatas $sumbu) ([double]$harapanBatas.$sumbu) $h.toleransi.panjangMm
+    }
+}
 
 # --- Sketsa ----------------------------------------------------------------
 
 $sk = Invoke-Tool 'inspect_sketches'
 $dataSk = Get-Properti $sk 'data'
-$semua = @(Get-Properti $dataSk 'sketches')
+# Get-Properti sudah mempertahankan array sebagai satu nilai. @(...)
+# pada pemanggilan fungsi justru membungkusnya menjadi array bertingkat.
+$semua = Get-Properti $dataSk 'sketches'
 
 function Cari-Sketsa([string] $nama) {
-    $hasil = $semua | Where-Object { $_.name -ceq $nama }
-    if (-not $hasil) { Write-Gagal "sketsa '$nama' tidak ada di hasil"; return $null }
-    return $hasil
+    $hasil = @($semua | Where-Object { (Get-Properti $_ 'name') -ceq $nama })
+    if ($hasil.Count -ne 1) {
+        Write-Gagal "sketsa '$nama': ditemukan $($hasil.Count), diharapkan tepat satu"
+        return $null
+    }
+    return $hasil[0]
 }
 
 function Periksa-Dimensi($sketsa, $harapan, [string] $label) {
@@ -176,6 +190,12 @@ function Periksa-Dimensi($sketsa, $harapan, [string] $label) {
     # INVARIANT. Diperiksa di sini juga, bukan hanya di produk: kalau ketiga
     # ember dan totalnya tidak cocok, ada dimensi yang lenyap antara dibaca dan
     # diklasifikasi - dan kehilangan seperti itu tidak muncul di angka mana pun.
+    foreach ($field in 'drivingDimensionCount', 'drivenDimensionCount', 'unknownDrivenStateCount', 'dimensionCountRead') {
+        if ($null -eq (Get-Properti $sketsa $field)) {
+            Write-Gagal "$label invariant tidak bisa diperiksa: $field tidak terbaca"
+            return
+        }
+    }
     $jumlah = [int](Get-Properti $sketsa 'drivingDimensionCount') +
               [int](Get-Properti $sketsa 'drivenDimensionCount') +
               [int](Get-Properti $sketsa 'unknownDrivenStateCount')
@@ -190,7 +210,7 @@ $s1 = Cari-Sketsa 'Sketch1'
 if ($s1) {
     Bandingkan-Teks 'Sketch1.constrainedStatus' (Get-Properti $s1 'constrainedStatus') $h.sketch1.constrainedStatus
 
-    $konsumen = @(Get-Properti $s1 'consumedByFeatures')
+    $konsumen = Get-Properti $s1 'consumedByFeatures'
     foreach ($f in $h.sketch1.consumedByFeatures) {
         if ($konsumen -contains $f) { Write-Lulus "consumedByFeatures memuat '$f'" }
         else { Write-Gagal "consumedByFeatures TIDAK memuat '$f'" }
@@ -204,8 +224,8 @@ if ($s1) {
 
     # --- HIPOTESIS: isi dependents ---------------------------------------
     Write-Judul 'HIPOTESIS - isi dependents'
-    $dep = @(Get-Properti $s1 'dependents')
-    $namaDep = @($dep | ForEach-Object { $_.name })
+    $dep = Get-Properti $s1 'dependents'
+    $namaDep = @($dep | ForEach-Object { Get-Properti $_ 'name' })
 
     foreach ($f in $h.sketch1.dependentsMemuat) {
         if ($namaDep -contains $f) { Write-Lulus "dependents memuat '$f'" }
@@ -239,8 +259,8 @@ Write-Host '  Daftar putih tipe konsumen diisi DARI SINI - dengan bukti, bukan i
 Write-Host ''
 
 foreach ($sketsa in $semua) {
-    $dep = @(Get-Properti $sketsa 'dependents')
-    if ($dep.Count -eq 0) { continue }
+    $dep = Get-Properti $sketsa 'dependents'
+    if ($null -eq $dep -or @($dep).Count -eq 0) { continue }
     Write-Host "  $($sketsa.name):" -ForegroundColor Gray
     foreach ($d in $dep) {
         $tn = $d.typeName
@@ -249,8 +269,8 @@ foreach ($sketsa in $semua) {
     }
 }
 
-$fieldKosong = @(Get-Properti $dataSk 'fieldsNotPopulated')
-if ($fieldKosong.Count -gt 0) {
+$fieldKosong = Get-Properti $dataSk 'fieldsNotPopulated'
+if ($null -ne $fieldKosong -and @($fieldKosong).Count -gt 0) {
     Write-Host ''
     Write-Host "  fieldsNotPopulated: $($fieldKosong -join ', ')" -ForegroundColor Gray
 }

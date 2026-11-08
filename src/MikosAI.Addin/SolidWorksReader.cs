@@ -201,7 +201,7 @@ namespace MikosAI.Addin
                 return hasil;
             }
 
-            Coba("GetBodies2", () =>
+            Coba("GetBodies2/GetExtremePoint", () =>
             {
                 var part = model as IPartDoc;
                 if (part is null)
@@ -210,40 +210,51 @@ namespace MikosAI.Addin
                 }
 
                 // swBodyType_e.swSolidBody = 0, visibleOnly = false.
-                if (part.GetBodies2(0, false) is object[] bodies)
-                {
-                    hasil.BodyCount = bodies.Length;
-                }
-            });
-
-            Coba("GetPartBox", () =>
-            {
-                var part = model as IPartDoc;
-                if (part is null)
+                var bodies = part.GetBodies2(0, false) as object[];
+                if (bodies is null || bodies.Length == 0)
                 {
                     return;
                 }
 
-                // GetPartBox mengembalikan 6 double dalam METER:
-                // xMin, yMin, zMin, xMax, yMax, zMax.
-                if (part.GetPartBox(true) is double[] kotak && kotak.Length >= 6)
+                // GetPartBox hanya perkiraan. Ukuran terukur berasal dari
+                // titik ekstrem SEMUA solid body, termasuk body tersembunyi.
+                // Gabungkan setelah seluruh pembacaan berhasil agar kotak
+                // parsial tidak dilaporkan sebagai ukuran seluruh part.
+                var min = new[] { double.PositiveInfinity, double.PositiveInfinity, double.PositiveInfinity };
+                var max = new[] { double.NegativeInfinity, double.NegativeInfinity, double.NegativeInfinity };
+                foreach (var item in bodies)
                 {
-                    hasil.Min = new Vector3Reading
+                    if (item is not IBody2 body)
+                        throw new InvalidOperationException("GetBodies2 mengembalikan entitas bukan body.");
+
+                    for (var sumbu = 0; sumbu < 3; sumbu++)
                     {
-                        X = kotak[0] * MeterKeMm,
-                        Y = kotak[1] * MeterKeMm,
-                        Z = kotak[2] * MeterKeMm,
-                    };
-                    hasil.Max = new Vector3Reading
-                    {
-                        X = kotak[3] * MeterKeMm,
-                        Y = kotak[4] * MeterKeMm,
-                        Z = kotak[5] * MeterKeMm,
-                    };
+                        min[sumbu] = Math.Min(min[sumbu], BacaEkstrem(body, sumbu, -1));
+                        max[sumbu] = Math.Max(max[sumbu], BacaEkstrem(body, sumbu, 1));
+                    }
                 }
+
+                hasil.Min = new Vector3Reading { X = min[0], Y = min[1], Z = min[2] };
+                hasil.Max = new Vector3Reading { X = max[0], Y = max[1], Z = max[2] };
+                hasil.BodyCount = bodies.Length;
             });
 
             return hasil;
+        }
+
+        private static double BacaEkstrem(IBody2 body, int sumbu, double arah)
+        {
+            if (!body.GetExtremePoint(
+                sumbu == 0 ? arah : 0,
+                sumbu == 1 ? arah : 0,
+                sumbu == 2 ? arah : 0,
+                out var x, out var y, out var z))
+                throw new InvalidOperationException("GetExtremePoint gagal membaca batas body.");
+
+            var nilai = (sumbu == 0 ? x : sumbu == 1 ? y : z) * MeterKeMm;
+            if (double.IsNaN(nilai) || double.IsInfinity(nilai))
+                throw new InvalidOperationException("GetExtremePoint mengembalikan koordinat tidak valid.");
+            return nilai;
         }
 
         // --- get_mass_properties ------------------------------------------------
@@ -377,7 +388,7 @@ namespace MikosAI.Addin
                         if (string.IsNullOrEmpty(namaSketsa)
                             || string.Equals(nama, namaSketsa, StringComparison.OrdinalIgnoreCase))
                         {
-                            daftar.Add(BacaSatuSketsa(fitur, nama));
+                            daftar.Add(BacaSatuSketsa(fitur, nama, model.GetTitle()));
                         }
                     }
 
@@ -448,17 +459,9 @@ namespace MikosAI.Addin
         /// pernah terisi sejak awal - pembacanya memang tidak pernah punya
         /// aksesnya.
         ///
-        /// CARA 'KONSUMEN' DIDETEKSI, ditulis di sini supaya tidak jadi aturan
-        /// tak tertulis: sebuah child dianggap konsumen kalau ia BUKAN sketsa.
-        /// Sketsa lain yang muncul sebagai child hanya punya relasi ke geometri
-        /// sketsa ini - ia bergantung padanya, tapi tidak memakainya sebagai
-        /// profil, path, atau posisi.
-        ///
-        /// Itu aturan yang BELUM TERBUKTI, dan fixture-konsumen.SLDPRT dibuat
-        /// khusus untuk mengujinya: Sketch2 di sana punya relasi ke Sketch1 tapi
-        /// tidak dipakai fitur apa pun. Kalau ternyata GetChildren() memang
-        /// hanya mengembalikan konsumen, aturan ini tidak pernah terpakai dan
-        /// kontraknya disederhanakan.
+        /// Konsumen ditentukan daftar putih tipe dengan bukti peran di fixture.
+        /// Run fixture-konsumen pada build 52357c5 menunjukkan GetChildren()
+        /// juga memuat Sketch2 dan Plane1, jadi dependent harus tetap terpisah.
         /// </summary>
         private void BacaKonsumenDanDependent(IFeature fitur, SketchReading bacaan)
         {
@@ -587,12 +590,24 @@ namespace MikosAI.Addin
             }
         }
 
-        private SketchReading BacaSatuSketsa(IFeature fitur, string nama)
+        private SketchReading BacaSatuSketsa(IFeature fitur, string nama, string documentTitle)
         {
             var bacaan = new SketchReading { Name = nama };
 
             BacaKonsumenDanDependent(fitur, bacaan);
             BacaDimensi(fitur, bacaan);
+
+            Coba("Sketch.RelationDump", () =>
+            {
+                if (fitur.GetSpecificFeature2() is ISketch sketsa)
+                    SketchRelationDump.WriteIfRequested(sketsa, nama, documentTitle);
+            });
+
+            Coba("Sketch.Connectivity", () =>
+            {
+                if (fitur.GetSpecificFeature2() is ISketch sketsa)
+                    SketchConnectivityReader.Read(sketsa, bacaan);
+            });
 
             Coba("Sketch.GetConstrainedStatus", () =>
             {

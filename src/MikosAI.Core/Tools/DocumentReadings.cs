@@ -237,6 +237,17 @@ namespace MikosAI.Core.Tools
         /// akan lenyap tanpa jejak dari ketiga ember di atas.
         /// </summary>
         public int? DimensionCountRead { get; set; }
+
+        public int? OpenEndpointCount { get; set; }
+        public int? BranchPointCount { get; set; }
+        public int? OpenEndpointOnSegmentCount { get; set; }
+        public int? JoinedEndpointOnSegmentCount { get; set; }
+        public int? NearlyCoincidentEndpointCount { get; set; }
+        public double? EndpointToleranceMm { get; set; }
+        public IReadOnlyList<string>? SegmentsNotAnalyzed { get; set; }
+        public IReadOnlyList<string>? Limits { get; set; }
+        // Pembanding invariant partisi; bukan field baru dalam kontrak tool.
+        public int? DeclaredEndpointOnSegmentCount { get; set; }
     }
 
     /// <summary>

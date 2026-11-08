@@ -56,12 +56,14 @@ namespace MikosAI.Core.Tools
             if (sketsa.Any(s => s.UnknownDrivenStateCount is null)) hasil.Add("unknownDrivenStateCount");
             if (sketsa.Any(s => s.DimensionCountRead is null)) hasil.Add("dimensionCountRead");
 
-            // Konektivitas belum diimplementasikan sama sekali - definisinya
-            // masih menunggu keputusan atas docs/proposal-kontur-loop-menempel.md.
-            // Disebut di sini supaya ketiadaannya tidak terbaca sebagai "sudah
-            // diperiksa dan bersih".
-            hasil.Add("openEndpointCount");
-            hasil.Add("branchPointCount");
+            if (sketsa.Any(s => s.OpenEndpointCount is null)) hasil.Add("openEndpointCount");
+            if (sketsa.Any(s => s.BranchPointCount is null)) hasil.Add("branchPointCount");
+            if (sketsa.Any(s => s.OpenEndpointOnSegmentCount is null)) hasil.Add("openEndpointOnSegmentCount");
+            if (sketsa.Any(s => s.JoinedEndpointOnSegmentCount is null)) hasil.Add("joinedEndpointOnSegmentCount");
+            if (sketsa.Any(s => s.NearlyCoincidentEndpointCount is null)) hasil.Add("nearlyCoincidentEndpointCount");
+            if (sketsa.Any(s => s.EndpointToleranceMm is null)) hasil.Add("endpointToleranceMm");
+            if (sketsa.Any(s => s.SegmentsNotAnalyzed is null)) hasil.Add("segmentsNotAnalyzed");
+            if (sketsa.Any(s => s.Limits is null)) hasil.Add("limits");
 
             return hasil;
         }
