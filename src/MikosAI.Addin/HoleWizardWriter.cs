@@ -118,17 +118,32 @@ namespace MikosAI.Addin
                 (standar, fastener) = Pemetaan[spec.Standard!];
             }
 
-            // AccessSelections dipanggil SEBELUM menyentuh properti apa pun.
-            // Kalau ternyata tidak dibutuhkan, ia tidak merugikan; kalau
-            // dibutuhkan dan dilewatkan, propertinya tidak akan tersimpan.
-            var akses = definisi!.AccessSelections(model, null);
-            Require(akses,
-                "AccessSelections menolak. ASUMSI YANG PATAH: definisi bisa diakses "
-                + "sebelum fitur dibuat.");
-
+            // TIDAK ADA AccessSelections DI JALUR BUAT. Ini diketahui dengan
+            // mahal.
+            //
+            // Versi pertama memanggil AccessSelections pada definisi yang baru
+            // dibuat, dengan alasan "kalau tidak dibutuhkan ia tidak
+            // merugikan". Alasan itu SALAH: SolidWorks mati seketika, tanpa
+            // exception, tanpa entri di crash.log kami, dan tanpa Event Log
+            // Windows - structured exception native yang tidak lewat CLR sama
+            // sekali.
+            //
+            // Yang memberi tahu kami jurnal SolidWorks sendiri:
+            //
+            //   auFeatureDataObject_c::disconnectFromCoreObject
+            //   auHoleSeriesFeatureData_c::GetThisClass
+            //
+            // Crash terjadi saat objek feature-data DILEPAS. Access/Release
+            // adalah pasangan untuk MENGEDIT definisi fitur yang SUDAH ADA -
+            // didapat lewat IFeature.GetDefinition. Definisi yang baru dibuat
+            // CreateDefinition belum terhubung ke objek inti mana pun, jadi
+            // melepasnya berarti memutus sesuatu yang tidak pernah tersambung.
+            //
+            // Jalur buat: CreateDefinition -> InitializeHole -> CreateFeature.
+            // Titik.
             try
             {
-                definisi.InitializeHole(
+                definisi!.InitializeHole(
                     (int)TipeUmum(spec.HoleType),
                     (int)standar,
                     (int)fastener,
@@ -137,24 +152,12 @@ namespace MikosAI.Addin
             }
             catch (Exception e)
             {
-                definisi.ReleaseSelectionAccess();
                 throw new InvalidOperationException(
                     "InitializeHole melempar. ASUMSI YANG PATAH: InitializeHole menerima "
                     + $"(tipe, standar, fastener, ukuran, endCondition) apa adanya. Pesan: {e.Message}", e);
             }
 
-            IFeature? fitur;
-            try
-            {
-                fitur = model.FeatureManager.CreateFeature(definisi) as IFeature;
-            }
-            finally
-            {
-                // Dilepas apa pun hasilnya. Akses yang menggantung membuat
-                // operasi berikutnya gagal dengan sebab yang tidak nyambung.
-                try { definisi.ReleaseSelectionAccess(); }
-                catch (Exception e) { _diagnostics.AddError("ReleaseSelectionAccess", e); }
-            }
+            var fitur = model.FeatureManager.CreateFeature(definisi) as IFeature;
 
             Require(fitur is not null,
                 "CreateFeature tidak menghasilkan fitur. ASUMSI YANG PATAH: face yang "
@@ -184,13 +187,20 @@ namespace MikosAI.Addin
                 "GetDefinition tidak mengembalikan IWizardHoleFeatureData2 pada fitur yang baru dibuat. "
                 + "ASUMSI YANG PATAH: fitur hasil CreateFeature bisa dibaca balik sebagai data Hole Wizard.");
 
-            var akses = data!.AccessSelections(model, null);
-            Require(akses, "AccessSelections menolak saat membaca ulang.");
-
+            // Juga TANPA AccessSelections. Properti di bawah hanya DIBACA,
+            // dan pasangan Access/Release ada untuk mengubah - bukan untuk
+            // melihat. Setelah apa yang terjadi di jalur buat, memanggilnya
+            // "untuk berjaga-jaga" bukan kehati-hatian melainkan cara lain
+            // menjatuhkan SolidWorks.
+            //
+            // Kalau ternyata GetSketchPoints memang menuntut akses, ia akan
+            // mengembalikan null atau kosong - dan itu ditangkap pemanggil
+            // sebagai jumlah titik yang tidak cocok, bukan sebagai proses yang
+            // mati.
             try
             {
                 var titik = new List<Titik3D>();
-                var jumlah = data.GetSketchPointCount();
+                var jumlah = data!.GetSketchPointCount();
 
                 if (data.GetSketchPoints() is object[] points)
                 {
@@ -221,10 +231,11 @@ namespace MikosAI.Addin
                     Requested = spec,
                 };
             }
-            finally
+            catch (Exception e)
             {
-                try { data.ReleaseSelectionAccess(); }
-                catch (Exception e) { _diagnostics.AddError("ReleaseSelectionAccess (baca ulang)", e); }
+                throw new InvalidOperationException(
+                    "Gagal membaca ulang data lubang. ASUMSI YANG PATAH: properti "
+                    + $"IWizardHoleFeatureData2 bisa dibaca tanpa AccessSelections. Pesan: {e.Message}", e);
             }
         }
     }
