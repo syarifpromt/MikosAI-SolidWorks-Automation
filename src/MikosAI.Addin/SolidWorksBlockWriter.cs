@@ -49,6 +49,19 @@ namespace MikosAI.Addin
                 throw new InvalidOperationException("Part baru belum menjadi dokumen aktif; dokumen pengguna tidak disentuh.");
             if (model.GetType()!=1 || _reader.BacaKotakPembatas().BodyCount!=0 || _reader.BacaSketsa(null).Count!=0)
                 throw new InvalidOperationException("Template pilot harus part kosong, tanpa body atau sketsa praisi.");
+            // APAKAH LUBANG SUDAH ADA, bukan apakah plan MEMINTA lubang.
+            //
+            // Verify() dipanggil beberapa kali: di dalam langkah extrude,
+            // sebelum simpan, dan setelah buka ulang. Memakai plan.Holes
+            // sebagai syarat membuat asersi "volume berkurang" ikut berjalan
+            // saat extrude - padahal lubangnya baru dibuat sesudahnya, jadi
+            // volumenya memang belum berkurang dan run gagal menuduh extrude.
+            //
+            // Dideklarasikan DI SINI, sebelum Step mana pun: Verify() membacanya,
+            // dan C# menuntut definite assignment pada titik PEMANGGILAN local
+            // function - bukan pada titik deklarasinya.
+            var lubangSudahDibuat = false;
+
             var dimensionNames = new List<string>();
             string sketchName = string.Empty;
             string bossName = string.Empty;
@@ -206,6 +219,7 @@ namespace MikosAI.Addin
             object? holeReadback = null;
             var volumeSebelumLubang = 0.0;
 
+
             if (plan.Holes is not null)
             {
                 Step("hole_wizard", () =>
@@ -273,6 +287,7 @@ namespace MikosAI.Addin
                         positionDeviationsMm = deviasi.ToArray(),
                     };
 
+                    lubangSudahDibuat = true;
                     return holeReadback;
                 });
             }
@@ -329,7 +344,7 @@ namespace MikosAI.Addin
                 Require(Math.Abs(box.Max.X-box.Min.X-plan.WidthMm)<=1e-6 && Math.Abs(box.Max.Y-box.Min.Y-plan.HeightMm)<=1e-6 &&
                     Math.Abs(box.Max.Z-box.Min.Z-plan.DepthMm)<=1e-6,"Ukuran body tidak cocok.");
                 Require(Math.Abs(box.Min.X)<=1e-6&&Math.Abs(box.Min.Y)<=1e-6&&Math.Abs(box.Min.Z)<=1e-6,"Posisi body tidak cocok dengan origin dan normal Front Plane.");
-                if (plan.Holes is null)
+                if (!lubangSudahDibuat)
                     Require(Math.Abs(mass.VolumeMm3-plan.WidthMm*plan.HeightMm*plan.DepthMm)<=1e-3,"Volume body tidak cocok.");
                 else
                 {

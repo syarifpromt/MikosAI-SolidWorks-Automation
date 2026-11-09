@@ -521,7 +521,11 @@ namespace SolidWorks.Interop.sldworks
         // Akses wajib dibuka sebelum menyentuh properti, dan DILEPAS apa pun
         // hasilnya - akses yang menggantung membuat operasi berikutnya gagal
         // dengan sebab yang tidak nyambung.
-        bool AccessSelections(object TopDoc, object Component);
+        // Component boleh null - PIA asli nullable-oblivious, jadi stub yang
+        // menuntut non-null akan memberi warning untuk kode yang justru benar.
+        // Stub yang lebih ketat daripada kenyataan menghasilkan kebisingan,
+        // dan kebisingan membuat warning berikutnya tidak terbaca.
+        bool AccessSelections(object TopDoc, object? Component);
 
         void ReleaseSelectionAccess();
 
