@@ -138,6 +138,30 @@ capabilities:
       `verified` hanya berguna selama ia tidak dilebarkan diam-diam.
 
   # ---- Fase 3: sketsa ---------------------------------------------------
+  - id: parametric_block
+    label: Balok parametrik pada part baru
+    status: pilot
+    phase: 3
+    review_required: true
+    tools:
+      - create_parametric_block
+    verification:
+      - new_document_only
+      - sketch_fully_defined
+      - driving_dimension_readback
+      - rebuild_clean
+      - body_size_and_volume
+      - save_close_reopen_readback
+    notes: >
+      Lingkup sempit: corner rectangle di Front Plane, blind normal, tanpa
+      draft, satu body pada part BARU. Writer yang sama telah SW_PASS pada
+      100x80x10 tiga kali dan 120x50x12 sekali, SW 33.1.1, build dasar
+      52357c5 dengan perubahan lokal (docs/pilot-balok.md). Integrasi
+      PlanRunner/chat baru tetap pilot dan memerlukan review manusia;
+      bukan promosi sketch_authoring atau part_features secara keseluruhan.
+      operationId dipertahankan per sesi: pemanggilan ulang mengembalikan
+      hasil lama, bukan menulis ulang. Tidak retry/rollback otomatis.
+
   - id: sketch_authoring
     label: Buat sketsa dengan geometri dasar dan fully define
     status: not_implemented

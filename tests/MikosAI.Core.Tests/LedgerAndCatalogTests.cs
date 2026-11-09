@@ -32,7 +32,7 @@ namespace MikosAI.Core.Tests
         [Fact]
         public void tools_json_memuat_18_tool_CAD_dan_2_orchestration()
         {
-            Assert.Equal(20, Catalog().All.Count);
+            Assert.Equal(21, Catalog().All.Count);
         }
 
         [Fact]
@@ -103,11 +103,11 @@ namespace MikosAI.Core.Tests
                 .Select(c => c.Id)
                 .ToList();
 
-            Assert.Equal(new[] { "document_inspection" }, dipromosikan);
+            Assert.Equal(new[] { "document_inspection", "parametric_block" }, dipromosikan);
         }
 
         [Fact]
-        public void TIDAK_ADA_tool_yang_menulis_yang_diekspos()
+        public void hanya_composite_balok_pilot_yang_menulis_yang_diekspos()
         {
             // Invarian terpenting di ledger. Tool read-only yang gagal tidak
             // bisa merusak pekerjaan pengguna; tool yang menulis bisa.
@@ -116,7 +116,9 @@ namespace MikosAI.Core.Tests
                 .Select(t => t.Name)
                 .ToList();
 
-            Assert.Empty(menulisTapiTerbuka);
+            Assert.Equal(new[]{"create_parametric_block"},menulisTapiTerbuka);
+            Assert.Equal(CapabilityStatus.Pilot,Ledger().Find("parametric_block")!.Status);
+            Assert.True(Ledger().Find("parametric_block")!.EffectiveReviewRequired);
         }
 
         [Fact]
@@ -128,7 +130,7 @@ namespace MikosAI.Core.Tests
                     "get_active_document", "get_bounding_box", "get_mass_properties",
                     "get_selection", "inspect_sketches", "list_features",
                 },
-                Catalog().ExposableTools().Select(t => t.Name).OrderBy(n => n, StringComparer.Ordinal));
+                Catalog().ExposableTools().Where(t=>!t.Mutates).Select(t => t.Name).OrderBy(n => n, StringComparer.Ordinal));
         }
 
         // --- Gating ---------------------------------------------------------
@@ -304,7 +306,7 @@ capabilities:
             var all = Catalog().All;
 
             Assert.Equal(8, all.Count(t => !t.Mutates));
-            Assert.Equal(12, all.Count(t => t.Mutates));
+            Assert.Equal(13, all.Count(t => t.Mutates));
         }
     }
 }

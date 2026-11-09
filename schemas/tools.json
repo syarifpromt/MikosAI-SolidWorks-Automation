@@ -4,6 +4,37 @@
   "commonDefs": "common.schema.json",
   "tools": [
     {
+      "name": "create_parametric_block",
+      "capabilityId": "parametric_block",
+      "phase": 3,
+      "mutates": true,
+      "description": "Buat balok berdimensi pada PART BARU, simpan dan buka ulang lalu verifikasi. Width/height/depth dalam mm wajib dinyatakan pengguna; jangan menebak ukuran. Hasil pilot memerlukan review manusia. Gunakan operationId yang sama untuk mengambil hasil panggilan ulang, termasuk saat respons isError karena review masih diperlukan; jangan membuat ID baru untuk retry.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["width", "height", "depth", "operationId"],
+        "properties": {
+          "width": {"type": "number", "minimum": 0.001, "maximum": 10000},
+          "height": {"type": "number", "minimum": 0.001, "maximum": 10000},
+          "depth": {"type": "number", "minimum": 0.001, "maximum": 10000},
+          "operationId": {"type": "string", "pattern": "^[a-f0-9]{32}$", "description": "UUID hex kecil 32 karakter, unik untuk satu permintaan pengguna; pertahankan saat memeriksa ulang hasil."}
+        }
+      },
+      "outputData": {
+        "operationId": "string",
+        "runId": "string",
+        "documentPath": "string",
+        "width": "number",
+        "height": "number",
+        "depth": "number",
+        "afterReopen": "object; hasil ukuran, volume, dan dimensi actual",
+        "plan": "object; DesignPlan yang dieksekusi",
+        "acceptanceChecks": "array of VerificationCheck",
+        "reviewRequired": "boolean"
+      },
+      "notes": "Implementasi composite terbatas: Front Plane, profil corner di origin, dimensi driving, blind normal. Tidak mengedit atau menutup dokumen pengguna yang sudah ada. Path output dikelola aplikasi dengan nama unik, tanpa argumen overwrite. PlanRunner dan fresh-read acceptance evaluator dipakai juga oleh chat. Model gagal dipertahankan untuk diperiksa. Tool primitive tulis lain tetap tidak diekspos."
+    },
+    {
       "name": "get_active_document",
       "capabilityId": "document_inspection",
       "phase": 1,

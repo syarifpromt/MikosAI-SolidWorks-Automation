@@ -29,20 +29,34 @@ namespace MikosAI.Core.Tests
         }
 
         [Fact]
-        public void dengan_ledger_sebenarnya_hanya_tool_read_only_yang_diekspos()
+        public void satu_satunya_tool_tulis_yang_diekspos_adalah_create_parametric_block()
         {
-            // Keadaan jujur hari ini: document_inspection berstatus pilot, jadi
-            // 6 tool read-only terbuka. Seluruh tool yang MENULIS masih
-            // not_implemented dan tidak boleh muncul - itu invarian yang
-            // sebenarnya dijaga, bukan "daftarnya kosong".
+            // NAMA DAN KOMENTAR INI PERNAH BERBOHONG.
+            //
+            // Keduanya menyatakan "hanya tool read-only yang diekspos" dan
+            // "seluruh tool yang MENULIS masih not_implemented dan tidak boleh
+            // muncul" - sementara assertion di bawahnya justru menegaskan ada
+            // satu tool tulis yang terekspos. Nama bertahan dari masa ketika
+            // itu benar, dan tidak ikut berubah saat parametric_block naik ke
+            // pilot.
+            //
+            // Penjaga yang namanya salah lebih buruk daripada tidak ada
+            // penjaga: orang membaca namanya, percaya tidak ada tool tulis yang
+            // terbuka, dan berhenti memeriksa.
+            //
+            // Keadaan jujur hari ini: document_inspection `verified` membuka 6
+            // tool read-only, validate_design_plan menambah satu, dan
+            // parametric_block `pilot` membuka SATU tool tulis.
+            //
+            // Yang dijaga bukan angkanya, melainkan DAFTARNYA: tool tulis yang
+            // terekspos harus persis create_parametric_block. Tool tulis lain
+            // yang menyelinap terbuka akan membuat test ini merah.
             var ledger = CapabilityLedger.Load(RepoFiles.CapabilitiesYaml);
             var catalog = ToolCatalog.Load(RepoFiles.ToolsJson, ledger);
             var tools = McpToolListBuilder.Build(catalog, ledger);
 
-            Assert.Equal(6, tools.Count);
-            Assert.All(tools, t => Assert.False(
-                catalog.Find(t.Name)!.Mutates,
-                $"Tool '{t.Name}' mengubah model tapi sudah diekspos."));
+            Assert.Equal(7, tools.Count);
+            Assert.Equal(new[]{"create_parametric_block"},tools.Where(t=>catalog.Find(t.Name)!.Mutates).Select(t=>t.Name));
         }
 
         [Fact]
@@ -75,7 +89,7 @@ namespace MikosAI.Core.Tests
             var (catalog, ledger) = WithAllVerified();
             var tools = McpToolListBuilder.Build(catalog, ledger);
 
-            Assert.Equal(20, tools.Count);
+            Assert.Equal(21, tools.Count);
             Assert.Contains(tools, t => t.Name == "get_active_document");
         }
 
