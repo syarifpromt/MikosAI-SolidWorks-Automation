@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using MikosAI.Core.Plan;
-using MikosAI.Core.Plan;
 using MikosAI.Core.Threading;
 using MikosAI.Core.Tools;
 using SolidWorks.Interop.sldworks;
