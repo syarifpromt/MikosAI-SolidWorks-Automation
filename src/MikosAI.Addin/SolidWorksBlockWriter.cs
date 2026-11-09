@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using MikosAI.Core.Plan;
+using MikosAI.Core.Plan;
 using MikosAI.Core.Threading;
 using MikosAI.Core.Tools;
 using SolidWorks.Interop.sldworks;
@@ -202,6 +203,124 @@ namespace MikosAI.Addin
                 Require(feature.GetErrorCode2(out _)==0,"Fitur extrude melaporkan rebuild error/warning.");
                 return new {featureName=bossName, dimensions=DimensionReadings(feature), measurements=Verify()};
             });
+            string holeFeatureName = string.Empty;
+            object? holeReadback = null;
+            var volumeSebelumLubang = 0.0;
+
+            if (plan.Holes is not null)
+            {
+                Step("hole_wizard", () =>
+                {
+                    volumeSebelumLubang = _reader.BacaPropertiMassa().VolumeMm3;
+                    Require(volumeSebelumLubang > 0, "Volume sebelum lubang tidak terbaca.");
+
+                    // PERMUKAAN ATAS, dipilih lewat koordinat MODEL - bukan
+                    // lewat nama Face1 dan bukan lewat koordinat layar.
+                    //
+                    // Titik uji diletakkan di tengah permukaan atas: x dan y di
+                    // tengah balok, z tepat di ketinggian extrude. SelectByID2
+                    // memakai meter.
+                    model.ClearSelection2(true);
+                    var tengahX = plan.WidthMm / 2000.0;
+                    var tengahY = plan.HeightMm / 2000.0;
+                    var atasZ = plan.DepthMm / 1000.0;
+                    Require(model.Extension.SelectByID2("", "FACE", tengahX, tengahY, atasZ, false, 0, null, 0),
+                        "Permukaan atas balok tidak bisa dipilih pada koordinat model.");
+
+                    var writer = new HoleWizardWriter(_app, _diagnostics);
+                    var hasil = writer.Buat(model, plan.Holes!);
+                    holeFeatureName = hasil.FeatureName;
+
+                    // TRANSFORMASI BALIK KE KOORDINAT MODEL.
+                    //
+                    // GetSketchPoints mengembalikan titik dalam RUANG SKETSA.
+                    // Di permukaan atas, ruang itu BERBEDA dari koordinat model
+                    // - dan justru itu sebabnya lubang ditaruh di sana alih-alih
+                    // di Front Plane, tempat keduanya kebetulan sama sehingga
+                    // transformasi yang hilang pun akan lulus.
+                    var sketsaPosisi = SketsaPosisi(FindFeature(holeFeatureName));
+                    var posisiModel = KeKoordinatModel(sketsaPosisi, hasil.PositionsSketchSpaceMm);
+
+                    Require(posisiModel.Count == plan.Holes!.Positions.Count,
+                        $"Jumlah titik posisi terbaca {posisiModel.Count}, diminta {plan.Holes!.Positions.Count}.");
+
+                    // Dibandingkan dalam koordinat MODEL, kerangka yang sama
+                    // dengan permintaan - jadi perbandingannya aritmetika,
+                    // bukan terjemahan.
+                    var deviasi = new List<double>();
+                    foreach (var diminta in plan.Holes!.Positions)
+                    {
+                        var terdekat = posisiModel
+                            .Select(a => Math.Sqrt(Math.Pow(a.X - diminta.X, 2) + Math.Pow(a.Y - diminta.Y, 2) + Math.Pow(a.Z - diminta.Z, 2)))
+                            .Min();
+                        deviasi.Add(terdekat);
+                        Require(terdekat <= 1e-3,
+                            $"Posisi lubang meleset {terdekat:0.######} mm dari {diminta}. "
+                            + "Kalau ini muncul hanya pada face non-Front, transformasi ruang sketsa yang salah.");
+                    }
+
+                    holeReadback = new
+                    {
+                        featureName = hasil.FeatureName,
+                        standard = hasil.Standard,
+                        fastenerType = hasil.FastenerType,
+                        fastenerSize = hasil.FastenerSize,
+                        counterBoreDiameterMm = hasil.CounterBoreDiameterMm,
+                        counterBoreDepthMm = hasil.CounterBoreDepthMm,
+                        thruHoleDiameterMm = hasil.ThruHoleDiameterMm,
+                        sketchPointCount = hasil.SketchPointCount,
+                        positionsSketchSpaceMm = hasil.PositionsSketchSpaceMm.Select(t => new { t.X, t.Y, t.Z }).ToArray(),
+                        positionsModelMm = posisiModel.Select(t => new { t.X, t.Y, t.Z }).ToArray(),
+                        positionDeviationsMm = deviasi.ToArray(),
+                    };
+
+                    return holeReadback;
+                });
+            }
+
+            ISketch SketsaPosisi(IFeature fitur)
+            {
+                var anak = fitur.GetFirstSubFeature() as IFeature;
+                for (var penjaga = 0; anak != null && penjaga < 100; penjaga++)
+                {
+                    if (anak.GetSpecificFeature2() is ISketch sk) return sk;
+                    anak = anak.GetNextSubFeature() as IFeature;
+                }
+                throw new InvalidOperationException(
+                    "Sketsa posisi tidak ditemukan di bawah fitur lubang. "
+                    + "ASUMSI YANG PATAH: Hole Wizard menyimpan sketsa posisinya sebagai sub-fitur.");
+            }
+
+            List<Titik3D> KeKoordinatModel(ISketch sketsa, IReadOnlyList<Titik3D> ruangSketsa)
+            {
+                var transform = sketsa.ModelToSketchTransform;
+                Require(transform != null, "ModelToSketchTransform null.");
+                // Inverse() mengembalikan Object, BUKAN MathTransform - cast
+                // eksplisit, kalau tidak seluruh ekspresi menjadi dynamic dan
+                // build gagal dengan CS0656 yang sebabnya tidak kelihatan.
+                var balik = transform!.Inverse() as IMathTransform;
+                Require(balik != null, "IMathTransform.Inverse mengembalikan null atau bukan IMathTransform.");
+                var m = balik!.ArrayData as double[];
+                Require(m != null && m!.Length >= 12,
+                    "ArrayData transformasi tidak berbentuk matriks 16 elemen seperti yang diharapkan.");
+
+                var hasil = new List<Titik3D>();
+                foreach (var t in ruangSketsa)
+                {
+                    // ArrayData: 0..8 rotasi baris-utama, 9..11 translasi,
+                    // 12 skala. Dikerjakan dalam METER lalu dikembalikan ke mm.
+                    var x = t.X / 1000.0;
+                    var y = t.Y / 1000.0;
+                    var z = t.Z / 1000.0;
+                    var skala = m![12] == 0 ? 1.0 : m[12];
+                    var mx = (m[0] * x + m[3] * y + m[6] * z) * skala + m[9];
+                    var my = (m[1] * x + m[4] * y + m[7] * z) * skala + m[10];
+                    var mz = (m[2] * x + m[5] * y + m[8] * z) * skala + m[11];
+                    hasil.Add(new Titik3D(mx * 1000.0, my * 1000.0, mz * 1000.0));
+                }
+                return hasil;
+            }
+
             object Verify()
             {
                 var box=_reader.BacaKotakPembatas();
@@ -211,7 +330,20 @@ namespace MikosAI.Addin
                 Require(Math.Abs(box.Max.X-box.Min.X-plan.WidthMm)<=1e-6 && Math.Abs(box.Max.Y-box.Min.Y-plan.HeightMm)<=1e-6 &&
                     Math.Abs(box.Max.Z-box.Min.Z-plan.DepthMm)<=1e-6,"Ukuran body tidak cocok.");
                 Require(Math.Abs(box.Min.X)<=1e-6&&Math.Abs(box.Min.Y)<=1e-6&&Math.Abs(box.Min.Z)<=1e-6,"Posisi body tidak cocok dengan origin dan normal Front Plane.");
-                Require(Math.Abs(mass.VolumeMm3-plan.WidthMm*plan.HeightMm*plan.DepthMm)<=1e-3,"Volume body tidak cocok.");
+                if (plan.Holes is null)
+                    Require(Math.Abs(mass.VolumeMm3-plan.WidthMm*plan.HeightMm*plan.DepthMm)<=1e-3,"Volume body tidak cocok.");
+                else
+                {
+                    // Volume setelah lubang TIDAK dipatok angkanya: diameter
+                    // counterbore untuk ISO M6 ditentukan basis data Hole
+                    // Wizard, bukan oleh kami, dan menuliskan angkanya berarti
+                    // menyalin keluaran tool lalu menyebutnya harapan.
+                    //
+                    // Yang bisa dipertanggungjawabkan hanya arahnya.
+                    Require(mass.VolumeMm3 < plan.WidthMm*plan.HeightMm*plan.DepthMm - 1e-6,
+                        "Volume tidak berkurang setelah lubang - lubangnya tidak memotong apa pun.");
+                    Require(mass.VolumeMm3 > 0, "Volume nol setelah lubang.");
+                }
                 Require(sketch.GetConstrainedStatus()==3,"Constraint profil berubah setelah operasi.");
                 var dims=DimensionReadings(FindFeature(sketchName));
                 Require(dims.Length==2,"Profil harus mempunyai dua dimensi desain.");
@@ -245,7 +377,8 @@ namespace MikosAI.Addin
             Require(Equals((object)_app.ActiveDoc,model),"Part yang dibuka ulang belum aktif.");
             Require(model.EditRebuild3(),"Rebuild setelah buka ulang gagal.");
             var afterReopen=Verify();
-            return new {status="SW_PASS",scope="satu balok pilot Front Plane",documentPath=path,
+            return new {status="SW_PASS",scope=plan.Holes is null ? "satu balok pilot Front Plane" : "balok + lubang Hole Wizard pada permukaan atas",
+                documentPath=path, holeFeatureName, holes=holeReadback, volumeSebelumLubangMm3=volumeSebelumLubang,
                 solidworksRevision=_app.RevisionNumber(),sketchName,featureName=bossName,beforeSave,afterReopen,
                 saveErrors,saveWarnings,openErrors,openWarnings,steps=Trace.ToArray()};
         }

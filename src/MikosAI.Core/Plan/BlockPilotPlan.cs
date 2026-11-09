@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -16,7 +17,22 @@ namespace MikosAI.Core.Plan
         public double HeightMm { get; private set; }
         public double DepthMm { get; private set; }
         public JsonObject[] Arguments { get; private set; } = Array.Empty<JsonObject>();
+
+        /// <summary>
+        /// Lubang opsional pada permukaan ATAS balok. null berarti balok polos.
+        ///
+        /// Permukaan atas dipilih dengan sengaja, bukan demi kemudahan: ia
+        /// BUKAN Front Plane, jadi koordinat sketsanya berbeda dari koordinat
+        /// model. Di Front Plane keduanya kebetulan sama, sehingga transformasi
+        /// yang hilang pun akan lulus - dan test yang tidak bisa gagal tidak
+        /// menguji apa pun.
+        /// </summary>
+        public HoleSpec? Holes { get; private set; }
+
         public static readonly string[] Tools = { "create_sketch", "add_rectangle", "close_sketch", "extrude_boss" };
+
+        /// <summary>Langkah kelima, opsional.</summary>
+        public const string ToolLubang = "hole_wizard";
 
         public static BlockPilotPlan Create(double width,double height,double depth)
         {
@@ -46,10 +62,21 @@ namespace MikosAI.Core.Plan
                 (c?["arguments"] is JsonObject a && a.Count>0)))
                 throw new ArgumentException("Pilot tidak mengabaikan acceptance yang belum didukung.");
             var steps = plan["steps"]?.AsArray() ?? throw new ArgumentException("Steps tidak ada.");
-            if (steps.Count != Tools.Length || steps.Where((s,i) => s?["tool"]?.GetValue<string>() != Tools[i]).Any())
-                throw new ArgumentException("Pilot hanya menerima urutan create_sketch/add_rectangle/close_sketch/extrude_boss.");
+            // Empat langkah balok, ATAU empat plus hole_wizard. Tidak ada
+            // bentuk lain: pilot ini sempit dengan sengaja.
+            var adaLubang = steps.Count == Tools.Length + 1
+                && steps[Tools.Length]?["tool"]?.GetValue<string>() == ToolLubang;
+            if ((steps.Count != Tools.Length && !adaLubang)
+                || steps.Take(Tools.Length).Where((s,i) => s?["tool"]?.GetValue<string>() != Tools[i]).Any())
+                throw new ArgumentException(
+                    "Pilot hanya menerima create_sketch/add_rectangle/close_sketch/extrude_boss, "
+                    + "opsional diikuti hole_wizard.");
             var parameters = ParameterResolver.BuildParameterTable(plan["parameters"]?.AsObject(), null);
-            var args = steps.Select((s,i) => ParameterResolver.Resolve(s!["arguments"]!.AsObject(), parameters, Tools[i])).ToArray();
+            var args = steps.Take(Tools.Length)
+                .Select((s,i) => ParameterResolver.Resolve(s!["arguments"]!.AsObject(), parameters, Tools[i])).ToArray();
+            var argLubang = adaLubang
+                ? ParameterResolver.Resolve(steps[Tools.Length]!["arguments"]!.AsObject(), parameters, ToolLubang)
+                : null;
             double Number(JsonNode? node)
             {
                 if (node is null) return double.NaN;
@@ -82,7 +109,30 @@ namespace MikosAI.Core.Plan
             var height=Length(args[1]["height"]);
             var depth=Length(args[3]["endCondition"]?["depth"]);
             args[1]["width"]=width; args[1]["height"]=height; args[3]["endCondition"]!["depth"]=depth;
-            return new BlockPilotPlan { WidthMm=width, HeightMm=height, DepthMm=depth, Arguments=args };
+            HoleSpec? holes = null;
+            if (argLubang is not null)
+            {
+                var titik = new List<Titik3D>();
+                foreach (var node in argLubang["positions"]?.AsArray() ?? throw new ArgumentException("hole_wizard memerlukan positions."))
+                {
+                    var x = Number(node?["x"]);
+                    var y = Number(node?["y"]);
+                    var z = Number(node?["z"]);
+                    if (double.IsNaN(x) || double.IsNaN(y) || double.IsNaN(z))
+                        throw new ArgumentException("positions memerlukan x, y, dan z dalam koordinat MODEL (mm).");
+                    titik.Add(new Titik3D(x, y, z));
+                }
+
+                // HoleSpec yang menolak, bukan di sini - supaya aturan "jangan
+                // menebak nilai engineering" hidup di SATU tempat.
+                holes = HoleSpec.Buat(
+                    argLubang["holeType"]?.GetValue<string>(),
+                    argLubang["standard"]?.GetValue<string>(),
+                    argLubang["fastenerSize"]?.GetValue<string>(),
+                    titik);
+            }
+
+            return new BlockPilotPlan { WidthMm=width, HeightMm=height, DepthMm=depth, Arguments=args, Holes=holes };
         }
     }
 }

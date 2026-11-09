@@ -1,0 +1,163 @@
+{
+  "schemaVersion": "1.0",
+  "title": "Pilot plat 100 x 80 x 10 mm, 4 lubang M6 counterbore",
+  "intent": "Pilot native menuju gerbang v0.1. Balok berdimensi lalu empat lubang counterbore pada permukaan ATAS - bukan Front Plane, karena di sana koordinat sketsa kebetulan sama dengan koordinat model sehingga transformasi yang hilang pun akan lulus.",
+  "units": {
+    "length": "mm",
+    "angle": "deg"
+  },
+  "parameters": {
+    "width": {
+      "value": 100,
+      "unit": "mm",
+      "source": "user_stated"
+    },
+    "height": {
+      "value": 80,
+      "unit": "mm",
+      "source": "user_stated"
+    },
+    "depth": {
+      "value": 10,
+      "unit": "mm",
+      "source": "user_stated"
+    }
+  },
+  "document": {
+    "type": "part",
+    "template": null,
+    "savePath": null
+  },
+  "steps": [
+    {
+      "id": "s1",
+      "tool": "create_sketch",
+      "arguments": {
+        "plane": {
+          "kind": "plane",
+          "by": "name",
+          "name": "Front Plane"
+        },
+        "name": "BlockProfile"
+      }
+    },
+    {
+      "id": "s2",
+      "tool": "add_rectangle",
+      "dependsOn": [
+        "s1"
+      ],
+      "arguments": {
+        "mode": "corner",
+        "corner": {
+          "x": 0,
+          "y": 0
+        },
+        "width": "$width",
+        "height": "$height",
+        "addDimensions": true
+      }
+    },
+    {
+      "id": "s3",
+      "tool": "close_sketch",
+      "dependsOn": [
+        "s2"
+      ],
+      "arguments": {
+        "sketchName": "BlockProfile"
+      },
+      "expect": {
+        "sketchFullyDefined": true
+      }
+    },
+    {
+      "id": "s4",
+      "tool": "extrude_boss",
+      "dependsOn": [
+        "s3"
+      ],
+      "arguments": {
+        "sketch": {
+          "kind": "sketch",
+          "by": "name",
+          "name": "BlockProfile"
+        },
+        "endCondition": {
+          "type": "blind",
+          "depth": "$depth"
+        },
+        "direction": "normal",
+        "merge": true
+      },
+      "expect": {
+        "volumeIncreases": true
+      }
+    },
+    {
+      "id": "s5",
+      "tool": "hole_wizard",
+      "dependsOn": [
+        "s4"
+      ],
+      "arguments": {
+        "holeType": "counterbore",
+        "standard": "ISO",
+        "fastenerSize": "M6",
+        "positions": [
+          {
+            "x": 20,
+            "y": 20,
+            "z": 10
+          },
+          {
+            "x": 80,
+            "y": 20,
+            "z": 10
+          },
+          {
+            "x": 20,
+            "y": 60,
+            "z": 10
+          },
+          {
+            "x": 80,
+            "y": 60,
+            "z": 10
+          }
+        ]
+      },
+      "expect": {
+        "volumeDecreases": true
+      }
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "rebuild",
+      "check": "rebuild_clean",
+      "required": true
+    },
+    {
+      "id": "constraints",
+      "check": "all_sketches_fully_defined",
+      "required": true
+    },
+    {
+      "id": "volume",
+      "check": "nonzero_volume",
+      "required": true
+    }
+  ],
+  "openQuestions": [],
+  "risks": [
+    "Posisi dalam KOORDINAT MODEL. Balok menempati x 0..100, y 0..80, z 0..10, jadi z=10 adalah permukaan atas. Empat lubang berjarak 20 mm dari tiap tepi.",
+    "Volume akhir TIDAK dipatok angkanya: diameter counterbore ISO M6 ditentukan basis data Hole Wizard, bukan oleh kami. Hanya arah perubahannya yang dipatok.",
+    "Jalur feature-definition untuk Hole Wizard belum pernah dijalankan. Setiap asumsinya dibungkus Require yang MENYEBUT asumsinya, supaya run pertama memberi tahu mana yang salah alih-alih menghasilkan lubang yang keliru.",
+    "Berbeda dari examples/mounting-plate.plan.json, yang merupakan contoh acuan Fase 3 untuk executor palsu dan memakai Top Plane, rectangle center, serta fillet. Berkas ini pilot native dan sengaja lebih sempit."
+  ],
+  "provenance": {
+    "generatedBy": "native golden pilot",
+    "editedByHuman": true
+  }
+}

@@ -392,8 +392,27 @@ namespace SolidWorks.Interop.sldworks
         int DrivenState { get; }
     }
 
+    public interface IMathTransform
+    {
+        // Direfleksikan: Object Inverse()
+        //
+        // Mengembalikan Object, BUKAN MathTransform. Tanpa cast eksplisit,
+        // seluruh ekspresi menjadi dynamic dan build nyata gagal dengan CS0656
+        // yang sebabnya tidak kelihatan dari pesannya.
+        object Inverse();
+
+        // Direfleksikan: Object get_ArrayData()
+        object ArrayData { get; }
+    }
+
     public interface ISketch
     {
+        // Direfleksikan: MathTransform ModelToSketchTransform
+        //
+        // Keberadaannya sendiri bukti bahwa entitas sketsa TIDAK hidup di
+        // koordinat model - kalau hidup, transform ini tidak ada gunanya.
+        IMathTransform ModelToSketchTransform { get; }
+
         int GetConstrainedStatus();
 
         object GetSketchSegments();
