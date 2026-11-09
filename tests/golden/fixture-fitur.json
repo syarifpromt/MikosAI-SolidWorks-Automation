@@ -1,0 +1,68 @@
+{
+  "_catatan": [
+    "Harapan untuk fixture-fitur.SLDPRT.",
+    "",
+    "Tujuan part ini menumbuhkan daftar putih tipe konsumen DENGAN BUKTI.",
+    "Syarat masuk daftar tetap dua: typeName teramati dari model nyata, dan",
+    "fitur itu terbukti memakai sketsa sebagai profil dengan efek terverifikasi.",
+    "",
+    "typeName untuk Revolve1 dan hole wizard SENGAJA TIDAK ditulis di sini.",
+    "Kami belum pernah melihatnya, dan menebaknya adalah hal yang dilarang.",
+    "Sensus di golden-fitur.ps1 yang akan menyebutkannya."
+  ],
+
+  "part": {
+    "judul": "fixture-fitur.SLDPRT",
+    "tipe": "part"
+  },
+
+  "tahap1": {
+    "_catatan": [
+      "Seluruhnya diturunkan dengan pensil:",
+      "  balok    80 x 60 x 10            = 48000 mm3",
+      "  silinder pi x 10^2 x 20          =  6283.185307 mm3",
+      "  total                            = 54283.185307 mm3",
+      "",
+      "Dua body karena silinder ditempatkan di z = 60, jauh dari balok yang",
+      "menempati z = 0..10. Keduanya tidak bersentuhan."
+    ],
+    "volumeMm3": 54283.185307,
+    "bodyCount": 2,
+    "sketsaKonsumen": {
+      "SketchBase": ["Boss-Extrude1"],
+      "SketchRevolve": ["Revolve1"]
+    }
+  },
+
+  "tahap2": {
+    "_catatan": [
+      "KENAPA VOLUME DI SINI TIDAK DIPATOK ANGKANYA.",
+      "",
+      "Diameter counterbore, kedalaman, dan diameter lubang tembus ditentukan",
+      "basis data Hole Wizard untuk ISO M6 - bukan oleh kami. Menuliskan",
+      "angkanya berarti menyalin dari keluaran tool, dan itu snapshot: kalau",
+      "pembacaannya salah, berkas ini akan membekukan kesalahan itu lalu",
+      "menyebutnya lulus.",
+      "",
+      "Yang bisa kami pertanggungjawabkan hanya ARAHNYA: lubang tembus",
+      "menghilangkan material, jadi volume WAJIB berkurang.",
+      "",
+      "Ini bukan kelonggaran melainkan batas yang jujur. Pada revolve kami",
+      "memaku angka eksak karena bisa dihitung; di sini kami tidak bisa, dan",
+      "mengaku tidak bisa."
+    ],
+    "aktif": false,
+    "volumeHarusBerkurangDari": 54283.185307,
+    "bodyCount": 2,
+    "jumlahLubang": 2
+  },
+
+  "toleransi": {
+    "_catatan": [
+      "Silinder dihitung SolidWorks dari geometri eksak, tapi pi membuat",
+      "hasilnya tidak bulat. Toleransi dilonggarkan sedikit dari prisma murni",
+      "untuk menampung pembulatan 6 desimal yang kami lakukan sendiri."
+    ],
+    "volumeMm3": 0.01
+  }
+}
