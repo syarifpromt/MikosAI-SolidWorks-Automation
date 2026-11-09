@@ -146,7 +146,7 @@ namespace MikosAI.Addin
         /// Sementara. Instalasi nanti mengemas berkas-berkas ini di samping
         /// assembly, dan fungsi ini menyusut jadi satu pemeriksaan.
         /// </summary>
-        private static string? CariAkarRepo()
+        internal static string? CariAkarRepo()
         {
             try
             {

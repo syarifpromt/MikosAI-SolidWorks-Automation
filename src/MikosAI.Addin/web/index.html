@@ -521,7 +521,7 @@ function renderProvider(s) {
     ? titik('ok', 'terdaftar di agy')
     : titik('tunggu', 'belum terdaftar');
 
-  bolehKirim = !!p.mayAttempt;
+  bolehKirim = (!!p.mayAttempt || !!s.blockAuthoringReady) && !s.chatBusy;
   el('masukan').disabled = !bolehKirim;
   el('btn-kirim').disabled = !bolehKirim;
 

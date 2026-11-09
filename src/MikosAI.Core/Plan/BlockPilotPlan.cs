@@ -18,6 +18,20 @@ namespace MikosAI.Core.Plan
         public JsonObject[] Arguments { get; private set; } = Array.Empty<JsonObject>();
         public static readonly string[] Tools = { "create_sketch", "add_rectangle", "close_sketch", "extrude_boss" };
 
+        public static BlockPilotPlan Create(double width,double height,double depth)
+        {
+            // Factory menggunakan batas yang sama dengan plan pilot dari disk.
+            var plan=JsonNode.Parse(@"{""schemaVersion"":""1.0"",""units"":{""length"":""mm"",""angle"":""deg""},""document"":{""type"":""part""},""steps"":[
+              {""tool"":""create_sketch"",""arguments"":{""plane"":{""kind"":""plane"",""by"":""name"",""name"":""Front Plane""},""name"":""BlockProfile""}},
+              {""tool"":""add_rectangle"",""arguments"":{""mode"":""corner"",""corner"":{""x"":0,""y"":0},""addDimensions"":true}},
+              {""tool"":""close_sketch"",""arguments"":{""sketchName"":""BlockProfile""}},
+              {""tool"":""extrude_boss"",""arguments"":{""sketch"":{""kind"":""sketch"",""by"":""name"",""name"":""BlockProfile""},""endCondition"":{""type"":""blind""},""direction"":""normal"",""merge"":true}}]}" )!.AsObject();
+            plan["steps"]![1]!["arguments"]!["width"]=width;
+            plan["steps"]![1]!["arguments"]!["height"]=height;
+            plan["steps"]![3]!["arguments"]!["endCondition"]!["depth"]=depth;
+            return Read(plan);
+        }
+
         public static BlockPilotPlan Read(JsonObject plan)
         {
             if (plan["schemaVersion"]?.GetValue<string>() != "1.0" ||

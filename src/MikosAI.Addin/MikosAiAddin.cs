@@ -98,6 +98,8 @@ namespace MikosAI.Addin
         private McpHost? _mcp;
         private SolidWorksReader? _pembaca;
         private BlockPilotHost? _blockPilot;
+        private MikosAI.Core.Plan.ParametricBlockFlow? _blockFlow;
+        private int _chatInProgress;
         private TaskPaneHost? _panel;
         private CommandGroupHost? _tombol;
         private ProviderHost? _provider;
@@ -226,9 +228,17 @@ namespace MikosAI.Addin
 
                     // Executor nyata: setiap pembacaan dijalankan lewat dispatcher
                     // ke thread utama SolidWorks.
+                    var root=McpHost.CariAkarRepo() ?? throw new InvalidOperationException("Akar aplikasi tidak ditemukan.");
+                    var blockCatalog=MikosAI.Core.Tools.ToolCatalog.Load(System.IO.Path.Combine(root,"schemas","tools.json"),
+                        MikosAI.Core.Capabilities.CapabilityLedger.Load(System.IO.Path.Combine(root,"capabilities.yaml")));
+                    _blockFlow=new MikosAI.Core.Plan.ParametricBlockFlow(blockCatalog,
+                        (w,h,d,path)=>new NativeBlockSession(_dispatcher!,
+                            ()=>_sw!.BuatPenulisBalok(_diagnostics,_pembaca!),()=>_pembaca,w,h,d,path,
+                            blockCatalog.RequiresReview(MikosAI.Core.Plan.ParametricBlockFlow.ToolName),_diagnostics),
+                        id=>System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments),"MikosAI","Models","block-"+id+".SLDPRT"));
                     var executor = new SolidWorksToolExecutor(
                         _dispatcher ?? throw new InvalidOperationException("dispatcher belum siap"),
-                        () => _pembaca);
+                        () => _pembaca,_blockFlow);
 
                     _mcp = new McpHost(_diagnostics, executor);
                     _diagnostics.McpServer = _mcp.Mulai();
@@ -611,6 +621,8 @@ namespace MikosAI.Addin
                 ["mcpToolCount"] = _mcp?.ToolCount ?? 0,
                 ["mcpWorkspace"] = _mcp?.WorkspaceDirectory,
                 ["provider"] = RingkasanProvider(),
+                ["blockAuthoringReady"] = _blockFlow!=null && _diagnostics.Status=="connected",
+                ["chatBusy"] = System.Threading.Volatile.Read(ref _chatInProgress)!=0,
                 ["buildCommit"] = _diagnostics.BuildCommit,
                 ["buildTime"] = _diagnostics.BuildTime,
                 ["errors"] = galat,
@@ -726,8 +738,26 @@ namespace MikosAI.Addin
         /// </summary>
         private async System.Threading.Tasks.Task TanganiChat(string prompt)
         {
+            if(System.Threading.Interlocked.Exchange(ref _chatInProgress,1)!=0)
+            {
+                _panel?.KirimPesanChat("ai","Permintaan sebelumnya masih berjalan. Tunggu hasilnya sebelum mengirim perintah baru.");
+                return;
+            }
             try
             {
+                var block=MikosAI.Core.Plan.BlockChatRequest.Parse(prompt);
+                if(block.Handled)
+                {
+                    if(!block.Valid) { _panel?.KirimPesanChat("ai",block.Message); return; }
+                    if(_blockFlow is null) { _panel?.KirimPesanChat("galat","Jalur balok belum siap. Periksa status add-in."); return; }
+                    _panel?.KirimPesanChat("ai",$"Membuat part baru {block.Width} × {block.Height} × {block.Depth} mm dan memverifikasi hasil simpan–buka ulang...");
+                    var result=await _blockFlow.ExecuteAsync(new JsonObject{["width"]=block.Width,["height"]=block.Height,["depth"]=block.Depth,["operationId"]=Guid.NewGuid().ToString("N")}).ConfigureAwait(false);
+                    if(result.Ok && result.Verification?.Verdict==MikosAI.Core.Execution.Verdict.Pass)
+                        _panel?.KirimPesanChat("ai",$"Balok {block.Width} × {block.Height} × {block.Depth} mm sudah dibuat. Ukuran, volume, constraint dan hasil simpan–buka ulang cocok.\nTersimpan: {result.Evidence?.DocumentPath}"+
+                            (result.Verification.ManualReviewRequired ? "\nHasil pilot: periksa part ini sebelum menganggap pekerjaan final." : string.Empty));
+                    else _panel?.KirimPesanChat("galat",$"Pembuatan balok berhenti: {result.Error?.Message ?? result.Verification?.Verdict.ToString()}. Part yang sempat dibuat dibiarkan untuk diperiksa; tidak diulang otomatis.");
+                    return;
+                }
                 if (_provider is null)
                 {
                     _panel?.KirimPesanChat("galat", "Provider AI belum siap.");
@@ -790,6 +820,7 @@ namespace MikosAI.Addin
                 _diagnostics.AddError("menangani chat", exception);
                 _panel?.KirimPesanChat("galat", "Terjadi kesalahan internal: " + exception.Message);
             }
+            finally { System.Threading.Interlocked.Exchange(ref _chatInProgress,0); }
         }
 
         // ====================================================================

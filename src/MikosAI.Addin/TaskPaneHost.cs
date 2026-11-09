@@ -618,12 +618,13 @@ namespace MikosAI.Addin
             {
                 _teksStatus.Text = RingkasStatusPolos(status);
 
-                // Kotak chat hanya aktif kalau provider benar-benar siap -
-                // aturan yang sama dengan panel WebView2.
-                var bolehKirim = status["provider"] is JsonObject provider
+                // Grammar balok lokal dapat dipakai tanpa menunggu provider AI.
+                var providerSiap = status["provider"] is JsonObject provider
                                  && provider["mayAttempt"] is JsonValue nilai
                                  && nilai.TryGetValue<bool>(out var boleh)
                                  && boleh;
+                var bolehKirim=(providerSiap || status["blockAuthoringReady"]?.GetValue<bool>()==true)
+                    && status["chatBusy"]?.GetValue<bool>()!=true;
 
                 if (_masukan is not null) _masukan.Enabled = bolehKirim;
                 if (_tombolKirim is not null) _tombolKirim.Enabled = bolehKirim;

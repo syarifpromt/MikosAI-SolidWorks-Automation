@@ -192,6 +192,14 @@ namespace MikosAI.Core.Mcp
                 ["taskSuccessful"] = result.IsTaskSuccessful,
             };
 
+            // ModelChanged/readBackFailed adalah kontrak tulis yang sudah ada.
+            // Read-only mempertahankan envelope lama tanpa klaim perubahan.
+            if (result.IsMutation)
+            {
+                summary["modelChanged"]=result.ModelChanged;
+                summary["readBackFailed"]=result.ReadBackFailed;
+            }
+
             if (result.Data is not null && result.Data.Count > 0)
             {
                 var data = new JsonObject();

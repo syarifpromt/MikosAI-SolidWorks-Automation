@@ -103,6 +103,9 @@ namespace MikosAI.Core.Execution
         public ToolEvidence? Evidence { get; set; }
 
         public long DurationMs { get; set; }
+        public bool IsMutation { get; set; }
+        public bool? ModelChanged { get; set; }
+        public string? ReadBackFailed { get; set; }
 
         /// <summary>
         /// Satu-satunya cara yang benar untuk menanyakan "apakah tugas ini berhasil".

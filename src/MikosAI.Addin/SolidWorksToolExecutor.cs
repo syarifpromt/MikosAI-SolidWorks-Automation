@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using MikosAI.Core.Execution;
 using MikosAI.Core.Threading;
 using MikosAI.Core.Tools;
+using MikosAI.Core.Plan;
 
 namespace MikosAI.Addin
 {
@@ -26,13 +27,18 @@ namespace MikosAI.Addin
     {
         private readonly IMainThreadDispatcher _dispatcher;
         private readonly Func<SolidWorksReader?> _ambilPembaca;
+        private readonly ParametricBlockFlow? _blockFlow;
 
         internal SolidWorksToolExecutor(
             IMainThreadDispatcher dispatcher,
             Func<SolidWorksReader?> ambilPembaca)
+            : this(dispatcher,ambilPembaca,null) { }
+
+        internal SolidWorksToolExecutor(IMainThreadDispatcher dispatcher,Func<SolidWorksReader?> ambilPembaca,ParametricBlockFlow? blockFlow)
         {
             _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
             _ambilPembaca = ambilPembaca ?? throw new ArgumentNullException(nameof(ambilPembaca));
+            _blockFlow=blockFlow;
         }
 
         public async Task<ToolResult> ExecuteAsync(
@@ -40,6 +46,9 @@ namespace MikosAI.Addin
             JsonObject arguments,
             CancellationToken cancellationToken = default)
         {
+            if(toolName==ParametricBlockFlow.ToolName)
+                return _blockFlow!=null ? await _blockFlow.ExecuteAsync(arguments,cancellationToken).ConfigureAwait(false)
+                    : ToolResult.Failure(ParametricBlockFlow.CapabilityId,ErrorKind.EnvironmentMissing,"Jalur balok belum siap.");
             try
             {
                 return await _dispatcher.InvokeAsync(

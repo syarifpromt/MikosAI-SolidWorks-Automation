@@ -96,6 +96,9 @@ namespace MikosAI.Core.Tools
         public ToolDefinition? Find(string toolName)
             => _byName.TryGetValue(toolName, out var tool) ? tool : null;
 
+        public bool RequiresReview(string toolName)
+            => Find(toolName) is ToolDefinition tool ? _ledger.Find(tool.CapabilityId)?.EffectiveReviewRequired ?? true : true;
+
         /// <summary>
         /// Tool yang boleh diekspos sebagai tool MCP: terdefinisi di katalog DAN
         /// kemampuannya verified atau pilot di ledger.

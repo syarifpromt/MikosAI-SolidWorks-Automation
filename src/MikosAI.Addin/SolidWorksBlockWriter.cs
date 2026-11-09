@@ -112,7 +112,8 @@ namespace MikosAI.Addin
                 for(var guard=0; display!=null && guard<1000; guard++)
                 {
                     var dim=(IDimension)display.GetDimension2(0);
-                    rows.Add(new {name=DimensionKey(dim.FullName),fullName=dim.FullName,valueMm=dim.SystemValue*1000,drivenState=dim.DrivenState});
+                    if(DimensionKey(dim.FullName).EndsWith("@"+feature.Name,StringComparison.Ordinal))
+                        rows.Add(new {name=DimensionKey(dim.FullName),fullName=dim.FullName,valueMm=dim.SystemValue*1000,drivenState=dim.DrivenState});
                     display=feature.GetNextDisplayDimension(display) as IDisplayDimension;
                 }
                 return rows.ToArray();
@@ -247,6 +248,39 @@ namespace MikosAI.Addin
             return new {status="SW_PASS",scope="satu balok pilot Front Plane",documentPath=path,
                 solidworksRevision=_app.RevisionNumber(),sketchName,featureName=bossName,beforeSave,afterReopen,
                 saveErrors,saveWarnings,openErrors,openWarnings,steps=Trace.ToArray()};
+        }
+
+        internal IReadOnlyDictionary<string,object> ReadOwnedDimensions(string expectedPath,string[] featureNames)
+        {
+            PastikanThreadUtama();
+            if((object)_app.ActiveDoc is not IModelDoc2 model || !string.Equals(model.GetPathName(),expectedPath,StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Dokumen acceptance berbeda dari part milik run.");
+            var result=new Dictionary<string,object>(StringComparer.Ordinal);
+            var pending=new Stack<IFeature>();
+            if(model.FirstFeature() is IFeature first) pending.Push(first);
+            var visited=new HashSet<object>();
+            while(pending.Count>0 && visited.Count<5000)
+            {
+                var feature=pending.Pop();
+                if(!visited.Add(feature)) continue;
+                if(feature.GetNextFeature() is IFeature next) pending.Push(next);
+                if(feature.GetFirstSubFeature() is IFeature sub) pending.Push(sub);
+                if(feature.GetNextSubFeature() is IFeature sibling) pending.Push(sibling);
+                if(!featureNames.Contains(feature.Name)) continue;
+                var dimensions=new List<object>();
+                var display=feature.GetFirstDisplayDimension() as IDisplayDimension;
+                for(var guard=0;display!=null && guard<1000;guard++)
+                {
+                    var dim=(IDimension)display.GetDimension2(0);
+                    var key=string.Join("@",dim.FullName.Split('@').Take(2));
+                    if(key.EndsWith("@"+feature.Name,StringComparison.Ordinal))
+                        dimensions.Add(new{name=key,valueMm=dim.SystemValue*1000,drivenState=dim.DrivenState});
+                    display=feature.GetNextDisplayDimension(display) as IDisplayDimension;
+                }
+                result[feature.Name]=dimensions.ToArray();
+            }
+            if(featureNames.Any(name=>!result.ContainsKey(name))) throw new InvalidOperationException("Fitur acceptance tidak ditemukan.");
+            return result;
         }
     }
 }
