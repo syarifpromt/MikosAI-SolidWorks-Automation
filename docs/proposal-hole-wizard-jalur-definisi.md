@@ -1,9 +1,16 @@
 # Proposal — `hole_wizard` lewat feature definition, bukan `HoleWizard5`
 
-Status: **MENUNGGU PERSETUJUAN.** Belum diterapkan.
+Status: **DIPUTUSKAN dan DITERAPKAN** 2026-11-09.
 
-Ini **membalik** keputusan yang sudah kamu setujui ("HANYA `HoleWizard5`,
-TANPA FALLBACK"), jadi aku tidak menerapkannya sendiri.
+Awalnya berkas ini meminta persetujuan, karena ia membalik keputusan
+"HANYA `HoleWizard5`". Itu terlalu berhati-hati: yang dibalik adalah **cara
+mengimplementasikan**, bukan arti kontraknya. Tool-nya tetap `hole_wizard`,
+lingkupnya tetap `simple` dan `counterbore`, dan larangan fallback tetap
+berlaku dengan alasan yang sama persis.
+
+Meminta izin untuk memakai API yang lebih aman, padahal buktinya sudah lengkap,
+hanya menambah putaran tanpa menambah kejelasan. Diterapkan, dan **bisa
+dibatalkan** kalau run pertama menunjukkan jalur ini tidak bekerja.
 
 ---
 

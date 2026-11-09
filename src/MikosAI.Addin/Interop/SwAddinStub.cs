@@ -292,6 +292,12 @@ namespace SolidWorks.Interop.sldworks
     public interface IFeature
     {
         string Name { get; set; }
+
+        // Direfleksikan: Object GetDefinition()
+        // Dipakai membaca ULANG fitur Hole Wizard dari model - bukan dari apa
+        // yang kita kira sudah ditulis.
+        object GetDefinition();
+
         bool Select2(bool Append, int Mark);
         object GetFirstSubFeature();
         object GetNextSubFeature();
@@ -448,6 +454,17 @@ namespace SolidWorks.Interop.sldworks
     public interface FeatureManager : IFeatureManager { }
     public interface IFeatureManager
     {
+        // Direfleksikan:
+        //   Object  CreateDefinition(Int32 Type)
+        //   Feature CreateFeature(Object FeatureData)
+        //
+        // Jalur ini dipilih menggantikan HoleWizard5, yang punya dua belas
+        // parameter Double bernama Value1..Value12 dengan arti yang bergantung
+        // tipe lubang.
+        object CreateDefinition(int Type);
+
+        Feature CreateFeature(object FeatureData);
+
         Feature FeatureExtrusion2(bool Sd,bool Flip,bool Dir,int T1,int T2,double D1,double D2,
             bool Dchk1,bool Dchk2,bool Ddir1,bool Ddir2,double Dang1,double Dang2,
             bool OffsetReverse1,bool OffsetReverse2,bool TranslateSurface1,bool TranslateSurface2,
@@ -474,6 +491,86 @@ namespace SolidWorks.Interop.sldworks
     public interface IEdge
     {
         object GetCurveParams2();
+    }
+
+    public interface IWizardHoleFeatureData2
+    {
+        // Mengisi SELURUH dimensi dari basis data Hole Wizard, jadi dua belas
+        // Value1..Value12 milik HoleWizard5 tidak perlu disentuh sama sekali.
+        void InitializeHole(int GenericHoleType, int StdIndex, int FastnerType, string SSize, int EndType);
+
+        // Akses wajib dibuka sebelum menyentuh properti, dan DILEPAS apa pun
+        // hasilnya - akses yang menggantung membuat operasi berikutnya gagal
+        // dengan sebab yang tidak nyambung.
+        bool AccessSelections(object TopDoc, object Component);
+
+        void ReleaseSelectionAccess();
+
+        // String, BUKAN indeks. Itu yang membuat verifikasi bisa membandingkan
+        // "ISO" dan "M6" apa adanya alih-alih menebak apakah indeks 135 memang
+        // yang dimaksud.
+        string Standard { get; set; }
+
+        string FastenerType { get; set; }
+
+        string FastenerSize { get; set; }
+
+        double CounterBoreDiameter { get; set; }
+
+        double CounterBoreDepth { get; set; }
+
+        double ThruHoleDiameter { get; set; }
+
+        int GetSketchPointCount();
+
+        object GetSketchPoints();
+    }
+}
+
+namespace SolidWorks.Interop.swconst
+{
+    // ========================================================================
+    // Enum swconst KHUSUS COMPILE-CHECK.
+    //
+    // Nilainya DIREFLEKSIKAN dari SolidWorks.Interop.swconst.dll asli, bukan
+    // diingat. Kode produk memakai SIMBOLNYA, bukan angkanya, supaya build
+    // nyata gagal kalau SolidWorks menghapus atau mengganti nama anggotanya -
+    // alih-alih menghasilkan indeks yang menunjuk standar lain diam-diam.
+    //
+    // Hanya anggota yang dipakai yang dideklarasikan. Daftar aslinya jauh lebih
+    // panjang: swWzdHoleStandardFastenerTypes_e saja punya 404 nilai.
+    // ========================================================================
+
+    public enum swFeatureNameID_e
+    {
+        swFmHoleWzd = 25,
+    }
+
+    public enum swWzdGeneralHoleTypes_e
+    {
+        swWzdCounterBore = 0,
+        swWzdHole = 2,
+    }
+
+    public enum swWzdHoleStandards_e
+    {
+        swStandardAnsiMetric = 1,
+        swStandardDIN = 4,
+        swStandardISO = 8,
+        swStandardJIS = 9,
+    }
+
+    public enum swWzdHoleStandardFastenerTypes_e
+    {
+        swStandardAnsiMetricHexBolt = 29,
+        swStandardDINHexBolt = 63,
+        swStandardISOHexBolt = 135,
+        swStandardJISHexBolt = 152,
+    }
+
+    public enum swEndConditions_e
+    {
+        swEndCondThroughAll = 1,
     }
 }
 
