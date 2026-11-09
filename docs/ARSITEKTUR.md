@@ -375,7 +375,8 @@ punya lapis 2 — itu sebabnya terasa berat dipakai.
 ## 7. Dokumen terkait
 
 - `docs/integrasi-antigravity.md` — integrasi `agy`, termasuk bug non-TTY yang kritis
-- `docs/ROADMAP.md` — fase, gerbang penerimaan, pembagian kerja
+- `docs/ROADMAP.md` — keadaan sekarang dan sisa pekerjaan sampai v0.1
+- `docs/ROADMAP-arsip-2026-11-09.md` — roadmap lama 5 fase, registry risiko, pembagian kerja
 - `docs/bedah-repo-referensi.md` — hasil bedah repo yang menjadi acuan
 - `docs/adr/` — catatan keputusan arsitektur
 - `capabilities.yaml` — ledger kemampuan

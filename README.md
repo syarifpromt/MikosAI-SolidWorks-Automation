@@ -103,7 +103,8 @@ akan menyatakannya dengan jujur.
 | Dokumen | Isi |
 |---|---|
 | [docs/ARSITEKTUR.md](docs/ARSITEKTUR.md) | Acuan arsitektur — mulai dari sini |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | 5 fase, gerbang penerimaan, pembagian kerja, registry risiko |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Keadaan sekarang, sisa pekerjaan sampai v0.1, dan aturan yang mengikat |
+| [docs/ROADMAP-arsip-2026-11-09.md](docs/ROADMAP-arsip-2026-11-09.md) | Roadmap lama 5 fase beserta registry risiko. Diarsipkan, bukan dihapus - ia mencatat KENAPA keputusan diambil |
 | [docs/integrasi-antigravity.md](docs/integrasi-antigravity.md) | Integrasi `agy`. **Wajib dibaca sebelum menyentuh ProviderHost** |
 | [docs/setup.md](docs/setup.md) | Setup, troubleshooting, dan keputusan yang membuatnya simpel |
 | [docs/skema-tool-dan-plan.md](docs/skema-tool-dan-plan.md) | Keputusan skema tool dan DesignPlan, plus konvensi yang mudah salah |

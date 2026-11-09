@@ -285,7 +285,9 @@ diimplementasikan di Tahap 1.
 
 ## Soal debugging
 
-Step-debug add-in net48 di VS Code punya batasan nyata — risiko R12 di `ROADMAP.md`.
+Step-debug add-in net48 di VS Code punya batasan nyata — risiko R12 di
+`ROADMAP-arsip-2026-11-09.md`. Registry risiko ada di arsip, bukan di roadmap
+yang sekarang.
 C# Dev Kit tidak mendukung .NET Framework; ekstensi C# dasar punya `type: "clr"` dengan
 attach ke proses tapi dukungannya belum terkonfirmasi di versi terkini; debugger ReSharper
 mendukungnya tapi tidak bisa aktif bareng C# Dev Kit.
