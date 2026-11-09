@@ -18,7 +18,6 @@
     "Setiap angka bisa diperiksa dengan pensil. Kalau tool melaporkan nilai",
     "lain, yang salah adalah tool - bukan berkas ini."
   ],
-
   "part": {
     "berkas": "plat-referensi.SLDPRT",
     "judul": "plat-referensi.SLDPRT",
@@ -26,23 +25,36 @@
     "konfigurasi": "Default",
     "material": "Plain Carbon Steel"
   },
-
   "boundingBox": {
-    "min": { "x": -50.0, "y": -40.0, "z": 0.0 },
-    "max": { "x": 50.0, "y": 40.0, "z": 10.0 },
-    "size": { "x": 100.0, "y": 80.0, "z": 10.0 },
+    "min": {
+      "x": -50.0,
+      "y": -40.0,
+      "z": 0.0
+    },
+    "max": {
+      "x": 50.0,
+      "y": 40.0,
+      "z": 10.0
+    },
+    "size": {
+      "x": 100.0,
+      "y": 80.0,
+      "z": 10.0
+    },
     "bodyCount": 1
   },
-
   "massProperties": {
     "volumeMm3": 80000.0,
     "massGrams": 624.0,
     "surfaceAreaMm2": 19600.0,
-    "centerOfMass": { "x": 0.0, "y": 0.0, "z": 5.0 },
+    "centerOfMass": {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 5.0
+    },
     "densityKgM3": 7800.0,
     "densityAssigned": true
   },
-
   "fitur": {
     "_catatan": [
       "featureCount SENGAJA TIDAK DIPATOK.",
@@ -60,13 +72,15 @@
       "suppress."
     ],
     "harusAda": [
-      { "name": "Boss-Extrude1", "typeName": "Extrusion" }
+      {
+        "name": "Boss-Extrude1",
+        "typeName": "Extrusion"
+      }
     ],
     "suppressedCount": 0,
     "errorCount": 0,
     "rebuildRequired": false
   },
-
   "sketsa": {
     "_catatan": [
       "entityCount TIDAK dipatok ke angka pasti.",
@@ -79,32 +93,30 @@
       "Yang benar-benar penting di sini adalah statusnya FullyDefined - dan itu",
       "yang membongkar pemetaan swConstrainedStatus_e yang bergeser satu.",
       "",
-      "hasOpenContour TIDAK lagi dipatok ke false. Versi pertama berkas ini",
-      "melakukannya, dan assertion itu LULUS tanpa menguji apa pun: nilainya",
-      "hardcoded dan tidak pernah dibaca dari SolidWorks. Yang dipatok sekarang",
-      "adalah kejujurannya - field yang belum dibaca harus null DAN diakui di",
-      "fieldsNotPopulated. Keduanya bisa merah."
+      "fieldsNotPopulated TIDAK lagi dipatok sebagai daftar nama. Versi sebelumnya",
+      "memaku dimensionCount, consumedByFeature, dan hasOpenContour - ketiganya",
+      "sudah DIPENSIUNKAN kontrak, jadi daftar itu menua dan merah tanpa ada yang",
+      "salah di produk. Yang dijaga sekarang invariant di golden-document.ps1:",
+      "setiap field null wajib diakui, dan setiap yang diakui memang null.",
+      "Daftar nama selalu menua; invariant tidak."
     ],
     "sketchCount": 1,
     "fullyDefinedCount": 1,
     "constrainedStatus": "FullyDefined",
-    "entityCountMinimal": 4,
-    "fieldsNotPopulated": ["dimensionCount", "consumedByFeature", "hasOpenContour"]
+    "entityCountMinimal": 4
   },
-
   "toleransi": {
     "_catatan": [
       "Prisma persegi dihitung eksak oleh SolidWorks, jadi toleransinya ketat.",
       "Yang dilonggarkan hanya pembulatan 6 desimal yang kita lakukan sendiri",
       "di ReadOnlyToolShaper."
     ],
-    "panjangMm": 1e-6,
-    "volumeMm3": 1e-3,
-    "massaGram": 1e-3,
-    "luasMm2": 1e-3,
-    "densitasKgM3": 1e-6
+    "panjangMm": 1e-06,
+    "volumeMm3": 0.001,
+    "massaGram": 0.001,
+    "luasMm2": 0.001,
+    "densitasKgM3": 1e-06
   },
-
   "pengulangan": {
     "_catatan": [
       "Pembacaan harus IDENTIK tiga kali berturut-turut. Sekali benar bisa",

@@ -132,6 +132,16 @@ capabilities:
       Terbukti pada add-in build 62d5aa8, yaitu commit yang sama dengan HEAD
       saat pengujian - jadi yang diuji memang kode yang tercatat.
 
+      DIVERIFIKASI ULANG pada build 8dd3dec, 2026-11-09: golden-document.ps1
+      34/0. Pembaca sudah berubah banyak sejak 62d5aa8 - pemisahan konsumen
+      dari dependent, tiga ember dimensi, dan konektivitas sketsa - jadi klaim
+      lama tidak lagi menjelaskan kode yang berjalan. Run ulang ini yang
+      menambatkannya kembali.
+
+      Bukti tambahan pada build yang sama:
+        golden-sketsa.ps1  33/0, nol hipotesis patah
+        golden-kontur.ps1  144/0
+
       `verified` di sini berarti: pembacaannya benar untuk part prismatik
       sederhana di SW2025 SP01.1. Ia TIDAK berarti benar untuk assembly,
       permukaan, atau konfigurasi ganda - itu belum pernah diuji, dan arti
@@ -154,11 +164,28 @@ capabilities:
       - save_close_reopen_readback
     notes: >
       Lingkup sempit: corner rectangle di Front Plane, blind normal, tanpa
-      draft, satu body pada part BARU. Writer yang sama telah SW_PASS pada
-      100x80x10 tiga kali dan 120x50x12 sekali, SW 33.1.1, build dasar
-      52357c5 dengan perubahan lokal (docs/pilot-balok.md). Integrasi
-      PlanRunner/chat baru tetap pilot dan memerlukan review manusia;
+      draft, satu body pada part BARU.
+
+      SW_PASS pada build 8dd3dec, 2026-11-09, SolidWorks 33.1.1 - build yang
+      TERMUAT sama persis dengan HEAD saat diuji, dan itu syaratnya. Klaim
+      sebelumnya menyebut "build dasar 52357c5 dengan perubahan lokal", yang
+      tidak bisa dirujuk siapa pun: commit plus perubahan yang tidak
+      disebutkan bukan artefak yang bisa dibangun ulang, dan writer-nya sudah
+      berubah lagi sesudah run itu.
+
+      Bukti pada 8dd3dec:
+        golden-balok.ps1      3/3 balok 100x80x10, volume 80000 mm3,
+                              diverifikasi setelah simpan-tutup-buka ulang
+        golden-block-flow.ps1 3/3 lewat PlanRunner, reopen, 5 fresh check
+
+      Integrasi PlanRunner/chat tetap pilot dan memerlukan review manusia;
       bukan promosi sketch_authoring atau part_features secara keseluruhan.
+
+      Snapshot sengaja TIDAK ada, dan itu konsekuensi lingkup - bukan celah.
+      Writer memanggil NewDocument, jadi ia selalu membuat part baru dan tidak
+      pernah menyentuh dokumen yang sudah dibuka pengguna. Begitu lingkupnya
+      dilebarkan ke dokumen yang sudah ada, perlindungan itu hilang dan
+      snapshot menjadi wajib.
       operationId dipertahankan per sesi: pemanggilan ulang mengembalikan
       hasil lama, bukan menulis ulang. Tidak retry/rollback otomatis.
 

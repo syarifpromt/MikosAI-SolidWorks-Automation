@@ -321,31 +321,51 @@ else {
         Write-Gagal "entityCount : $jumlahEntitas, diharapkan minimal $minimal"
     }
 
-    # DULU DI SINI ADA ASSERTION HAMPA.
+    # INVARIANT, BUKAN DAFTAR NAMA.
     #
-    # Versi pertama meng-assert `hasOpenContour -eq $false` dan LULUS - padahal
-    # nilainya hardcoded false dan tidak pernah dibaca dari SolidWorks.
-    # Assertion yang tidak pernah bisa merah tidak menguji apa pun; ia hanya
-    # menambah rasa aman tanpa menambah jaminan.
+    # Versi sebelumnya memaku tiga nama field - dimensionCount,
+    # consumedByFeature, hasOpenContour - dan menuntut ketiganya muncul di
+    # fieldsNotPopulated. Itu merah pada run 2026-11-09, tapi BUKAN karena
+    # produknya salah: ketiga nama itu sudah DIPENSIUNKAN kontrak. dimensionCount
+    # dipecah jadi tiga ember, consumedByFeature jadi consumedByFeatures, dan
+    # hasOpenContour dihapus sepenuhnya demi openEndpointCount.
     #
-    # Yang diuji sekarang adalah kejujurannya: field yang belum dibaca harus
-    # null, DAN harus diakui di fieldsNotPopulated. Keduanya bisa merah.
-    $kontur = Get-Properti $s1 'hasOpenContour'
-    if ($null -eq $kontur) {
-        Write-Lulus 'hasOpenContour = null (belum dibaca, dan tidak mengaku sudah)'
-    }
-    else {
-        Write-Gagal "hasOpenContour : $kontur, diharapkan null selama belum diimplementasikan"
+    # Assertion lama tidak bisa membedakan "janji diingkari" dari "field
+    # dipensiunkan", dan ia melaporkan keduanya dengan kalimat yang sama.
+    # Daftar nama selalu menua; invariant tidak.
+    #
+    # Yang dijaga sekarang: SETIAP field yang nilainya null WAJIB diakui di
+    # fieldsNotPopulated, dan sebaliknya setiap yang diakui memang null.
+    # Diturunkan dari respons yang sebenarnya, jadi penggantian nama field tidak
+    # membuatnya basi - sementara satu field null yang tidak diakui tetap merah.
+    $belumDibaca = @(Get-Properti $dataSk 'fieldsNotPopulated')
+
+    $nullTakDiakui = @()
+    foreach ($prop in $s1.PSObject.Properties) {
+        if ($prop.Name -eq 'name') { continue }
+        if ($null -eq $prop.Value -and $belumDibaca -notcontains $prop.Name) {
+            $nullTakDiakui += $prop.Name
+        }
     }
 
-    $belumDibaca = @(Get-Properti $dataSk 'fieldsNotPopulated')
-    foreach ($f in $h.sketsa.fieldsNotPopulated) {
-        if ($belumDibaca -contains $f) {
-            Write-Lulus "fieldsNotPopulated memuat '$f'"
-        }
-        else {
-            Write-Gagal "fieldsNotPopulated TIDAK memuat '$f' - janji yang tidak ditepati jadi senyap lagi"
-        }
+    if ($nullTakDiakui.Count -eq 0) {
+        Write-Lulus "setiap field null diakui di fieldsNotPopulated ($($belumDibaca.Count) diakui)"
+    }
+    else {
+        Write-Gagal "field null TIDAK diakui: $($nullTakDiakui -join ', ') - janji yang tidak ditepati jadi senyap"
+    }
+
+    $diakuiTapiTerisi = @()
+    foreach ($f in $belumDibaca) {
+        $nilai = Get-Properti $s1 $f
+        if ($null -ne $nilai) { $diakuiTapiTerisi += $f }
+    }
+
+    if ($diakuiTapiTerisi.Count -eq 0) {
+        Write-Lulus 'tidak ada field terisi yang masih mengaku belum dibaca'
+    }
+    else {
+        Write-Gagal "diakui belum dibaca padahal TERISI: $($diakuiTapiTerisi -join ', ')"
     }
 }
 
