@@ -195,8 +195,18 @@ capabilities:
       counterbore 14.547 mm, tembus 6.6 mm, standar "Hex Bolt Grade C ISO
       4016". Semuanya dari basis data Hole Wizard.
 
-      Jalur lubang BELUM terekspos sebagai tool MCP - ia hidup di harness pilot
-      native. create_parametric_block masih hanya membuat balok.
+      TEREKSPOS LEWAT MCP sejak a7f8bd8, 2026-11-10: create_parametric_block
+      menerima `holes` (counterbore, ISO, permukaan atas). golden-plat-flow.ps1
+      SW_PASS 3/3 lewat tools/call, termasuk dua penolakan tanpa menyentuh
+      model. golden-plat.ps1 SW_PASS 3/3 dengan posisi lubang dibaca SETELAH
+      reopen.
+
+      Koreksi atas run fbce808: posisinya waktu itu diverifikasi SEBELUM simpan,
+      walau skripnya berkomentar sebaliknya. Klaim posisi-setelah-reopen baru
+      berlaku sejak a7f8bd8.
+
+      Batas yang diakui: sketsa posisi under-defined - titik ditaruh dengan
+      koordinat, bukan dimensi desain.
 
       Snapshot sengaja TIDAK ada, dan itu konsekuensi lingkup - bukan celah.
       Writer memanggil NewDocument, jadi ia selalu membuat part baru dan tidak

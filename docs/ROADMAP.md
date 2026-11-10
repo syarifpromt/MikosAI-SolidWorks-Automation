@@ -116,17 +116,34 @@ yang bisa kebetulan cocok.
 `hole_wizard` **selesai**, termasuk transformasi posisi ke ruang sketsa dan
 baca-ulang yang ditransformasi balik.
 
+### Disambungkan ke MCP dan chat — 2026-11-10, build `a7f8bd8`
+
+| skrip | hasil |
+|---|---|
+| `golden-plat.ps1 -Runs 3` | **SW_PASS 3/3** — posisi lubang kini dibaca **setelah reopen** |
+| `golden-plat-flow.ps1 -Runs 3` | **SW_PASS 3/3 lewat tool MCP**, jalur yang dipakai AI dari chat |
+
+Jalur MCP juga membuktikan dua penolakan **tanpa menyentuh model**: posisi di
+tengah ketebalan (`z = 5`), dan permintaan tanpa standar — yang **tidak** diberi
+ISO diam-diam. Panggilan ulang dengan `operationId` yang sama mengembalikan hasil
+lama, bukan membuat plat kedua.
+
+Satu koreksi atas run sebelumnya: SW_PASS `fbce808` memverifikasi posisi lubang
+**sebelum simpan**, padahal skripnya berkomentar sebaliknya. Writer-nya sah;
+klaim "posisi terverifikasi setelah reopen" baru benar sejak `a7f8bd8`.
+
 ### Yang MASIH kurang untuk v0.1
 
-Gerbangnya berbunyi *"dibuat dari chat"*, dan itu belum.
-
-1. **Lubang belum terekspos lewat MCP.** `create_parametric_block` hanya
-   membuat balok. Jalur lubang hidup di harness pilot native, bukan di tool
-   yang bisa dipanggil AI.
+1. **Shortcut chat di panel belum diketik manusia.** Jalur LLM (agy → MCP) dan
+   flow-nya sudah terbukti; kalimat
+   `buat plat 100 x 80 x 10 mm dengan 4 lubang M6 counterbore ISO jarak 20 mm dari tepi`
+   di kotak chat belum pernah dicoba.
 2. **Belum 50 eksekusi tanpa crash** — kriteria "layak dipakai".
 3. **Pemulihan setelah gagal** belum diuji sebagai kriteria tersendiri.
-
-Bagian tersulitnya sudah lewat: yang tersisa menyambungkan, bukan menemukan.
+4. **Sketsa posisi lubang under-defined.** Titiknya ditaruh dengan koordinat,
+   bukan dimensi desain — mengubah ukuran plat tidak menggeser lubang ikut.
+   Gerbang Fase 3 menuntut sketsa fully defined lewat dimensi desain, jadi ini
+   harus dibereskan sebelum gerbang itu dinyatakan tertutup penuh.
 
 Empat lubang memang jadi **satu fitur**, jadi `linear_pattern` tidak
 dibutuhkan — seperti dugaan kontraknya.
