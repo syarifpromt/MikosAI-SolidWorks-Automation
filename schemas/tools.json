@@ -8,7 +8,7 @@
       "capabilityId": "parametric_block",
       "phase": 3,
       "mutates": true,
-      "description": "Buat balok berdimensi pada PART BARU, simpan dan buka ulang lalu verifikasi. Width/height/depth dalam mm wajib dinyatakan pengguna; jangan menebak ukuran. Hasil pilot memerlukan review manusia. Gunakan operationId yang sama untuk mengambil hasil panggilan ulang, termasuk saat respons isError karena review masih diperlukan; jangan membuat ID baru untuk retry.",
+      "description": "Buat balok berdimensi pada PART BARU, opsional dengan lubang counterbore di permukaan atas, simpan dan buka ulang lalu verifikasi. Width/height/depth dalam mm wajib dinyatakan pengguna; untuk lubang, standar, ukuran fastener, dan posisi juga wajib dinyatakan - jangan menebak. Hasil pilot memerlukan review manusia. Gunakan operationId yang sama untuk mengambil hasil panggilan ulang, termasuk saat respons isError karena review masih diperlukan; jangan membuat ID baru untuk retry.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
@@ -38,6 +38,45 @@
             "type": "string",
             "pattern": "^[a-f0-9]{32}$",
             "description": "UUID hex kecil 32 karakter, unik untuk satu permintaan pengguna; pertahankan saat memeriksa ulang hasil."
+          },
+          "holes": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "holeType",
+              "standard",
+              "fastenerSize",
+              "positions"
+            ],
+            "description": "OPSIONAL. Lubang Hole Wizard pada permukaan ATAS balok (z = depth). Tanpa field ini yang dibuat balok polos. Semua field di dalamnya WAJIB dinyatakan pengguna - tidak ada default untuk standar, ukuran fastener, maupun posisi.",
+            "properties": {
+              "holeType": {
+                "enum": [
+                  "counterbore"
+                ],
+                "description": "Hanya counterbore yang sudah SW_PASS lewat jalur ini."
+              },
+              "standard": {
+                "enum": [
+                  "ISO"
+                ],
+                "description": "Hanya ISO yang sudah SW_PASS. Standar lain ditolak sampai terbukti."
+              },
+              "fastenerSize": {
+                "type": "string",
+                "pattern": "^M[0-9]+(\\.[0-9]+)?$",
+                "description": "Mis. 'M6'. Dibaca ulang dari model setelah dibuat dan WAJIB sama persis."
+              },
+              "positions": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 64,
+                "items": {
+                  "$ref": "common.schema.json#/$defs/Vector3D"
+                },
+                "description": "Pusat lubang dalam KOORDINAT MODEL, mm. Balok menempati x 0..width, y 0..height, z 0..depth, jadi z wajib = depth dan x, y wajib di dalam permukaan atas."
+              }
+            }
           }
         }
       },
@@ -51,9 +90,10 @@
         "afterReopen": "object; hasil ukuran, volume, dan dimensi actual",
         "plan": "object; DesignPlan yang dieksekusi",
         "acceptanceChecks": "array of VerificationCheck",
-        "reviewRequired": "boolean"
+        "reviewRequired": "boolean",
+        "holes": "object|null; dibaca ULANG dari berkas setelah simpan-tutup-buka: featureName, standard, fastenerSize, counterBoreDiameterMm, thruHoleDiameterMm, sketchPointCount, positionsModelMm, positionDeviationsMm"
       },
-      "notes": "Implementasi composite terbatas: Front Plane, profil corner di origin, dimensi driving, blind normal. Tidak mengedit atau menutup dokumen pengguna yang sudah ada. Path output dikelola aplikasi dengan nama unik, tanpa argumen overwrite. PlanRunner dan fresh-read acceptance evaluator dipakai juga oleh chat. Model gagal dipertahankan untuk diperiksa. Tool primitive tulis lain tetap tidak diekspos."
+      "notes": "Implementasi composite terbatas: Front Plane, profil corner di origin, dimensi driving, blind normal. Tidak mengedit atau menutup dokumen pengguna yang sudah ada. Path output dikelola aplikasi dengan nama unik, tanpa argumen overwrite. PlanRunner dan fresh-read acceptance evaluator dipakai juga oleh chat. Model gagal dipertahankan untuk diperiksa. Tool primitive tulis lain tetap tidak diekspos. LUBANG (2026-11-10): jalur hole_wizard yang sudah SW_PASS 3/3 dibuka lewat tool ini, SEMPIT dengan sengaja - counterbore, ISO, di permukaan atas saja. Itu persis yang sudah terbukti di SolidWorks nyata; standar dan tipe lain menunggu run mereka sendiri. Posisi yang tidak berada di permukaan atas DITOLAK sebelum SolidWorks disentuh, karena lubang di luar face bukan permintaan yang bisa dipenuhi dan lebih baik ditolak di depan daripada dibuat di tempat lain. Diameter counterbore dan lubang tembus TIDAK dijanjikan: keduanya dari basis data Hole Wizard. Yang dijanjikan: standar dan ukuran yang dibaca ulang sama dengan yang diminta, jumlah titik sama, deviasi posisi <= 0.001 mm setelah transformasi balik, dan volume berkurang. BATAS YANG DIAKUI: titik posisi ditaruh dengan koordinat, bukan dengan dimensi desain, jadi sketsa posisinya under-defined - mengubah ukuran plat TIDAK menggeser lubang ikut."
     },
     {
       "name": "get_active_document",
