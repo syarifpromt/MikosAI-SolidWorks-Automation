@@ -77,3 +77,11 @@ tests/golden/~$*
 # ---------------------------------------------------------------------------
 Thumbs.db
 desktop.ini
+
+# Installer pihak ketiga yang dibedah untuk riset.
+#
+# JANGAN PERNAH ikut ter-commit: ia biner besar milik orang lain, dan repo
+# bukan tempat menyimpan artefak berlisensi pihak lain. Dicantumkan karena
+# `git add -A` dipakai rutin di proyek ini, dan satu kelalaian sudah cukup.
+*.exe
+!scripts/**/*.exe

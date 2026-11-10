@@ -60,7 +60,16 @@ for($run=1; $run -le $Runs; $run++) {
     while(-not (Test-Path -LiteralPath $resultPath)) {
         if ($timer.Elapsed.TotalSeconds -gt $TimeoutSeconds) {
             # Jangan hapus/retry request: ia mungkin sudah sedang berjalan.
-            throw "Belum ada hasil. Periksa apakah build terbaru termuat atau ada dialog modal. Request $id tetap untuk ditinjau; jangan kirim ulang."
+            # MENYEBUT apa yang menahan, bukan menyuruh orang menebak.
+            # Deteksi harus DARI LUAR proses: dialog modal memblokir thread
+            # yang seharusnya melapor, jadi add-in tidak akan pernah bisa
+            # menceritakannya sendiri.
+            Import-Module (Join-Path $PSScriptRoot 'lib\Dialog.psm1') -Force
+            Write-Host ''
+            Write-Host 'Run tidak memberi hasil. Diagnosa:' -ForegroundColor Yellow
+            Write-DiagnosaMacet -RequestId $id
+            Write-Host ''
+            throw "Belum ada hasil dalam $TimeoutSeconds detik. Request $id tetap untuk ditinjau; jangan kirim ulang."
         }
         Start-Sleep -Milliseconds 250
     }
