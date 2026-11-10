@@ -245,6 +245,11 @@ namespace SolidWorks.Interop.sldworks
 
     public interface IModelDoc2
     {
+        // Direfleksikan: Void EditSketch()
+        // Membuka sketsa yang SUDAH terpilih untuk diedit - dipakai menaruh
+        // titik posisi tambahan di sketsa milik Hole Wizard.
+        void EditSketch();
+
         SketchManager SketchManager { get; }
         FeatureManager FeatureManager { get; }
         object GetActiveSketch2();
@@ -438,6 +443,11 @@ namespace SolidWorks.Interop.sldworks
     }
     public interface ISketchPoint
     {
+        // Direfleksikan: Boolean SetCoords(Double Xx, Double Yy, Double Zz)
+        // Titik otomatis Hole Wizard DIPINDAH, bukan dihapus: menghapusnya
+        // bisa memutus relasi yang menautkannya ke fiturnya.
+        bool SetCoords(double Xx, double Yy, double Zz);
+
         bool Select4(bool Append, SelectData? Data);
         int Type { get; }
         object GetID();
@@ -469,6 +479,13 @@ namespace SolidWorks.Interop.sldworks
     {
         void InsertSketch(bool UpdateEditRebuild);
         object CreateCornerRectangle(double X1,double Y1,double Z1,double X2,double Y2,double Z2);
+
+        // Direfleksikan: SketchPoint CreatePoint(Double X, Double Y, Double Z)
+        //
+        // Koordinatnya RUANG SKETSA, bukan koordinat model. Z ada karena
+        // method yang sama dipakai 3D sketch. Lihat catatan transformasi di
+        // SolidWorksBlockWriter.
+        ISketchPoint CreatePoint(double X, double Y, double Z);
     }
     public interface FeatureManager : IFeatureManager { }
     public interface IFeatureManager

@@ -241,8 +241,15 @@ namespace MikosAI.Addin
                         "Permukaan atas balok tidak bisa dipilih pada koordinat model.");
 
                     var writer = new HoleWizardWriter(_app, _diagnostics);
-                    var hasil = writer.Buat(model, plan.Holes!);
-                    holeFeatureName = hasil.FeatureName;
+                    var awal = writer.Buat(model, plan.Holes!);
+                    holeFeatureName = awal.FeatureName;
+
+                    // Hole Wizard menaruh SATU titik; sisanya kita yang taruh.
+                    TaruhTitikPosisi(FindFeature(holeFeatureName), plan.Holes!.Positions);
+
+                    // Dibaca ULANG setelah titik lengkap - bukan memakai hasil
+                    // pembacaan sebelum titiknya ditambahkan.
+                    var hasil = writer.BacaUlangFitur(model, FindFeature(holeFeatureName), plan.Holes!);
 
                     // TRANSFORMASI BALIK KE KOORDINAT MODEL.
                     //
@@ -292,12 +299,18 @@ namespace MikosAI.Addin
                 });
             }
 
-            ISketch SketsaPosisi(IFeature fitur)
+            // Mengembalikan NODE FITUR-nya, bukan hanya ISketch.
+            //
+            // ISketch tidak punya jalan balik ke node-nya - tidak ada
+            // GetFeature. Node itu dibutuhkan untuk memilih sketsa sebelum
+            // EditSketch, jadi ia dikembalikan dari penelusuran yang memang
+            // sudah memegangnya alih-alih dicari ulang lewat nama.
+            IFeature NodeSketsaPosisi(IFeature fitur)
             {
                 var anak = fitur.GetFirstSubFeature() as IFeature;
                 for (var penjaga = 0; anak != null && penjaga < 100; penjaga++)
                 {
-                    if (anak.GetSpecificFeature2() is ISketch sk) return sk;
+                    if (anak.GetSpecificFeature2() is ISketch) return anak;
                     anak = anak.GetNextSubFeature() as IFeature;
                 }
                 throw new InvalidOperationException(
@@ -305,34 +318,96 @@ namespace MikosAI.Addin
                     + "ASUMSI YANG PATAH: Hole Wizard menyimpan sketsa posisinya sebagai sub-fitur.");
             }
 
-            List<Titik3D> KeKoordinatModel(ISketch sketsa, IReadOnlyList<Titik3D> ruangSketsa)
+            ISketch SketsaPosisi(IFeature fitur)
+                => (ISketch)(object)NodeSketsaPosisi(fitur).GetSpecificFeature2();
+
+            // SATU penerap transformasi, dipakai KEDUA arah.
+            //
+            // Menulis dua rutin yang mirip adalah cara paling mudah membuat
+            // satu arah benar dan arah lainnya diam-diam salah - lalu
+            // keduanya terlihat bekerja karena diuji di Front Plane, tempat
+            // transformasinya identitas.
+            List<Titik3D> Terapkan(IMathTransform? transform, IReadOnlyList<Titik3D> titik, string label)
             {
-                var transform = sketsa.ModelToSketchTransform;
-                Require(transform != null, "ModelToSketchTransform null.");
-                // Inverse() mengembalikan Object, BUKAN MathTransform - cast
-                // eksplisit, kalau tidak seluruh ekspresi menjadi dynamic dan
-                // build gagal dengan CS0656 yang sebabnya tidak kelihatan.
-                var balik = transform!.Inverse() as IMathTransform;
-                Require(balik != null, "IMathTransform.Inverse mengembalikan null atau bukan IMathTransform.");
-                var m = balik!.ArrayData as double[];
-                Require(m != null && m!.Length >= 12,
-                    "ArrayData transformasi tidak berbentuk matriks 16 elemen seperti yang diharapkan.");
+                Require(transform != null, $"Transformasi {label} null.");
+                var m = transform!.ArrayData as double[];
+                Require(m != null && m!.Length >= 13,
+                    $"ArrayData transformasi {label} bukan matriks yang diharapkan.");
 
                 var hasil = new List<Titik3D>();
-                foreach (var t in ruangSketsa)
+                foreach (var t in titik)
                 {
                     // ArrayData: 0..8 rotasi baris-utama, 9..11 translasi,
-                    // 12 skala. Dikerjakan dalam METER lalu dikembalikan ke mm.
+                    // 12 skala. Dikerjakan dalam METER lalu kembali ke mm.
                     var x = t.X / 1000.0;
                     var y = t.Y / 1000.0;
                     var z = t.Z / 1000.0;
                     var skala = m![12] == 0 ? 1.0 : m[12];
-                    var mx = (m[0] * x + m[3] * y + m[6] * z) * skala + m[9];
-                    var my = (m[1] * x + m[4] * y + m[7] * z) * skala + m[10];
-                    var mz = (m[2] * x + m[5] * y + m[8] * z) * skala + m[11];
-                    hasil.Add(new Titik3D(mx * 1000.0, my * 1000.0, mz * 1000.0));
+                    hasil.Add(new Titik3D(
+                        ((m[0] * x + m[3] * y + m[6] * z) * skala + m[9]) * 1000.0,
+                        ((m[1] * x + m[4] * y + m[7] * z) * skala + m[10]) * 1000.0,
+                        ((m[2] * x + m[5] * y + m[8] * z) * skala + m[11]) * 1000.0));
                 }
                 return hasil;
+            }
+
+            List<Titik3D> KeRuangSketsa(ISketch sketsa, IReadOnlyList<Titik3D> model3D)
+                => Terapkan(sketsa.ModelToSketchTransform, model3D, "model->sketsa");
+
+            List<Titik3D> KeKoordinatModel(ISketch sketsa, IReadOnlyList<Titik3D> ruangSketsa)
+            {
+                // Inverse() mengembalikan Object, BUKAN MathTransform - cast
+                // eksplisit, kalau tidak seluruh ekspresi menjadi dynamic dan
+                // build gagal dengan CS0656 yang sebabnya tidak kelihatan.
+                var balik = sketsa.ModelToSketchTransform?.Inverse() as IMathTransform;
+                return Terapkan(balik, ruangSketsa, "sketsa->model");
+            }
+
+            // MENARUH SELURUH TITIK YANG DIMINTA DI SKETSA POSISI.
+            //
+            // Hole Wizard hanya menaruh SATU titik, di tempat yang ia pilih
+            // sendiri dari seleksi face. Itu terbukti di run 2026-11-10:
+            // fiturnya terbentuk dengan benar - CBORE for M6 Hex Head Bolt1,
+            // volume turun 80000 -> 79129.92 - tapi titiknya satu, bukan empat.
+            //
+            // Jadi titik otomatis itu DIPINDAH ke posisi pertama, dan sisanya
+            // dibuat. Koordinatnya ditransformasi ke ruang sketsa lebih dulu,
+            // karena CreatePoint dan SetCoords keduanya bekerja di sana.
+            void TaruhTitikPosisi(IFeature fiturLubang, IReadOnlyList<Titik3D> diminta)
+            {
+                var sketsa = SketsaPosisi(fiturLubang);
+                var sasaran = KeRuangSketsa(sketsa, diminta);
+
+                var nodeSketsa = NodeSketsaPosisi(fiturLubang);
+                model.ClearSelection2(true);
+                Require(nodeSketsa.Select2(false, 0), "Sketsa posisi tidak bisa dipilih untuk diedit.");
+                model.EditSketch();
+
+                var aktif = ActiveSketch();
+                var adaSekarang = (aktif.GetSketchPoints2() as object[])?.OfType<ISketchPoint>().ToList()
+                                  ?? new List<ISketchPoint>();
+                Require(adaSekarang.Count >= 1,
+                    "Sketsa posisi tidak punya titik sama sekali. ASUMSI YANG PATAH: Hole Wizard "
+                    + "selalu menaruh satu titik awal.");
+
+                // Titik otomatis dipindah, bukan dihapus: menghapusnya bisa
+                // memutus relasi yang menautkannya ke fitur.
+                Require(adaSekarang[0].SetCoords(sasaran[0].X / 1000.0, sasaran[0].Y / 1000.0, sasaran[0].Z / 1000.0),
+                    "SetCoords menolak memindahkan titik posisi pertama. ASUMSI YANG PATAH: titik "
+                    + "otomatis bebas dipindah, tidak terkunci relasi.");
+
+                for (var i = 1; i < sasaran.Count; i++)
+                {
+                    var titikBaru = model.SketchManager.CreatePoint(
+                        sasaran[i].X / 1000.0, sasaran[i].Y / 1000.0, sasaran[i].Z / 1000.0);
+                    Require(titikBaru != null, $"CreatePoint gagal untuk posisi ke-{i + 1}.");
+                }
+
+                model.SketchManager.InsertSketch(true);
+                Require((object)model.GetActiveSketch2() == null, "Sketsa posisi masih terbuka.");
+                Require(model.EditRebuild3(), "Rebuild gagal setelah menaruh titik posisi.");
+                Require(fiturLubang.GetErrorCode2(out _) == 0,
+                    "Fitur lubang melaporkan rebuild error setelah titik ditambahkan.");
             }
 
             object Verify()

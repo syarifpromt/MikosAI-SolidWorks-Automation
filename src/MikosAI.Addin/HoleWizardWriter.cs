@@ -166,7 +166,7 @@ namespace MikosAI.Addin
             Require(model.EditRebuild3(), "Rebuild gagal setelah Hole Wizard.");
             Require(fitur!.GetErrorCode2(out _) == 0, "Fitur Hole Wizard melaporkan rebuild error.");
 
-            return BacaUlang(model, fitur!, spec);
+            return BacaUlangFitur(model, fitur!, spec);
         }
 
         /// <summary>
@@ -180,7 +180,7 @@ namespace MikosAI.Addin
         /// pemanggil: standar dan ukuran yang diminta, jumlah lubang, dan arah
         /// perubahan volume.
         /// </summary>
-        private HasilLubang BacaUlang(IModelDoc2 model, IFeature fitur, HoleSpec spec)
+        internal HasilLubang BacaUlangFitur(IModelDoc2 model, IFeature fitur, HoleSpec spec)
         {
             var data = fitur.GetDefinition() as IWizardHoleFeatureData2;
             Require(data is not null,
