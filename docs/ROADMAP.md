@@ -94,26 +94,51 @@ wajib. Itu bukan formalitas — belum ada bukti ia benar untuk bentuk lain.
 
 Ini definisi yang sudah dipakai sejak awal, dan tidak diubah.
 
-### Yang sudah ada untuk itu
+### Yang sudah terbukti — 2026-11-10
 
-Plat 100×80×10 **sudah bisa dibuat** — itu persis yang dilakukan
-`create_parametric_block`, dan sudah SW_PASS 3/3.
+**Mounting plate lengkap, SW_PASS 3/3 berturut-turut** pada build `fbce808`,
+SolidWorks 33.1.1, lewat harness pilot native.
 
-### Yang kurang: satu tool
+```
+lubang : ISO M6, counterbore 14.547 mm, tembus 6.6 mm
+posisi : (20,20,10) (80,20,10) (20,60,10) (80,60,10) — deviasi maks 0 mm
+volume : 80000 → 76519.678200 mm³
+```
 
-**`hole_wizard`.** Itu saja.
+Tiga kali, identik sampai desimal terakhir, masing-masing diverifikasi
+**setelah simpan-tutup-buka ulang**.
 
-Kontraknya sudah selesai dan disetujui — `positions` menerima array, jadi empat
-lubang bisa jadi satu fitur dan `linear_pattern` belum tentu dibutuhkan.
+Dan ada pemeriksaan silang yang berdiri sendiri: empat lubang membuang
+**870.08045 mm³ masing-masing**, persis sama dengan yang dibuang satu lubang
+pada run sebelumnya. Keempatnya identik dan memotong penuh — itu bukan sesuatu
+yang bisa kebetulan cocok.
 
-Pekerjaannya tidak ringan, dan sudah diketahui di mana sulitnya:
+`hole_wizard` **selesai**, termasuk transformasi posisi ke ruang sketsa dan
+baca-ulang yang ditransformasi balik.
+
+### Yang MASIH kurang untuk v0.1
+
+Gerbangnya berbunyi *"dibuat dari chat"*, dan itu belum.
+
+1. **Lubang belum terekspos lewat MCP.** `create_parametric_block` hanya
+   membuat balok. Jalur lubang hidup di harness pilot native, bukan di tool
+   yang bisa dipanggil AI.
+2. **Belum 50 eksekusi tanpa crash** — kriteria "layak dipakai".
+3. **Pemulihan setelah gagal** belum diuji sebagai kriteria tersendiri.
+
+Bagian tersulitnya sudah lewat: yang tersisa menyambungkan, bukan menemukan.
+
+Empat lubang memang jadi **satu fitur**, jadi `linear_pattern` tidak
+dibutuhkan — seperti dugaan kontraknya.
+
+Yang sudah terjawab lewat run nyata, dan sempat salah semua di tebakan awal:
 
 | | |
 |---|---|
-| `Value1…Value12` | dua belas parameter `Double` yang artinya bergantung tipe lubang, dan namanya tidak memberi petunjuk. Test urutan parameter dibuat **per tipe lubang** |
-| `StandardIndex`, `FastenerTypeIndex` | `Int32` dengan enum asli (19 dan 404 nilai). Pemetaan nama→enum **di-generate dari refleksi PIA**, tidak ditulis tangan |
-| Posisi | `HoleWizard5` **tidak punya parameter koordinat**. Posisi ditaruh sebagai titik sketsa lewat `CreatePoint`, yang koordinatnya **ruang sketsa** — jadi wajib ditransformasi lewat `ISketch.ModelToSketchTransform`, dan dibalik dengan `IMathTransform.Inverse` untuk `actualPositions` |
-| Lingkup M0 | hanya `simple` dan `counterbore`. Tipe lain `BLOCKED` sampai test urutan parameternya SW_PASS |
+| `Value1…Value12` | **tidak pernah disentuh.** Jalur `CreateDefinition` → `InitializeHole` → `CreateFeature` mengisi dimensi dari basis data Hole Wizard, jadi perangkap urutan parameter hilang alih-alih diuji-kelilingi |
+| `AccessSelections` | **MEMATIKAN SolidWorks** kalau dipanggil pada definisi yang baru dibuat — tanpa exception, tanpa jejak managed. Pasangan Access/Release hanya untuk mengedit definisi yang sudah ada |
+| Posisi | Hole Wizard menaruh **satu** titik saja. Sisanya ditaruh sendiri lewat `CreatePoint` di ruang sketsa, dan titik otomatisnya **dipindah** lewat `SetCoords`, bukan dihapus |
+| Lingkup M0 | hanya `simple` dan `counterbore`. Tipe lain `BLOCKED` sampai test-nya SW_PASS |
 
 ### Urutan kerja
 

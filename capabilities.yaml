@@ -181,6 +181,23 @@ capabilities:
       Integrasi PlanRunner/chat tetap pilot dan memerlukan review manusia;
       bukan promosi sketch_authoring atau part_features secara keseluruhan.
 
+      LUBANG HOLE WIZARD: SW_PASS 3/3 pada build fbce808, 2026-11-10,
+      SolidWorks 33.1.1. Mounting plate 100x80x10 dengan 4 lubang M6
+      counterbore ISO, masing-masing diverifikasi setelah simpan-tutup-buka
+      ulang. Posisi (20,20,10) (80,20,10) (20,60,10) (80,60,10) dengan deviasi
+      maksimum 0 mm setelah transformasi ruang sketsa dan baliknya.
+
+      Pemeriksaan silang yang berdiri sendiri: empat lubang membuang 870.08045
+      mm3 masing-masing, persis sama dengan yang dibuang satu lubang pada run
+      sebelumnya - keempatnya identik dan memotong penuh.
+
+      Nilai yang TIDAK kami tentukan, dan karena itu tidak kami patok:
+      counterbore 14.547 mm, tembus 6.6 mm, standar "Hex Bolt Grade C ISO
+      4016". Semuanya dari basis data Hole Wizard.
+
+      Jalur lubang BELUM terekspos sebagai tool MCP - ia hidup di harness pilot
+      native. create_parametric_block masih hanya membuat balok.
+
       Snapshot sengaja TIDAK ada, dan itu konsekuensi lingkup - bukan celah.
       Writer memanggil NewDocument, jadi ia selalu membuat part baru dan tidak
       pernah menyentuh dokumen yang sudah dibuka pengguna. Begitu lingkupnya
