@@ -101,8 +101,15 @@ for($run=1; $run -le $Runs; $run++) {
     $volumePolos=$Width*$Height*$Depth
     if ($measure.volumeMm3 -ge $volumePolos) { throw "Volume $($measure.volumeMm3) tidak berkurang dari balok polos $volumePolos - lubangnya tidak memotong apa pun." }
     if ($measure.volumeMm3 -le 0) { throw 'Volume nol setelah lubang.' }
-    # --- Lubang: dibaca ULANG dari berkas yang sudah ditutup dan dibuka ---
-    $holes=$response.data.holes
+    # --- Lubang: dibaca dari afterReopen, yaitu SETELAH simpan-tutup-buka ---
+    #
+    # Versi sebelumnya membaca $response.data.holes, yang berasal dari langkah
+    # hole_wizard SEBELUM simpan - sementara komentar di sini menyatakan
+    # "dibaca ULANG dari berkas yang sudah ditutup dan dibuka". Komentar itu
+    # tidak benar, dan tiga run SW_PASS pertama memakai pembacaan sebelum
+    # simpan untuk posisi lubang. afterReopen.holes baru ada sejak Verify()
+    # membaca ulang lubang setelah reopen.
+    $holes=$measure.holes
     if (-not $holes) { throw 'Hasil tidak memuat data lubang.' }
     if ($holes.sketchPointCount -ne 4) { throw "Jumlah titik posisi $($holes.sketchPointCount), diharapkan 4." }
     if ($holes.standard -cne 'ISO') { throw "Standard terbaca '$($holes.standard)', diharapkan 'ISO'." }

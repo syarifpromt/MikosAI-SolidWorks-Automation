@@ -35,6 +35,17 @@ namespace MikosAI.Core.Plan
         public const string ToolLubang = "hole_wizard";
 
         public static BlockPilotPlan Create(double width,double height,double depth)
+            => Create(width,height,depth,null);
+
+        /// <summary>
+        /// Plan balok, opsional dengan langkah hole_wizard.
+        ///
+        /// Lubang ditambahkan sebagai JSON lalu dilewatkan ke Read - BUKAN
+        /// disetel langsung ke properti. Dengan begitu aturan validasi tetap
+        /// hidup di satu tempat, dan plan yang dieksekusi adalah plan yang
+        /// sama persis dengan yang bisa diperiksa orang.
+        /// </summary>
+        public static BlockPilotPlan Create(double width,double height,double depth,HoleSpec? holes)
         {
             // Factory menggunakan batas yang sama dengan plan pilot dari disk.
             var plan=JsonNode.Parse(@"{""schemaVersion"":""1.0"",""units"":{""length"":""mm"",""angle"":""deg""},""document"":{""type"":""part""},""steps"":[
@@ -45,6 +56,16 @@ namespace MikosAI.Core.Plan
             plan["steps"]![1]!["arguments"]!["width"]=width;
             plan["steps"]![1]!["arguments"]!["height"]=height;
             plan["steps"]![3]!["arguments"]!["endCondition"]!["depth"]=depth;
+            if (holes is not null)
+            {
+                var posisi = new JsonArray();
+                foreach (var t in holes.Positions)
+                    posisi.Add(new JsonObject { ["x"]=t.X, ["y"]=t.Y, ["z"]=t.Z });
+                var argumen = new JsonObject { ["holeType"]=holes.HoleType, ["positions"]=posisi };
+                if (holes.Standard is not null) argumen["standard"]=holes.Standard;
+                if (holes.FastenerSize is not null) argumen["fastenerSize"]=holes.FastenerSize;
+                plan["steps"]!.AsArray().Add(new JsonObject { ["tool"]=ToolLubang, ["arguments"]=argumen });
+            }
             return Read(plan);
         }
 

@@ -46,7 +46,7 @@ namespace MikosAI.Core.Tests
         public async Task runs_real_planrunner_resolves_values_and_enforces_pilot_review()
         {
             var session=new Session();
-            var flow=new ParametricBlockFlow(Catalog(),(w,h,d,p)=>session,id=>"new-"+id+".SLDPRT");
+            var flow=new ParametricBlockFlow(Catalog(),(w,h,d,holes,p)=>session,id=>"new-"+id+".SLDPRT");
             var result=await flow.ExecuteAsync(Args());
             Assert.Equal(1,session.Executions);Assert.Equal(1,session.Evaluations);
             Assert.Equal(120,session.LastArgs!["width"]!.GetValue<double>());
@@ -59,14 +59,14 @@ namespace MikosAI.Core.Tests
         public async Task ledger_blocks_before_native_session_creation()
         {
             var creates=0;
-            var flow=new ParametricBlockFlow(Catalog(false),(w,h,d,p)=>{creates++;return new Session();},id=>id+".SLDPRT");
+            var flow=new ParametricBlockFlow(Catalog(false),(w,h,d,holes,p)=>{creates++;return new Session();},id=>id+".SLDPRT");
             var result=await flow.ExecuteAsync(Args());
             Assert.Equal(0,creates);Assert.False(result.ModelChanged);Assert.Equal(ErrorKind.PolicyBlocked,result.Error!.Kind);
         }
         [Fact]
         public async Task duplicate_operation_is_shared_and_changed_arguments_are_rejected()
         {
-            var session=new Session();var flow=new ParametricBlockFlow(Catalog(),(w,h,d,p)=>session,id=>id+".SLDPRT");
+            var session=new Session();var flow=new ParametricBlockFlow(Catalog(),(w,h,d,holes,p)=>session,id=>id+".SLDPRT");
             var id=Guid.NewGuid().ToString("N");
             var results=await Task.WhenAll(flow.ExecuteAsync(Args(id)),flow.ExecuteAsync(Args(id)));
             Assert.Same(results[0],results[1]);Assert.Equal(1,session.Executions);
@@ -76,7 +76,7 @@ namespace MikosAI.Core.Tests
         [Fact]
         public async Task native_failure_does_not_run_acceptance_or_retry()
         {
-            var session=new Session{Fail=true};var flow=new ParametricBlockFlow(Catalog(),(w,h,d,p)=>session,id=>id+".SLDPRT");
+            var session=new Session{Fail=true};var flow=new ParametricBlockFlow(Catalog(),(w,h,d,holes,p)=>session,id=>id+".SLDPRT");
             var args=Args();var first=await flow.ExecuteAsync(args);var second=await flow.ExecuteAsync(args);
             Assert.Same(first,second);Assert.Equal(1,session.Executions);Assert.Equal(0,session.Evaluations);
             Assert.Equal(Verdict.Fail,first.Verification!.Verdict);Assert.False(first.IsTaskSuccessful);
@@ -84,7 +84,7 @@ namespace MikosAI.Core.Tests
         [Fact]
         public async Task acceptance_failure_cannot_become_success()
         {
-            var session=new Session{BadAcceptance=true};var flow=new ParametricBlockFlow(Catalog(),(w,h,d,p)=>session,id=>id+".SLDPRT");
+            var session=new Session{BadAcceptance=true};var flow=new ParametricBlockFlow(Catalog(),(w,h,d,holes,p)=>session,id=>id+".SLDPRT");
             var result=await flow.ExecuteAsync(Args());Assert.Equal(Verdict.Fail,result.Verification!.Verdict);Assert.False(result.IsTaskSuccessful);
         }
         [Fact]
@@ -95,7 +95,7 @@ namespace MikosAI.Core.Tests
             var envelope=McpRequestHandler.BuildToolCallResult(invalid);
             var wire=JsonNode.Parse(envelope["content"]![0]!["text"]!.GetValue<string>())!;
             Assert.False(wire["modelChanged"]!.GetValue<bool>());Assert.True(envelope["isError"]!.GetValue<bool>());
-            var flow=new ParametricBlockFlow(Catalog(),(w,h,d,p)=>new Session(),id=>id);
+            var flow=new ParametricBlockFlow(Catalog(),(w,h,d,holes,p)=>new Session(),id=>id);
             var pilot=McpRequestHandler.BuildToolCallResult(await flow.ExecuteAsync(Args()));
             var payload=JsonNode.Parse(pilot["content"]![0]!["text"]!.GetValue<string>())!;
             Assert.True(payload["modelChanged"]!.GetValue<bool>());
@@ -106,7 +106,7 @@ namespace MikosAI.Core.Tests
         [InlineData(0)][InlineData(-1)][InlineData(10001)]
         public async Task rejects_bad_sizes_before_factory(double value)
         {
-            var creates=0;var flow=new ParametricBlockFlow(Catalog(),(w,h,d,p)=>{creates++;return new Session();},id=>id);
+            var creates=0;var flow=new ParametricBlockFlow(Catalog(),(w,h,d,holes,p)=>{creates++;return new Session();},id=>id);
             var args=Args();args["width"]=value;
             Assert.False((await flow.ExecuteAsync(args)).ModelChanged);Assert.Equal(0,creates);
         }

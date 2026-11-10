@@ -62,6 +62,11 @@ namespace MikosAI.Addin
             // function - bukan pada titik deklarasinya.
             var lubangSudahDibuat = false;
 
+            // Sama alasannya dengan lubangSudahDibuat: Verify() membacanya, dan
+            // C# menuntut definite assignment di titik PEMANGGILAN local
+            // function. Ini jebakan yang sama untuk kedua kalinya.
+            string holeFeatureName = string.Empty;
+
             var dimensionNames = new List<string>();
             string sketchName = string.Empty;
             string bossName = string.Empty;
@@ -215,7 +220,6 @@ namespace MikosAI.Addin
                 Require(feature.GetErrorCode2(out _)==0,"Fitur extrude melaporkan rebuild error/warning.");
                 return new {featureName=bossName, dimensions=DimensionReadings(feature), measurements=Verify()};
             });
-            string holeFeatureName = string.Empty;
             object? holeReadback = null;
             var volumeSebelumLubang = 0.0;
 
@@ -446,7 +450,46 @@ namespace MikosAI.Addin
                 Require(boss.GetErrorCode2(out _)==0,"Extrude mempunyai rebuild error.");
                 var depthDimensions=DimensionReadings(boss).Select(x=>JsonSerializer.SerializeToElement(x)).ToList();
                 Require(depthDimensions.Any(x=>x.GetProperty("drivenState").GetInt32()==2 && Math.Abs(x.GetProperty("valueMm").GetDouble()-plan.DepthMm)<=1e-6),"Dimensi depth extrude tidak cocok.");
-                return new {bodyCount=box.BodyCount,min=box.Min,max=box.Max,volumeMm3=mass.VolumeMm3,profileDimensions=dims,depthDimensions};
+                // LUBANG DIBACA ULANG DI SINI, bukan hanya di langkah hole_wizard.
+                //
+                // Verify() dipanggil lagi setelah simpan-tutup-buka. Versi
+                // sebelumnya hanya memeriksa volume di titik itu, sementara data
+                // lubang yang dilaporkan berasal dari langkah hole_wizard -
+                // SEBELUM simpan. Skrip golden bahkan berkomentar "dibaca ULANG
+                // dari berkas yang sudah ditutup dan dibuka", dan komentar itu
+                // tidak benar. Klaim "terverifikasi setelah reopen" untuk posisi
+                // lubang baru jujur sejak baris-baris ini ada.
+                object? lubang = null;
+                if (lubangSudahDibuat)
+                {
+                    var fiturLubang = FindFeature(holeFeatureName);
+                    Require(fiturLubang.GetErrorCode2(out _) == 0, "Fitur lubang mempunyai rebuild error.");
+                    var baca = new HoleWizardWriter(_app, _diagnostics).BacaUlangFitur(model, fiturLubang, plan.Holes!);
+                    var posisi = KeKoordinatModel(SketsaPosisi(fiturLubang), baca.PositionsSketchSpaceMm);
+                    Require(posisi.Count == plan.Holes!.Positions.Count,
+                        $"Setelah baca ulang: {posisi.Count} titik posisi, diminta {plan.Holes!.Positions.Count}.");
+                    Require(string.Equals(baca.FastenerSize, plan.Holes!.FastenerSize, StringComparison.Ordinal),
+                        $"FastenerSize terbaca '{baca.FastenerSize}', diminta '{plan.Holes!.FastenerSize}'.");
+                    var deviasi = plan.Holes!.Positions.Select(d0 => posisi
+                        .Select(a => Math.Sqrt(Math.Pow(a.X - d0.X, 2) + Math.Pow(a.Y - d0.Y, 2) + Math.Pow(a.Z - d0.Z, 2)))
+                        .Min()).ToArray();
+                    Require(deviasi.All(x => x <= 1e-3),
+                        $"Posisi lubang meleset setelah baca ulang: maks {deviasi.Max():0.######} mm.");
+                    lubang = new
+                    {
+                        featureName = baca.FeatureName,
+                        standard = baca.Standard,
+                        fastenerType = baca.FastenerType,
+                        fastenerSize = baca.FastenerSize,
+                        counterBoreDiameterMm = baca.CounterBoreDiameterMm,
+                        counterBoreDepthMm = baca.CounterBoreDepthMm,
+                        thruHoleDiameterMm = baca.ThruHoleDiameterMm,
+                        sketchPointCount = baca.SketchPointCount,
+                        positionsModelMm = posisi.Select(t => new { t.X, t.Y, t.Z }).ToArray(),
+                        positionDeviationsMm = deviasi,
+                    };
+                }
+                return new {bodyCount=box.BodyCount,min=box.Min,max=box.Max,volumeMm3=mass.VolumeMm3,profileDimensions=dims,depthDimensions,holes=lubang};
             }
             var beforeSave=Verify();
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);

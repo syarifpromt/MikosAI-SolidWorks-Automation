@@ -232,8 +232,8 @@ namespace MikosAI.Addin
                     var blockCatalog=MikosAI.Core.Tools.ToolCatalog.Load(System.IO.Path.Combine(root,"schemas","tools.json"),
                         MikosAI.Core.Capabilities.CapabilityLedger.Load(System.IO.Path.Combine(root,"capabilities.yaml")));
                     _blockFlow=new MikosAI.Core.Plan.ParametricBlockFlow(blockCatalog,
-                        (w,h,d,path)=>new NativeBlockSession(_dispatcher!,
-                            ()=>_sw!.BuatPenulisBalok(_diagnostics,_pembaca!),()=>_pembaca,w,h,d,path,
+                        (w,h,d,holes,path)=>new NativeBlockSession(_dispatcher!,
+                            ()=>_sw!.BuatPenulisBalok(_diagnostics,_pembaca!),()=>_pembaca,w,h,d,holes,path,
                             blockCatalog.RequiresReview(MikosAI.Core.Plan.ParametricBlockFlow.ToolName),_diagnostics),
                         id=>System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments),"MikosAI","Models","block-"+id+".SLDPRT"));
                     var executor = new SolidWorksToolExecutor(
@@ -750,12 +750,28 @@ namespace MikosAI.Addin
                 {
                     if(!block.Valid) { _panel?.KirimPesanChat("ai",block.Message); return; }
                     if(_blockFlow is null) { _panel?.KirimPesanChat("galat","Jalur balok belum siap. Periksa status add-in."); return; }
-                    _panel?.KirimPesanChat("ai",$"Membuat part baru {block.Width} × {block.Height} × {block.Depth} mm dan memverifikasi hasil simpan–buka ulang...");
-                    var result=await _blockFlow.ExecuteAsync(new JsonObject{["width"]=block.Width,["height"]=block.Height,["depth"]=block.Depth,["operationId"]=Guid.NewGuid().ToString("N")}).ConfigureAwait(false);
+                    var benda=block.Holes is null ? "balok" : "plat";
+                    var keteranganLubang=block.Holes is null ? string.Empty
+                        : $" dengan {block.Holes.Positions.Count} lubang {block.Holes.FastenerSize} {block.Holes.HoleType} {block.Holes.Standard}";
+                    _panel?.KirimPesanChat("ai",$"Membuat part baru: {benda} {block.Width} × {block.Height} × {block.Depth} mm{keteranganLubang}, lalu memverifikasi hasil simpan–buka ulang...");
+                    var argumen=new JsonObject{["width"]=block.Width,["height"]=block.Height,["depth"]=block.Depth,["operationId"]=Guid.NewGuid().ToString("N")};
+                    if(block.Holes is not null)
+                    {
+                        // Lewat flow yang SAMA dengan tool MCP, bukan jalur
+                        // terpisah - supaya aturan yang menolak posisi di luar
+                        // permukaan atas atau standar yang belum terbukti hidup
+                        // di satu tempat.
+                        var posisi=new JsonArray();
+                        foreach(var t in block.Holes.Positions) posisi.Add(new JsonObject{["x"]=t.X,["y"]=t.Y,["z"]=t.Z});
+                        argumen["holes"]=new JsonObject{["holeType"]=block.Holes.HoleType,["standard"]=block.Holes.Standard,
+                            ["fastenerSize"]=block.Holes.FastenerSize,["positions"]=posisi};
+                    }
+                    var result=await _blockFlow.ExecuteAsync(argumen).ConfigureAwait(false);
                     if(result.Ok && result.Verification?.Verdict==MikosAI.Core.Execution.Verdict.Pass)
-                        _panel?.KirimPesanChat("ai",$"Balok {block.Width} × {block.Height} × {block.Depth} mm sudah dibuat. Ukuran, volume, constraint dan hasil simpan–buka ulang cocok.\nTersimpan: {result.Evidence?.DocumentPath}"+
-                            (result.Verification.ManualReviewRequired ? "\nHasil pilot: periksa part ini sebelum menganggap pekerjaan final." : string.Empty));
-                    else _panel?.KirimPesanChat("galat",$"Pembuatan balok berhenti: {result.Error?.Message ?? result.Verification?.Verdict.ToString()}. Part yang sempat dibuat dibiarkan untuk diperiksa; tidak diulang otomatis.");
+                        _panel?.KirimPesanChat("ai",$"{(block.Holes is null ? "Balok" : "Plat")} {block.Width} × {block.Height} × {block.Depth} mm{keteranganLubang} sudah dibuat. "
+                            +(block.Holes is null ? "Ukuran, volume, constraint" : "Ukuran, posisi lubang, standar dan ukuran fastener")+$" dan hasil simpan–buka ulang cocok.\nTersimpan: {result.Evidence?.DocumentPath}"
+                            +(result.Verification.ManualReviewRequired ? "\nHasil pilot: periksa part ini sebelum menganggap pekerjaan final." : string.Empty));
+                    else _panel?.KirimPesanChat("galat",$"Pembuatan {benda} berhenti: {result.Error?.Message ?? result.Verification?.Verdict.ToString()}. Part yang sempat dibuat dibiarkan untuk diperiksa; tidak diulang otomatis.");
                     return;
                 }
                 if (_provider is null)

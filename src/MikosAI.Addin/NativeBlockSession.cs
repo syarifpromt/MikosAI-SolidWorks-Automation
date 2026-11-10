@@ -20,14 +20,15 @@ namespace MikosAI.Addin
         private readonly Func<SolidWorksBlockWriter> _writer;
         private readonly Func<SolidWorksReader?> _reader;
         private readonly double _width,_height,_depth;
+        private readonly HoleSpec? _holes;
         private readonly string _path;
         private readonly bool _review;
         private readonly HostDiagnostics _diagnostics;
         private SolidWorksBlockWriter? _usedWriter;
         private ToolResult? _result;
         internal NativeBlockSession(IMainThreadDispatcher dispatcher,Func<SolidWorksBlockWriter> writer,Func<SolidWorksReader?> reader,
-            double width,double height,double depth,string path,bool review,HostDiagnostics diagnostics)
-        { _dispatcher=dispatcher;_writer=writer;_reader=reader;_width=width;_height=height;_depth=depth;_path=path;_review=review;_diagnostics=diagnostics; }
+            double width,double height,double depth,HoleSpec? holes,string path,bool review,HostDiagnostics diagnostics)
+        { _dispatcher=dispatcher;_writer=writer;_reader=reader;_width=width;_height=height;_depth=depth;_holes=holes;_path=path;_review=review;_diagnostics=diagnostics; }
 
         public Task<ToolResult> ExecuteAsync(string name,JsonObject arguments,CancellationToken cancellationToken=default)
             => _dispatcher.InvokeAsync(()=>
@@ -38,14 +39,28 @@ namespace MikosAI.Addin
                 {
                     writer=_writer();
                     _usedWriter=writer;
-                    var raw=writer.Run(BlockPilotPlan.Create(_width,_height,_depth),_path,null);
+                    var raw=writer.Run(BlockPilotPlan.Create(_width,_height,_depth,_holes),_path,null);
                     var json=JsonSerializer.SerializeToElement(raw);
                     var data=json.EnumerateObject().ToDictionary(p=>p.Name,p=>(object?)p.Value.Clone());
                     data["width"]=_width;data["height"]=_height;data["depth"]=_depth;
+                    var setelahBuka=json.GetProperty("afterReopen");
+                    var checks=new List<VerificationCheck>{VerificationCheck.Pass("save_reopen_readback",setelahBuka.Clone())};
+                    var fitur=new List<string>{json.GetProperty("sketchName").GetString()!,json.GetProperty("featureName").GetString()!};
+                    if(_holes is not null)
+                    {
+                        // Yang dilaporkan sebagai `holes` adalah pembacaan SETELAH
+                        // reopen, bukan data dari langkah hole_wizard. Writer
+                        // mengisi keduanya; hanya yang kedua yang jujur disebut
+                        // terverifikasi dari berkas tersimpan.
+                        var lubang=setelahBuka.GetProperty("holes");
+                        data["holes"]=lubang.Clone();
+                        checks.Add(VerificationCheck.Pass("holes_after_reopen",lubang.Clone()));
+                        fitur.Add(lubang.GetProperty("featureName").GetString()!);
+                    }
                     _result=new ToolResult{Ok=true,CapabilityId=ParametricBlockFlow.CapabilityId,IsMutation=true,ModelChanged=true,Data=data,
-                        Verification=VerificationGate.Evaluate(new[]{VerificationCheck.Pass("save_reopen_readback",json.GetProperty("afterReopen").Clone())},manualReviewRequired:_review),
+                        Verification=VerificationGate.Evaluate(checks,manualReviewRequired:_review),
                         Evidence=new ToolEvidence{DocumentPath=_path,SolidWorksRevision=json.GetProperty("solidworksRevision").GetString(),
-                            FeatureNames=new[]{json.GetProperty("sketchName").GetString()!,json.GetProperty("featureName").GetString()!}}};
+                            FeatureNames=fitur.ToArray()}};
                     return _result;
                 }
                 catch(Exception e)
@@ -75,7 +90,10 @@ namespace MikosAI.Addin
                 var mass=reader.BacaPropertiMassa();
                 if(errorsBefore!=_diagnostics.Errors.Count)
                     return new[]{VerificationCheck.Blocked("acceptance_readback","Pembacaan acceptance parsial; lihat diagnostik host.")};
-                var names=_result.Evidence!.FeatureNames!.ToArray();
+                // Hanya profil dan boss. Nama fitur lubang ikut tercatat di
+                // evidence, tapi dimensinya milik basis data Hole Wizard, bukan
+                // dimensi desain yang kita tetapkan.
+                var names=_result.Evidence!.FeatureNames!.Take(2).ToArray();
                 var dimensions=_usedWriter!.ReadOwnedDimensions(_path,names);
                 var profile=JsonSerializer.SerializeToElement(dimensions[names[0]]);
                 var boss=JsonSerializer.SerializeToElement(dimensions[names[1]]);
@@ -92,7 +110,12 @@ namespace MikosAI.Addin
                     {
                         "rebuild_clean"=>!tree.RebuildRequired && tree.Features.Count>0 && tree.Features.All(f=>!f.HasError),
                         "all_sketches_fully_defined"=>sketches.Count==1 && sketches.All(s=>s.ConstrainedStatus==SketchConstraintStatus.FullyDefined),
-                        "nonzero_volume"=>box.BodyCount==1 && Math.Abs(mass.VolumeMm3-_width*_height*_depth)<=1e-3,
+                        // Dengan lubang, volume TIDAK dipatok angkanya - diameter
+                        // counterbore dari basis data, bukan dari kita. Yang
+                        // dipatok arahnya: berkurang, tapi tidak habis.
+                        "nonzero_volume"=>box.BodyCount==1 && (_holes is null
+                            ? Math.Abs(mass.VolumeMm3-_width*_height*_depth)<=1e-3
+                            : mass.VolumeMm3>0 && mass.VolumeMm3<_width*_height*_depth-1e-6),
                         "bounding_box_within"=>box.BodyCount==1 && Math.Abs(box.Min.X)<=1e-6 && Math.Abs(box.Min.Y)<=1e-6 && Math.Abs(box.Min.Z)<=1e-6 &&
                             Math.Abs(box.Max.X-_width)<=1e-6 && Math.Abs(box.Max.Y-_height)<=1e-6 && Math.Abs(box.Max.Z-_depth)<=1e-6,
                         _=>(bool?)null,
